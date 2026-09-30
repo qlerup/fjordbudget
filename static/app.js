@@ -13,7 +13,9 @@ const dateName = date => new Intl.DateTimeFormat('da-DK', {day:'numeric', month:
 async function api(url, options={}) {
   const response = await fetch(url, {...options, headers:{'Content-Type':'application/json', 'X-CSRF-Token':csrf, ...options.headers}});
   if(response.status===401){window.location.assign('/login');throw new Error('Log ind for at fortsætte.');}
-  const data = await response.json();
+  let data;
+  try { data = await response.json(); }
+  catch { throw new Error(`Serveren gav et ugyldigt svar (HTTP ${response.status}). Prøv igen om lidt.`); }
   if (!response.ok) throw new Error(data.error || 'Forespørgslen mislykkedes.');
   return data;
 }

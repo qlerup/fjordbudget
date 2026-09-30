@@ -88,6 +88,23 @@ class AppTests(unittest.TestCase):
                     provider.request(method,path)
                 request.assert_not_called()
 
+    def test_authorization_redirect_accepts_both_provider_hosts_only(self):
+        for url in ['https://auth.enablebanking.com/ais/start?sessionid=test',
+                    'https://tilisy.enablebanking.com/ais/start?sessionid=test']:
+            with self.subTest(url=url), patch.object(self.provider, 'request', return_value={'url':url}):
+                response=self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
+                self.assertEqual(response.status_code,200)
+                self.assertEqual(response.json['url'],url)
+        for url in ['http://tilisy.enablebanking.com/start', 'https://evil.example/start',
+                    'https://tilisy.enablebanking.com.evil.example/start',
+                    'https://tilisy.enablebanking.com:8443/start',
+                    'https://user@tilisy.enablebanking.com/start']:
+            with self.subTest(url=url), patch.object(self.provider, 'request', return_value={'url':url}):
+                response=self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
+                self.assertEqual(response.status_code,502)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM oauth_states').fetchone()[0],2)
+
     def test_callback_is_browser_bound_single_use_and_preserves_account_on_reconnect(self):
         def start():
             self.assertEqual(self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers).status_code,200)

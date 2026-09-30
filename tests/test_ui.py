@@ -42,6 +42,16 @@ class UITests(unittest.TestCase):
         self.assertEqual(self.errors,[])
         self.context.close()
 
+    def test_api_handles_html_gateway_error(self):
+        self.page.route('**/api/bank/connect', lambda route: route.fulfill(
+            status=502, content_type='text/html', body='<!DOCTYPE html><h1>Bad gateway</h1>'))
+        message=self.page.evaluate("""async () => {
+            try { await api('/api/bank/connect', {method:'POST',body:'{}'}); }
+            catch (error) { return error.message; }
+        }""")
+        self.assertIn('HTTP 502',message)
+        self.assertNotIn('Unexpected token',message)
+
     def test_account_navigation_search_and_category_edit(self):
         self.page.locator('[data-account="demo-daily"]').click()
         expect(self.page.locator('#accountFilter')).to_have_value('demo-daily')

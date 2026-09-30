@@ -267,7 +267,10 @@ def create_app(config=None):
         result = provider.request('POST', '/auth', json={'access': {'valid_until': valid_until}, 'aspsp': {'name': name, 'country': 'DK'},
                                   'state': state, 'redirect_url': public_url()+'/bank/callback', 'psu_type': 'personal', 'language': 'da'})
         url = urlparse(result['url'])
-        if url.scheme != 'https' or url.hostname != 'auth.enablebanking.com':
+        if (url.scheme != 'https'
+                or url.hostname not in {'auth.enablebanking.com', 'tilisy.enablebanking.com'}
+                or url.port not in (None, 443)
+                or url.username is not None or url.password is not None):
             raise BankError('Banktjenesten gav en uventet godkendelsesadresse.')
         with connect(db_path) as db:
             db.execute('DELETE FROM oauth_states WHERE expires<?', (time.time(),))
