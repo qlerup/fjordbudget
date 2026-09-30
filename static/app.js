@@ -81,12 +81,13 @@ async function loadTransactions() {
 }
 async function refresh() {
   const generation=++dashboardGeneration;
+  const requestedSource=source;
   transactionsGeneration++;
   showError('loadError','');
   try {
     const result=await api('/api/dashboard?'+query());
     if(generation!==dashboardGeneration)return;
-    dashboard=result; renderDashboard();
+    dashboard=result; dashboardSource=requestedSource; renderDashboard();
     await loadTransactions();
     if(generation!==dashboardGeneration)return;
     $('loading').hidden=true; $('appContent').hidden=false;
@@ -177,6 +178,18 @@ function openBudget() {
   $('budgetFields').innerHTML=dashboard.categories.map((c,i)=>`<label class="budget-field"><span class="budget-category"><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><input name="${esc(c.name)}" aria-label="Budget for ${esc(c.name)}" type="number" min="0" max="1000000000" step="0.01" required value="${c.budget/100}"></label>`).join('');
   showError('budgetError',''); $('budgetDialog').showModal();
 }
+let accountSetupDismissed=false, dashboardSource=null;
+function openAccountSetup(){
+  if(source!=='live' || dashboardSource!=='live' || syncPolling || accountSetupDismissed || document.querySelector('dialog[open]'))return;
+  const accounts=(dashboard?.accounts || []).filter(a=>!a.custom_name);
+  if(!accounts.length)return;
+  $('accountSetupFields').innerHTML=accounts.map((a,i)=>`<div class="account-setup-row">
+    <div class="account-setup-summary"><div><strong>${esc(a.bank)}</strong><small>${esc(a.name)} · ${a.last4?'•• '+esc(a.last4):esc(a.currency)}</small></div>
+    <strong>${a.balance===null?'Saldo ikke hentet':esc(money(a.balance,a.currency,2))}</strong></div>
+    <label for="setupAccount${i}">Navn på konto ${i+1}</label>
+    <input id="setupAccount${i}" name="${esc(a.id)}" maxlength="100" required placeholder="Fx Kostkonto eller Budgetkonto" autocomplete="off"></div>`).join('');
+  showError('accountSetupError','');$('accountSetupDialog').showModal();
+}
 async function pollSync() {
   if(syncPolling)return;
   syncPolling=true;
@@ -188,6 +201,7 @@ async function pollSync() {
       if(result.running){setTimeout(tick,1500);return;}
       syncPolling=false;
       if(result.message){toast(result.message);await refresh(); if(source==='live')$('syncMessage').textContent=result.message;}
+      openAccountSetup();
     }catch(error){syncPolling=false;$('syncButton').disabled=false;showError('loadError',error.message);}
   };
   await tick();
@@ -271,12 +285,17 @@ async function init(){
     const bankResult=new URLSearchParams(location.search).get('bank_result');
     if(bankResult){
       history.replaceState({},'', '/');
-      const messages={connected:'Banken er forbundet. Klik Opdater saldi for at hente posteringer.',cancelled:'Bankforbindelsen blev annulleret.',invalid:'Godkendelsen er udløbet eller åbnet i en anden browser. Prøv igen.',failed:'Bankforbindelsen kunne ikke gemmes. Kontroller opsætningen og prøv igen.'};
+      const messages={connected:'Banken er forbundet. Henter konti, saldi og posteringer …',cancelled:'Bankforbindelsen blev annulleret.',invalid:'Godkendelsen er udløbet eller åbnet i en anden browser. Prøv igen.',failed:'Bankforbindelsen kunne ikke gemmes. Kontroller opsætningen og prøv igen.'};
       if(bankResult==='connected')source='live';
       toast(messages[bankResult]||'Bankens godkendelse er afsluttet.');
     }
     await switchSource(source);
-    const status=await api('/api/sync'); if(status.running)await pollSync();
+    const status=await api('/api/sync');
+    if(status.running)await pollSync();
+    else if(bankResult==='connected'){
+      try{await api('/api/sync',{method:'POST',body:'{}'});await pollSync();}
+      catch(error){showError('loadError',error.message);openAccountSetup();}
+    }else openAccountSetup();
   }catch(error){$('loading').hidden=true;showError('loadError',error.message);}
 }
 if($('logoutButton'))$('logoutButton').onclick=async()=>{await api('/logout',{method:'POST',body:'{}'});window.location.assign('/login');};
@@ -290,5 +309,16 @@ $('accountNameForm').addEventListener('submit',async event=>{
       method:'PUT',body:JSON.stringify({name:$('accountNameInput').value})});
     await refresh();$('accountNameDialog').close();toast('Kontonavnet er gemt');
   }catch(error){showError('accountNameError',error.message);}
+  finally{button.disabled=false;}
+});
+
+$('accountSetupDialog').addEventListener('close',()=>{accountSetupDismissed=true;});
+$('accountSetupForm').addEventListener('submit',async event=>{
+  event.preventDefault();const button=$('saveAccountSetup');button.disabled=true;
+  showError('accountSetupError','');
+  try{
+    await api('/api/accounts/setup',{method:'PUT',body:JSON.stringify({names:Object.fromEntries(new FormData(event.currentTarget))})});
+    await refresh();$('accountSetupDialog').close();toast('Dine konti er klar');
+  }catch(error){showError('accountSetupError',error.message);}
   finally{button.disabled=false;}
 });

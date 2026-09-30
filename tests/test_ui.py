@@ -42,6 +42,40 @@ class UITests(unittest.TestCase):
         self.assertEqual(self.errors,[])
         self.context.close()
 
+    def test_account_setup_after_bank_sync_and_no_repeat_after_save(self):
+        data=self.app.test_client().get('/api/dashboard?source=demo').json
+        data['accounts'][0]['custom_name']='Already named'
+        def dashboard(route):
+            route.fulfill(json=data)
+        def save(route):
+            names=route.request.post_data_json['names']
+            for account in data['accounts']:
+                if account['id'] in names:
+                    account['custom_name']=names[account['id']]
+                    account['name']=names[account['id']]
+            route.fulfill(json={'ok':True})
+        self.page.route('**/api/dashboard?*',dashboard)
+        self.page.route('**/api/accounts/setup',save)
+        calls=[]
+        def sync(route):
+            calls.append(route.request.method)
+            route.fulfill(json={'running':False,'message':'Fetched','error':False})
+        self.page.route('**/api/sync',sync)
+        self.page.set_viewport_size({'width':390,'height':844})
+        self.page.goto(self.url+'/?bank_result=connected')
+        expect(self.page.locator('#accountSetupDialog')).to_be_visible()
+        self.assertIn('POST',calls)
+        expect(self.page.locator('#accountSetupFields input')).to_have_count(2)
+        expect(self.page.locator('#accountSetupFields')).to_contain_text('9036')
+        self.assertEqual(self.page.locator('#accountSetupDialog').evaluate('(el)=>el.scrollWidth<=el.clientWidth'),True)
+        self.page.locator('#setupAccount0').fill('Bills')
+        self.page.locator('#setupAccount1').fill('Savings')
+        self.page.locator('#saveAccountSetup').click()
+        expect(self.page.locator('#accountSetupDialog')).not_to_be_visible()
+        self.page.reload()
+        expect(self.page.locator('#appContent')).to_be_visible()
+        expect(self.page.locator('#accountSetupDialog')).not_to_be_visible()
+
     def test_api_handles_html_gateway_error(self):
         self.page.route('**/api/bank/connect', lambda route: route.fulfill(
             status=502, content_type='text/html', body='<!DOCTYPE html><h1>Bad gateway</h1>'))

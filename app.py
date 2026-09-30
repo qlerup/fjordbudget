@@ -316,6 +316,25 @@ def create_app(config=None):
         except (BankError, KeyError, ValueError):
             return redirect('/?bank_result=failed')
 
+    @app.put('/api/accounts/setup')
+    def setup_accounts():
+        body = request.get_json()
+        names = body.get('names') if isinstance(body, dict) else None
+        if not isinstance(names, dict) or not names:
+            raise ValueError('Udfyld kontonavnene.')
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            for account_id, name in names.items():
+                if (not isinstance(name, str) or not 1 <= len(name.strip()) <= 100
+                        or any(ord(char) < 32 for char in name)):
+                    raise ValueError('Hver konto skal have et navn på 1–100 tegn uden linjeskift.')
+                account = db.execute("SELECT custom_name FROM accounts WHERE id=? AND source='live'", (account_id,)).fetchone()
+                if account is None:
+                    raise ValueError('En af kontiene findes ikke længere. Genindlæs siden.')
+                if not account['custom_name']:
+                    db.execute('UPDATE accounts SET custom_name=? WHERE id=?', (name.strip(), account_id))
+        return jsonify(ok=True)
+
     @app.put('/api/accounts/<account_id>/name')
     def rename_account(account_id):
         body = request.get_json()

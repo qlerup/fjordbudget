@@ -87,5 +87,10 @@
 <div id="accountNameError" class="error-box" role="alert" hidden></div>
 <div class="dialog-actions"><button type="button" class="button quiet" data-close="accountNameDialog">Annuller</button><button id="saveAccountName" class="button primary" type="submit">Gem navn</button></div>
 </form></dialog>
+<dialog id="accountSetupDialog" aria-labelledby="accountSetupTitle">
+<div class="dialog-header"><p class="eyebrow">KOM GODT I GANG</p><button class="icon-button" data-close="accountSetupDialog" aria-label="Luk">×</button></div>
+<h2 id="accountSetupTitle">Giv dine konti et navn</h2><p class="dialog-intro">Brug saldoen og kontonummerets sidste cifre til at kende dine konti. Navnene gemmes i FjordBudget, så dit overblik bliver nemt at bruge.</p>
+<form id="accountSetupForm"><div id="accountSetupFields"></div><div id="accountSetupError" class="error-box" role="alert" hidden></div>
+<div class="dialog-actions"><button type="button" class="button quiet" data-close="accountSetupDialog">Gør det senere</button><button id="saveAccountSetup" type="submit" class="button primary">Gem og kom i gang</button></div></form></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 </body></html>

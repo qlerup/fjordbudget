@@ -88,6 +88,19 @@ class AppTests(unittest.TestCase):
                     provider.request(method,path)
                 request.assert_not_called()
 
+    def test_setup_names_are_atomic_and_preserve_existing_names(self):
+        self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
+        state=self.provider.calls[-1][2]['json']['state']
+        self.client.get('/bank/callback?state='+state+'&code=abc')
+        aid=self.client.get('/api/dashboard?source=live').json['accounts'][0]['id']
+        url='/api/accounts/setup'
+        self.assertEqual(self.client.put(url,json={'names':{aid:'Food'}}).status_code,403)
+        self.assertEqual(self.client.put(url,json={'names':{aid:'Food','missing':'Bad'}},headers=self.headers).status_code,400)
+        self.assertIsNone(self.client.get('/api/dashboard?source=live').json['accounts'][0]['custom_name'])
+        self.assertEqual(self.client.put(url,json={'names':{aid:'Food'}},headers=self.headers).status_code,200)
+        self.client.put(url,json={'names':{aid:'Changed'}},headers=self.headers)
+        self.assertEqual(self.client.get('/api/dashboard?source=live').json['accounts'][0]['name'],'Food')
+
     def test_account_label_uses_description_then_product_never_holder(self):
         self.assertEqual(account_name({'name':'Holder','details':' Holiday ','product':'Savings'}),'Holiday')
         self.assertEqual(account_name({'name':'Holder','details':' ','product':'Savings'}),'Savings')
