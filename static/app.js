@@ -24,10 +24,10 @@ function showError(id, message) { $(id).textContent=message; $(id).hidden=!messa
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false; toastTimer=setTimeout(()=>{$('toast').hidden=true;},5000); }
 function setView(next) {
   view=next;
-  const titles={overview:['Din økonomi, samlet.','Alle dine konti. Ét enkelt overblik.','Overblik'], accounts:['Alle konti. Helt enkelt.','Se din saldo, og gå på opdagelse i dine posteringer.','Mine konti'], transactions:['De små tal fortæller.','Find og kategorisér dine bogførte posteringer.','Posteringer'], budget:['Plads til dine planer.','Sæt et budget, der passer til din hverdag.','Mit budget']};
+  const titles={categories:['Dine kategorier.','Tilpas kategorier til din økonomi.','Kategorier'],overview:['Din økonomi, samlet.','Alle dine konti. Ét enkelt overblik.','Overblik'], accounts:['Alle konti. Helt enkelt.','Se din saldo, og gå på opdagelse i dine posteringer.','Mine konti'], transactions:['De små tal fortæller.','Find og kategorisér dine bogførte posteringer.','Posteringer'], budget:['Plads til dine planer.','Sæt et budget, der passer til din hverdag.','Mit budget']};
   $('pageTitle').textContent=titles[next][0]; $('pageSubtitle').textContent=titles[next][1]; $('breadcrumb').textContent=titles[next][2];
   document.querySelectorAll('.nav-item[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===next); b.setAttribute('aria-current',b.dataset.view===next?'page':'false');});
-  document.querySelectorAll('[data-section]').forEach(el=>{ const section=el.dataset.section; el.hidden=next==='overview'? section==='budget' : next==='budget'?!['summary','budget'].includes(section):section!==next; });
+  document.querySelectorAll('[data-section]').forEach(el=>{ const section=el.dataset.section; el.hidden=next==='overview'? ['budget','categories'].includes(section) : next==='budget'?!['summary','budget'].includes(section):section!==next; });
 }
 function switchSource(next) {
   source=next; localStorage.setItem('fjordbudget-source',source);
@@ -209,7 +209,7 @@ async function pollSync() {
 document.addEventListener('click',async event=>{
   const connect=event.target.closest('[data-connect]'); if(connect){await openBank();return;}
   const close=event.target.closest('[data-close]'); if(close){$(close.dataset.close).close();return;}
-  const nav=event.target.closest('[data-view]'); if(nav){setView(nav.dataset.view);window.scrollTo({top:0,behavior:'smooth'});return;}
+  const nav=event.target.closest('[data-view]'); if(nav){if(nav.dataset.view==='categories'){try{await loadCategories();}catch(error){showError('loadError',error.message);}}setView(nav.dataset.view);window.scrollTo({top:0,behavior:'smooth'});return;}
   const mode=event.target.closest('[data-source]'); if(mode){await switchSource(mode.dataset.source);return;}
   const rename=event.target.closest('[data-rename]'); if(rename){
     const item=dashboard.accounts.find(a=>a.id===rename.dataset.rename);
@@ -321,4 +321,31 @@ $('accountSetupForm').addEventListener('submit',async event=>{
     await refresh();$('accountSetupDialog').close();toast('Dine konti er klar');
   }catch(error){showError('accountSetupError',error.message);}
   finally{button.disabled=false;}
+});
+
+let editableCategories=[];
+async function loadCategories(){
+  const result=await api('/api/categories');editableCategories=result.items;
+  config.categories=result.items.map(c=>c.name);config.colors=result.items.map(c=>c.color);
+  const selected=$('categoryFilter').value;
+  $('categoryFilter').innerHTML='<option value="">Alle kategorier</option>'+config.categories.map(c=>`<option>${esc(c)}</option>`).join('');
+  if(config.categories.includes(selected))$('categoryFilter').value=selected;
+  $('categoryList').innerHTML=result.items.map(c=>`<div class="category-management-row"><span><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span>${c.protected?'<small class="muted">Fast kategori</small>':`<button class="button quiet" data-delete-category="${esc(c.name)}" aria-label="Slet ${esc(c.name)}">Slet</button>`}</div>`).join('');
+}
+$('categoryCreateForm').addEventListener('submit',async event=>{
+  event.preventDefault();const button=event.submitter;button.disabled=true;showError('categoryError','');
+  try{await api('/api/categories',{method:'POST',body:JSON.stringify({name:$('newCategoryName').value})});$('newCategoryName').value='';await loadCategories();await refresh();toast('Kategori tilføjet');}
+  catch(error){showError('categoryError',error.message);}finally{button.disabled=false;}
+});
+$('categoryList').addEventListener('click',event=>{
+  const button=event.target.closest('[data-delete-category]');if(!button)return;
+  const name=button.dataset.deleteCategory;$('categoryDeleteForm').dataset.category=name;
+  $('categoryDeleteText').textContent=`Alle posteringer, regler og budgetbeløb i “${name}” flyttes, før kategorien slettes. Dette gælder både bankdata og demodata.`;
+  $('categoryReplacement').innerHTML=editableCategories.filter(c=>![name,'Indkomst','Overførsler'].includes(c.name)).map(c=>`<option>${esc(c.name)}</option>`).join('');
+  $('categoryReplacement').value='Andet';showError('categoryDeleteError','');$('categoryDeleteDialog').showModal();
+});
+$('categoryDeleteForm').addEventListener('submit',async event=>{
+  event.preventDefault();const button=event.submitter;button.disabled=true;showError('categoryDeleteError','');
+  try{await api('/api/categories',{method:'DELETE',body:JSON.stringify({name:event.currentTarget.dataset.category,replacement:$('categoryReplacement').value})});await loadCategories();await refresh();$('categoryDeleteDialog').close();toast('Kategorien er slettet, og data er flyttet');}
+  catch(error){showError('categoryDeleteError',error.message);}finally{button.disabled=false;}
 });

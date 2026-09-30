@@ -11,7 +11,7 @@ from urllib.parse import quote
 import jwt
 import requests
 
-from db import CURRENCIES, categorize, cents, connect, transaction_title
+from db import CURRENCIES, categorize, cents, connect, transaction_title, category_list
 
 
 class BankError(Exception):
@@ -136,9 +136,10 @@ def import_account(db_path, account_id, transactions, balances):
         rules = dict(db.execute('SELECT title,category FROM category_rules WHERE source=?', (account['source'],)).fetchall())
         eligible = [b for b in balances if b.get('balance_type') in ranking and b.get('balance_amount', {}).get('currency') == account['currency']]
         balance = min(eligible, key=lambda b: ranking[b['balance_type']]) if eligible else None
+        categories = {c['name'] for c in category_list(db)}
         for row in rows:
             rule = rules.get(transaction_title(row[2]))
-            row = (*row[:-1], rule or row[-1], int(rule is not None))
+            row = (*row[:-1], rule or (row[-1] if row[-1] in categories else 'Andet'), int(rule is not None))
             db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual)
               VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
               booked_on=excluded.booked_on, description=excluded.description, amount=excluded.amount,

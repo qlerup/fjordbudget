@@ -231,6 +231,32 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(imported_id,)).fetchone()[0],'Fritid')
 
+    def test_category_management_moves_rules_transactions_and_budgets(self):
+        url='/api/categories'
+        self.assertEqual(self.client.post(url,json={'name':'Travel'}).status_code,403)
+        self.assertEqual(self.client.post(url,json={'name':'Travel'},headers=self.headers).status_code,200)
+        self.assertEqual(self.client.post(url,json={'name':' TRAVEL '},headers=self.headers).status_code,400)
+        self.assertIn('Travel',self.client.get('/api/config').json['categories'])
+        self.assertIn('Travel',[c['name'] for c in self.client.get('/api/dashboard').json['categories']])
+        with connect(self.db) as db:
+            tid=db.execute("SELECT id FROM transactions WHERE account_id='demo-daily' LIMIT 1").fetchone()[0]
+            db.execute("INSERT INTO budgets VALUES ('live','2025-01','DKK','Travel',12300)")
+            db.execute("INSERT INTO budgets VALUES ('live','2025-01','DKK','Andet',1000)")
+        self.assertEqual(self.client.patch('/api/transactions/'+str(tid),json={'category':'Travel'},headers=self.headers).status_code,200)
+        self.assertEqual(self.client.delete(url,json={'name':'Travel','replacement':'Andet'},headers=self.headers).status_code,200)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute('SELECT category FROM transactions WHERE id=?',(tid,)).fetchone()[0],'Andet')
+            self.assertEqual(db.execute("SELECT count(*) FROM category_rules WHERE category='Travel'").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT amount FROM budgets WHERE source='live' AND month='2025-01' AND category='Andet'").fetchone()[0],13300)
+        self.assertEqual(self.client.delete(url,json={'name':'Andet','replacement':'Bolig'},headers=self.headers).status_code,400)
+        self.client.delete(url,json={'name':'Shopping','replacement':'Andet'},headers=self.headers)
+        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        self.assertNotIn('Shopping',self.client.get('/api/config').json['categories'])
+        raw={'status':'BOOK','booking_date':'2026-09-01','credit_debit_indicator':'DBIT','transaction_amount':{'amount':'12','currency':'DKK'},'remittance_information':['Matas'],'entry_reference':'deleted-default'}
+        import_account(self.db,'demo-daily',[raw],[])
+        with connect(self.db) as db:
+            self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(normalize_transactions([raw])[0][0],)).fetchone()[0],'Andet')
+
     def test_provider_pagination_continues_through_empty_page(self):
         provider=EnableBanking('unused','unused')
         with patch.object(provider,'request',side_effect=[{'transactions':[],'continuation_key':'next'}, {'transactions':[{'entry_reference':'a'}]}]) as req:

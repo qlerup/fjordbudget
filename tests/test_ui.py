@@ -76,6 +76,26 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#appContent')).to_be_visible()
         expect(self.page.locator('#accountSetupDialog')).not_to_be_visible()
 
+    def test_category_create_budget_delete_and_mobile(self):
+        self.page.set_viewport_size({'width':390,'height':844})
+        self.page.locator('[data-view="categories"]').click()
+        self.page.locator('#newCategoryName').fill('Holiday <test>')
+        self.page.get_by_role('button',name='Tilføj kategori',exact=True).click()
+        expect(self.page.locator('#categoryList')).to_contain_text('Holiday <test>')
+        self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
+        self.page.locator('[data-view="budget"]').first.click()
+        self.page.locator('.full-budget .edit-budget').click()
+        expect(self.page.get_by_label('Budget for Holiday <test>')).to_be_visible()
+        self.page.keyboard.press('Escape')
+        self.page.locator('[data-view="categories"]').click()
+        self.page.get_by_role('button',name='Slet Holiday <test>',exact=True).click()
+        self.page.get_by_role('button',name='Flyt og slet',exact=True).click()
+        expect(self.page.locator('#categoryDeleteDialog')).not_to_be_visible()
+        expect(self.page.locator('#categoryList')).not_to_contain_text('Holiday <test>')
+        self.page.reload()
+        self.page.locator('[data-view="categories"]').click()
+        expect(self.page.locator('#categoryList')).not_to_contain_text('Holiday <test>')
+
     def test_api_handles_html_gateway_error(self):
         self.page.route('**/api/bank/connect', lambda route: route.fulfill(
             status=502, content_type='text/html', body='<!DOCTYPE html><h1>Bad gateway</h1>'))

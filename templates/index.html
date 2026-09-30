@@ -31,7 +31,7 @@
     <button class="nav-item" data-view="accounts"><svg><use href="#icon-wallet"/></svg>Mine konti<span id="accountCount" class="nav-count">0</span></button>
     <button class="nav-item" data-view="transactions"><svg><use href="#icon-arrows"/></svg>Posteringer</button>
     <button class="nav-item" data-view="budget"><svg><use href="#icon-chart"/></svg>Mit budget</button>
-  </nav>
+  <button class="nav-item" data-view="categories" aria-label="Kategorier"><svg><use href="#icon-grid"/></svg>Kategorier</button></nav>
   <p class="nav-label second-label">FORBINDELSER</p>
   <button class="nav-item" data-connect><svg><use href="#icon-bank"/></svg>Mine banker</button>
   <div class="sidebar-bottom"><div class="privacy-icon"><svg><use href="#icon-shield"/></svg></div><strong>Din økonomi. Dit overblik.</strong><p>Kun læseadgang til banken.<br>Ingen betalinger eller overførsler.</p><span class="local-status"><i></i> {{ 'Beskyttet med FjordHub-login' if managed else 'Kører lokalt på din computer' }}</span></div>
@@ -57,7 +57,13 @@
         <section class="panel cashflow"><div class="section-heading"><div><h2>Ind og ud</h2><p>Din økonomi måned for måned</p></div><div class="legend"><span><i class="income-dot"></i>Indtægter</span><span><i class="expense-dot"></i>Udgifter</span></div></div><div id="cashflowChart" class="cashflow-chart"></div><div class="chart-footer"><span>Overførsler mellem konti er ikke medregnet</span><strong id="netCashflow"></strong></div></section>
         <section class="panel budget-panel"><div class="section-heading"><div><h2>Dit månedsbudget</h2><p>Giv dine penge en retning</p></div><button class="text-button edit-budget">Rediger <span>↗</span></button></div><div id="budgetProgress"></div><div id="budgetPreview"></div><button class="budget-detail text-button" data-view="budget">Se hele budgettet <span>→</span></button></section>
       </div>
-      <section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><div id="budgetFull"></div></section>
+      <section class="panel" data-section="categories" hidden>
+<div class="section-heading"><div><h2>Dine kategorier</h2><p>Kategorierne bruges på tværs af dine konti og budgetter.</p></div></div>
+<form id="categoryCreateForm" class="category-create"><label for="newCategoryName">Ny kategori</label><input id="newCategoryName" maxlength="60" required placeholder="Fx Børn eller Ferie"><button class="button primary" type="submit">Tilføj kategori</button></form>
+<div id="categoryError" class="error-box" role="alert" hidden></div><div id="categoryList"></div>
+<p class="small muted">Andet, Indkomst og Overførsler er faste kategorier, som bruges i overblikkets beregninger. Ved sletning flyttes posteringer, regler og budgetbeløb til den kategori, du vælger.</p>
+</section>
+<section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><div id="budgetFull"></div></section>
       <section class="panel transactions-panel" data-section="transactions"><div class="section-heading"><div><h2>Posteringer</h2><p id="transactionSubtitle">Dine bogførte ind- og udbetalinger</p></div><span class="subtle-tag">Kun bogførte</span></div>
         <p class="small muted">Når du ændrer en kategori, gælder det alle eksisterende og fremtidige posteringer med samme titel på tværs af dine konti.</p>
         <div class="transaction-filters"><label class="search-field"><svg><use href="#icon-search"/></svg><input id="search" type="search" placeholder="Søg i posteringer …" aria-label="Søg i posteringer"></label><label class="sr-only" for="accountFilter">Konto</label><select id="accountFilter"><option value="">Alle konti</option></select><label class="sr-only" for="categoryFilter">Kategori</label><select id="categoryFilter"><option value="">Alle kategorier</option></select></div>
@@ -93,5 +99,6 @@
 <h2 id="accountSetupTitle">Giv dine konti et navn</h2><p class="dialog-intro">Brug saldoen og kontonummerets sidste cifre til at kende dine konti. Navnene gemmes i FjordBudget, så dit overblik bliver nemt at bruge.</p>
 <form id="accountSetupForm"><div id="accountSetupFields"></div><div id="accountSetupError" class="error-box" role="alert" hidden></div>
 <div class="dialog-actions"><button type="button" class="button quiet" data-close="accountSetupDialog">Gør det senere</button><button id="saveAccountSetup" type="submit" class="button primary">Gem og kom i gang</button></div></form></dialog>
+<dialog id="categoryDeleteDialog" aria-labelledby="categoryDeleteTitle"><h2 id="categoryDeleteTitle">Slet kategori</h2><p id="categoryDeleteText"></p><form id="categoryDeleteForm"><label for="categoryReplacement">Flyt til kategori</label><select id="categoryReplacement" class="full-width" required></select><div id="categoryDeleteError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="categoryDeleteDialog">Annuller</button><button class="button primary" type="submit">Flyt og slet</button></div></form></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 </body></html>

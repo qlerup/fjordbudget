@@ -60,6 +60,9 @@ def initialize(path):
           source TEXT NOT NULL CHECK(source IN ('demo','live')),
           title TEXT NOT NULL, category TEXT NOT NULL,
           PRIMARY KEY(source,title));
+        CREATE TABLE IF NOT EXISTS categories (
+          name TEXT PRIMARY KEY, color TEXT NOT NULL, protected INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS budgets (
           source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,
           category TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>=0),
@@ -70,9 +73,17 @@ def initialize(path):
         PRAGMA user_version=1;
         ''')
         db.execute('BEGIN IMMEDIATE')
+        if not db.execute("SELECT 1 FROM app_migrations WHERE name='categories'").fetchone():
+            db.executemany('INSERT OR IGNORE INTO categories VALUES (?,?,?)',
+                [(name,COLORS[i],int(name in ('Andet','Indkomst','Overførsler'))) for i,name in enumerate(CATEGORIES)])
+            db.execute("INSERT INTO app_migrations VALUES ('categories')")
         if 'custom_name' not in {row[1] for row in db.execute('PRAGMA table_info(accounts)')}:
             db.execute('ALTER TABLE accounts ADD COLUMN custom_name TEXT')
         seed_demo(db)
+
+
+def category_list(db):
+    return [dict(row) for row in db.execute('SELECT name,color,protected FROM categories ORDER BY rowid')]
 
 
 def seed_demo(db):

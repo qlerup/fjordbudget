@@ -19,7 +19,7 @@ from flask import Flask, g, jsonify, redirect, render_template, request, session
 from werkzeug.exceptions import HTTPException
 
 from banking import BankError, EnableBanking, account_name, sync_all
-from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title
+from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, category_list
 from hub_auth import register_hub_auth
 
 
@@ -128,11 +128,48 @@ def create_app(config=None):
             db.execute('SELECT 1').fetchone()
         return jsonify(ok=True)
 
+    def stored_categories():
+        with connect(db_path) as db:
+            return category_list(db)
+
+    @app.route('/api/categories', methods=['GET', 'POST', 'DELETE'])
+    def manage_categories():
+        if request.method == 'GET':
+            return jsonify(items=stored_categories())
+        body = request.get_json()
+        name = body.get('name') if isinstance(body, dict) else None
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 60 or any(ord(c)<32 for c in name):
+            raise ValueError('Kategorinavnet skal være på 1–60 tegn uden linjeskift.')
+        name = name.strip()
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            categories = category_list(db)
+            if request.method == 'POST':
+                if any(transaction_title(c['name']) == transaction_title(name) for c in categories):
+                    raise ValueError('Kategorien findes allerede.')
+                db.execute('INSERT INTO categories VALUES (?,?,0)', (name,COLORS[len(categories)%len(COLORS)]))
+            else:
+                current = next((c for c in categories if c['name']==name),None)
+                if not current or current['protected']:
+                    raise ValueError('Denne kategori kan ikke slettes.')
+                replacement = body.get('replacement')
+                if replacement == name or replacement not in [c['name'] for c in categories if c['name'] not in ('Indkomst','Overførsler')]:
+                    raise ValueError('Vælg en anden udgiftskategori til posteringer og budgetter.')
+                db.execute('UPDATE transactions SET category=? WHERE category=?',(replacement,name))
+                db.execute('UPDATE category_rules SET category=? WHERE category=?',(replacement,name))
+                for budget in db.execute('SELECT * FROM budgets WHERE category=?',(name,)).fetchall():
+                    db.execute('INSERT INTO budgets VALUES (?,?,?,?,?) ON CONFLICT(source,month,currency,category) DO UPDATE SET amount=budgets.amount+excluded.amount',
+                        (budget['source'],budget['month'],budget['currency'],replacement,budget['amount']))
+                db.execute('DELETE FROM budgets WHERE category=?',(name,))
+                db.execute('DELETE FROM categories WHERE name=?',(name,))
+        return jsonify(ok=True,items=stored_categories())
+
     @app.get('/api/config')
     def configuration():
+        categories = stored_categories()
         return jsonify(provider_configured=provider.configured, callback_url=public_url()+'/bank/callback',
                        privacy_url=public_url()+'/privacy', terms_url=public_url()+'/terms',
-                       categories=CATEGORIES, colors=COLORS, currencies=sorted(CURRENCIES),
+                       categories=[c['name'] for c in categories], colors=[c['color'] for c in categories], currencies=sorted(CURRENCIES),
                        month=date.today().strftime('%Y-%m'), read_only=True)
 
     @app.post('/api/bank/credentials')
@@ -186,8 +223,8 @@ def create_app(config=None):
                  AND substr(t.booked_on,1,7)<=? GROUP BY 1 ORDER BY 1 DESC LIMIT 6''', (source, currency, month))]
         income = sum(r['amount'] for r in rows if r['amount'] > 0 and r['category'] != 'Overførsler')
         expenses = -sum(r['amount'] for r in rows if r['amount'] < 0 and r['category'] != 'Overførsler')
-        categories = [{'name': cat, 'color': COLORS[i], 'spent': -sum(r['amount'] for r in rows if r['category'] == cat and r['amount'] < 0),
-                       'budget': budgets.get(cat, 0)} for i, cat in enumerate(CATEGORIES[:8])]
+        categories = [{'name': cat['name'], 'color': cat['color'], 'spent': -sum(r['amount'] for r in rows if r['category'] == cat['name'] and r['amount'] < 0),
+                       'budget': budgets.get(cat['name'], 0)} for cat in stored_categories() if cat['name'] not in ('Indkomst','Overførsler')]
         selected = [a for a in accounts if a['currency'] == currency]
         return jsonify(accounts=accounts, connections=connections, income=income, expenses=expenses,
                        balance=sum(a['balance'] for a in selected if a['balance'] is not None), missing_balances=sum(a['balance'] is None for a in selected),
@@ -209,7 +246,7 @@ def create_app(config=None):
             conditions.append('instr(lower(t.description),lower(?))>0')
             values.append(query)
         if category:
-            if category not in CATEGORIES:
+            if category not in [c['name'] for c in stored_categories()]:
                 raise ValueError('Ukendt kategori.')
             conditions.append('t.category=?')
             values.append(category)
@@ -223,10 +260,10 @@ def create_app(config=None):
     @app.patch('/api/transactions/<int:transaction_id>')
     def update_category(transaction_id):
         category = request.get_json().get('category')
-        if category not in CATEGORIES:
-            raise ValueError('Ukendt kategori.')
         with connect(db_path) as db:
             db.execute('BEGIN IMMEDIATE')
+            if category not in [c['name'] for c in category_list(db)]:
+                raise ValueError('Ukendt kategori.')
             row = db.execute('SELECT t.description,a.source FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE t.id=?', (transaction_id,)).fetchone()
             if row is None:
                 return jsonify(error='Posteringen blev ikke fundet.'), 404
@@ -243,12 +280,15 @@ def create_app(config=None):
     def save_budgets():
         source, month, currency = parameters()
         amounts = request.get_json().get('amounts')
-        if not isinstance(amounts, dict) or set(amounts) != set(CATEGORIES[:8]):
+        if not isinstance(amounts, dict) or set(amounts) != {c['name'] for c in stored_categories() if c['name'] not in ('Indkomst','Overførsler')}:
             raise ValueError('Budgettet skal indeholde alle udgiftskategorier.')
         amounts = {cat: cents(value) for cat, value in amounts.items()}
         if any(value < 0 for value in amounts.values()):
             raise ValueError('Et budget kan ikke være negativt.')
         with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            if set(amounts) != {c['name'] for c in category_list(db) if c['name'] not in ('Indkomst','Overførsler')}:
+                raise ValueError('Kategorierne er ændret. Genindlæs siden og prøv igen.')
             for cat, value in amounts.items():
                 db.execute('INSERT INTO budgets VALUES (?,?,?,?,?) ON CONFLICT(source,month,currency,category) DO UPDATE SET amount=excluded.amount', (source, month, currency, cat, value))
         return jsonify(ok=True)
