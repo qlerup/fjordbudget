@@ -1,5 +1,6 @@
 import calendar
 import sqlite3
+import unicodedata
 from contextlib import contextmanager
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
@@ -19,10 +20,15 @@ def cents(value):
         raise ValueError('Ugyldigt beløb.') from None
 
 
+def transaction_title(value):
+    return ' '.join(unicodedata.normalize('NFKC', str(value or '')).casefold().split())
+
+
 @contextmanager
 def connect(path):
     conn = sqlite3.connect(path, timeout=20)
     conn.row_factory = sqlite3.Row
+    conn.create_function('transaction_title', 1, transaction_title, deterministic=True)
     conn.execute('PRAGMA foreign_keys=ON')
     try:
         with conn:
@@ -50,6 +56,10 @@ def initialize(path):
           category_manual INTEGER NOT NULL DEFAULT 0,
           UNIQUE(account_id,external_id));
         CREATE INDEX IF NOT EXISTS tx_account_date ON transactions(account_id,booked_on DESC);
+        CREATE TABLE IF NOT EXISTS category_rules (
+          source TEXT NOT NULL CHECK(source IN ('demo','live')),
+          title TEXT NOT NULL, category TEXT NOT NULL,
+          PRIMARY KEY(source,title));
         CREATE TABLE IF NOT EXISTS budgets (
           source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,
           category TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>=0),

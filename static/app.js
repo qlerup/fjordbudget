@@ -258,7 +258,7 @@ $('nextPage').onclick=()=>{if(page<pages){page++;loadTransactions().catch(e=>sho
 $('transactionRows').addEventListener('change',async event=>{
   const select=event.target.closest('[data-transaction]');if(!select)return;
   select.disabled=true;
-  try{await api('/api/transactions/'+select.dataset.transaction,{method:'PATCH',body:JSON.stringify({category:select.value})});toast('Kategori gemt');await refresh();}
+  try{const result=await api('/api/transactions/'+select.dataset.transaction,{method:'PATCH',body:JSON.stringify({category:select.value})});toast(`Kategori gemt · ${result.updated} posteringer opdateret. Huskes fremover.`);await refresh();}
   catch(error){showError('loadError',error.message);select.disabled=false;}
 });
 $('budgetForm').addEventListener('submit',async event=>{

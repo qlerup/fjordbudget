@@ -110,7 +110,7 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#transactionRows')).not_to_contain_text('Spotify')
         category=self.page.locator('#transactionRows .category-select').first
         category.select_option('Fritid')
-        expect(self.page.locator('#toast')).to_have_text('Kategori gemt')
+        expect(self.page.locator('#toast')).to_contain_text('Huskes fremover.')
         self.page.reload()
         self.page.locator('#search').fill('Netto')
         expect(self.page.locator('#transactionRows .category-select').first).to_have_value('Fritid')

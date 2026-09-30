@@ -19,7 +19,7 @@ from flask import Flask, g, jsonify, redirect, render_template, request, session
 from werkzeug.exceptions import HTTPException
 
 from banking import BankError, EnableBanking, account_name, sync_all
-from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize
+from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title
 from hub_auth import register_hub_auth
 
 
@@ -226,10 +226,18 @@ def create_app(config=None):
         if category not in CATEGORIES:
             raise ValueError('Ukendt kategori.')
         with connect(db_path) as db:
-            result = db.execute('UPDATE transactions SET category=?,category_manual=1 WHERE id=?', (category, transaction_id))
-            if not result.rowcount:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT t.description,a.source FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE t.id=?', (transaction_id,)).fetchone()
+            if row is None:
                 return jsonify(error='Posteringen blev ikke fundet.'), 404
-        return jsonify(ok=True)
+            title = transaction_title(row['description'])
+            db.execute('''INSERT INTO category_rules(source,title,category) VALUES (?,?,?)
+              ON CONFLICT(source,title) DO UPDATE SET category=excluded.category''', (row['source'], title, category))
+            result = db.execute('''UPDATE transactions SET category=?,category_manual=1
+              WHERE transaction_title(description)=? AND account_id IN (SELECT id FROM accounts WHERE source=?)''',
+              (category, title, row['source']))
+            updated = result.rowcount
+        return jsonify(ok=True, updated=updated, rule_saved=True)
 
     @app.put('/api/budgets')
     def save_budgets():

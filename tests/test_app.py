@@ -205,6 +205,32 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM transactions WHERE description='Coffee'").fetchone()[0],3)
 
+    def test_category_rule_updates_history_and_future_imports_across_accounts(self):
+        with connect(self.db) as db:
+            db.execute("INSERT INTO accounts(id,source,name,bank,last4,currency) VALUES ('live-test','live','Account','Bank','1234','DKK')")
+            for aid,ref,title,day in [('demo-daily','rule1','Løn overførsel','2024-01-01'),
+                    ('demo-bills','rule2','  LØN   OVERFØRSEL ','2025-02-01'),
+                    ('demo-save','rule3','Løn overførsel ekstra','2025-02-01'),
+                    ('live-test','rule4','Løn overførsel','2025-02-01')]:
+                db.execute('INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category) VALUES (?,?,?,?,10000,?,?)',
+                           (aid,ref,day,title,'DKK','Andet'))
+            tid=db.execute("SELECT id FROM transactions WHERE external_id='rule1'").fetchone()[0]
+        response=self.client.patch('/api/transactions/'+str(tid),json={'category':'Indkomst'},headers=self.headers)
+        self.assertEqual(response.json['updated'],2)
+        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        raw={'status':'BOOK','booking_date':'2026-09-01','credit_debit_indicator':'CRDT',
+             'transaction_amount':{'amount':'200','currency':'DKK'},'remittance_information':['løn overførsel'],'entry_reference':'rule-new'}
+        import_account(self.db,'demo-save',[raw],[])
+        imported_id=normalize_transactions([raw])[0][0]
+        with connect(self.db) as db:
+            rows=dict(db.execute("SELECT external_id,category FROM transactions WHERE external_id LIKE 'rule%'"))
+            self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(imported_id,)).fetchone()[0],'Indkomst')
+        self.assertEqual(rows,{'rule1':'Indkomst','rule2':'Indkomst','rule3':'Andet','rule4':'Andet'})
+        self.client.patch('/api/transactions/'+str(tid),json={'category':'Fritid'},headers=self.headers)
+        import_account(self.db,'demo-save',[raw],[])
+        with connect(self.db) as db:
+            self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(imported_id,)).fetchone()[0],'Fritid')
+
     def test_provider_pagination_continues_through_empty_page(self):
         provider=EnableBanking('unused','unused')
         with patch.object(provider,'request',side_effect=[{'transactions':[],'continuation_key':'next'}, {'transactions':[{'entry_reference':'a'}]}]) as req:

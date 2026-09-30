@@ -11,7 +11,7 @@ from urllib.parse import quote
 import jwt
 import requests
 
-from db import CURRENCIES, categorize, cents, connect
+from db import CURRENCIES, categorize, cents, connect, transaction_title
 
 
 class BankError(Exception):
@@ -131,14 +131,19 @@ def import_account(db_path, account_id, transactions, balances):
     # Prefer booked balances; never replace an unavailable balance with zero.
     ranking = {'CLBD': 0, 'ITBD': 1, 'CLAV': 2, 'ITAV': 3, 'OPBD': 4}
     with connect(db_path) as db:
+        db.execute('BEGIN IMMEDIATE')
         account = db.execute('SELECT * FROM accounts WHERE id=?', (account_id,)).fetchone()
+        rules = dict(db.execute('SELECT title,category FROM category_rules WHERE source=?', (account['source'],)).fetchall())
         eligible = [b for b in balances if b.get('balance_type') in ranking and b.get('balance_amount', {}).get('currency') == account['currency']]
         balance = min(eligible, key=lambda b: ranking[b['balance_type']]) if eligible else None
         for row in rows:
-            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
-              VALUES (?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
+            rule = rules.get(transaction_title(row[2]))
+            row = (*row[:-1], rule or row[-1], int(rule is not None))
+            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual)
+              VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
               booked_on=excluded.booked_on, description=excluded.description, amount=excluded.amount,
-              currency=excluded.currency, category=CASE WHEN category_manual=1 THEN transactions.category ELSE excluded.category END''',
+              currency=excluded.currency, category=CASE WHEN excluded.category_manual=1 THEN excluded.category WHEN transactions.category_manual=1 THEN transactions.category ELSE excluded.category END,
+              category_manual=MAX(transactions.category_manual,excluded.category_manual)''',
                        (account_id, *row))
         db.execute('UPDATE accounts SET balance=?,balance_type=?,synced_at=? WHERE id=?',
                    (cents(balance['balance_amount']['amount']) if balance else None,
