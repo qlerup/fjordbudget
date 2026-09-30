@@ -58,10 +58,10 @@
         <section class="panel budget-panel"><div class="section-heading"><div><h2>Dit månedsbudget</h2><p>Giv dine penge en retning</p></div><button class="text-button edit-budget">Rediger <span>↗</span></button></div><div id="budgetProgress"></div><div id="budgetPreview"></div><button class="budget-detail text-button" data-view="budget">Se hele budgettet <span>→</span></button></section>
       </div>
       <section class="panel" data-section="categories" hidden>
-<div class="section-heading"><div><h2>Dine kategorier</h2><p>Kategorierne bruges på tværs af dine konti og budgetter.</p></div></div>
+<div class="section-heading"><div><h2>Dine kategorier</h2><p>Kategorierne bruges til posteringer. Du vælger selv, om de også tæller med i en budgetkategori.</p></div></div>
 <form id="categoryCreateForm" class="category-create"><label for="newCategoryName">Ny kategori</label><input id="newCategoryName" maxlength="60" required placeholder="Fx Børn eller Ferie"><button class="button primary" type="submit">Tilføj kategori</button></form>
 <div id="categoryError" class="error-box" role="alert" hidden></div><div id="categoryList"></div>
-<p class="small muted">Andet, Indkomst og Overførsler er faste kategorier, som bruges i overblikkets beregninger. Ved sletning flyttes posteringer, regler og budgetbeløb til den kategori, du vælger.</p>
+<p class="small muted">Andet, Indkomst og Overførsler er faste kategorier, som bruges i overblikkets beregninger. Ved sletning flyttes posteringer og regler til den kategori, du vælger. Budgetkategorier og budgetbeløb bevares.</p>
 </section>
 <section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><div id="budgetFull"></div></section>
       <section class="panel transactions-panel" data-section="transactions"><div class="section-heading"><div><h2>Posteringer</h2><p id="transactionSubtitle">Dine bogførte ind- og udbetalinger</p></div><span class="subtle-tag">Kun bogførte</span></div>

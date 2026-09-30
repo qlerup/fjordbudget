@@ -231,14 +231,15 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(imported_id,)).fetchone()[0],'Fritid')
 
-    def test_category_management_moves_rules_transactions_and_budgets(self):
+    def test_category_management_preserves_separate_budgets(self):
         url='/api/categories'
         self.assertEqual(self.client.post(url,json={'name':'Travel'}).status_code,403)
         self.assertEqual(self.client.post(url,json={'name':'Travel'},headers=self.headers).status_code,200)
         self.assertEqual(self.client.post(url,json={'name':' TRAVEL '},headers=self.headers).status_code,400)
         self.assertIn('Travel',self.client.get('/api/config').json['categories'])
-        self.assertIn('Travel',[c['name'] for c in self.client.get('/api/dashboard').json['categories']])
+        self.assertNotIn('Travel',[c['name'] for c in self.client.get('/api/dashboard').json['categories']])
         with connect(self.db) as db:
+            db.execute("INSERT INTO budget_categories VALUES ('Travel','#809087')")
             tid=db.execute("SELECT id FROM transactions WHERE account_id='demo-daily' LIMIT 1").fetchone()[0]
             db.execute("INSERT INTO budgets VALUES ('live','2025-01','DKK','Travel',12300)")
             db.execute("INSERT INTO budgets VALUES ('live','2025-01','DKK','Andet',1000)")
@@ -247,7 +248,8 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute('SELECT category FROM transactions WHERE id=?',(tid,)).fetchone()[0],'Andet')
             self.assertEqual(db.execute("SELECT count(*) FROM category_rules WHERE category='Travel'").fetchone()[0],0)
-            self.assertEqual(db.execute("SELECT amount FROM budgets WHERE source='live' AND month='2025-01' AND category='Andet'").fetchone()[0],13300)
+            self.assertEqual(db.execute("SELECT amount FROM budgets WHERE source='live' AND month='2025-01' AND category='Andet'").fetchone()[0],1000)
+            self.assertEqual(db.execute("SELECT amount FROM budgets WHERE source='live' AND month='2025-01' AND category='Travel'").fetchone()[0],12300)
         self.assertEqual(self.client.delete(url,json={'name':'Andet','replacement':'Bolig'},headers=self.headers).status_code,400)
         self.client.delete(url,json={'name':'Shopping','replacement':'Andet'},headers=self.headers)
         create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
@@ -256,6 +258,45 @@ class AppTests(unittest.TestCase):
         import_account(self.db,'demo-daily',[raw],[])
         with connect(self.db) as db:
             self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(normalize_transactions([raw])[0][0],)).fetchone()[0],'Andet')
+
+    def test_optional_budget_mapping_groups_categories_without_changing_spending(self):
+        self.client.post('/api/categories',json={'name':'Custom'},headers=self.headers)
+        with connect(self.db) as db:
+            db.execute("INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category) VALUES ('demo-daily','mapping',?,'Mapping',-34500,'DKK','Custom')",(self.month+'-01',))
+        before=self.client.get('/api/dashboard?source=demo').json
+        endpoint='/api/categories'
+        self.assertEqual(self.client.patch(endpoint,json={'name':'Custom','budget_category':'Andet'}).status_code,403)
+        self.assertEqual(self.client.patch(endpoint,json={'name':'Custom','budget_category':'Unknown'},headers=self.headers).status_code,400)
+        self.assertEqual(self.client.patch(endpoint,json={'name':'Custom','budget_category':'Andet'},headers=self.headers).status_code,200)
+        after=self.client.get('/api/dashboard?source=demo').json
+        self.assertEqual(after['expenses'],before['expenses'])
+        self.assertEqual(after['budget_spent'],before['budget_spent']+34500)
+        self.assertEqual(after['budget'],before['budget'])
+        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        self.assertEqual(next(c for c in self.client.get(endpoint).json['items'] if c['name']=='Custom')['budget_category'],'Andet')
+        self.client.patch(endpoint,json={'name':'Custom','budget_category':None},headers=self.headers)
+        self.assertEqual(self.client.get('/api/dashboard?source=demo').json['budget_spent'],before['budget_spent'])
+
+    def test_migration_preserves_existing_custom_budget_and_mapping(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'budget.sqlite3'
+            with sqlite3.connect(path) as db:
+                db.executescript("""CREATE TABLE categories(name TEXT PRIMARY KEY,color TEXT NOT NULL,protected INTEGER NOT NULL);
+                    CREATE TABLE app_migrations(name TEXT PRIMARY KEY);
+                    INSERT INTO app_migrations VALUES ('categories');
+                    INSERT INTO categories VALUES ('Legacy','#809087',0);
+                    CREATE TABLE budgets(source TEXT,month TEXT,currency TEXT,category TEXT,amount INTEGER,PRIMARY KEY(source,month,currency,category));
+                    INSERT INTO budgets VALUES ('live','2026-01','DKK','Legacy',12345);""")
+            db.close()
+            migrated=create_app({'TESTING':True,'DATA_DIR':directory,'PROVIDER':self.provider})
+            client=migrated.test_client()
+            data=client.get('/api/categories').json
+            self.assertEqual(data['items'][0]['budget_category'],'Legacy')
+            with connect(path) as db:
+                self.assertEqual(db.execute("SELECT amount FROM budgets WHERE category='Legacy'").fetchone()[0],12345)
+            create_app({'TESTING':True,'DATA_DIR':directory,'PROVIDER':self.provider})
+            self.assertEqual(client.get('/api/categories').json,data)
 
     def test_provider_pagination_continues_through_empty_page(self):
         provider=EnableBanking('unused','unused')

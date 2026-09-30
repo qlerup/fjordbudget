@@ -19,7 +19,7 @@ from flask import Flask, g, jsonify, redirect, render_template, request, session
 from werkzeug.exceptions import HTTPException
 
 from banking import BankError, EnableBanking, account_name, sync_all
-from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, category_list
+from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, category_list, budget_category_list
 from hub_auth import register_hub_auth
 
 
@@ -132,10 +132,14 @@ def create_app(config=None):
         with connect(db_path) as db:
             return category_list(db)
 
-    @app.route('/api/categories', methods=['GET', 'POST', 'DELETE'])
+    def stored_budget_categories():
+        with connect(db_path) as db:
+            return budget_category_list(db)
+
+    @app.route('/api/categories', methods=['GET', 'POST', 'PATCH', 'DELETE'])
     def manage_categories():
         if request.method == 'GET':
-            return jsonify(items=stored_categories())
+            return jsonify(items=stored_categories(), budget_categories=stored_budget_categories())
         body = request.get_json()
         name = body.get('name') if isinstance(body, dict) else None
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 60 or any(ord(c)<32 for c in name):
@@ -147,20 +151,23 @@ def create_app(config=None):
             if request.method == 'POST':
                 if any(transaction_title(c['name']) == transaction_title(name) for c in categories):
                     raise ValueError('Kategorien findes allerede.')
-                db.execute('INSERT INTO categories VALUES (?,?,0)', (name,COLORS[len(categories)%len(COLORS)]))
+                db.execute('INSERT INTO categories(name,color,protected) VALUES (?,?,0)', (name,COLORS[len(categories)%len(COLORS)]))
+            elif request.method == 'PATCH':
+                target = body.get('budget_category')
+                if not any(c['name']==name for c in categories):
+                    raise ValueError('Kategorien findes ikke.')
+                if target is not None and target not in [c['name'] for c in budget_category_list(db)]:
+                    raise ValueError('Vælg en gyldig budgetkategori eller ingen.')
+                db.execute('UPDATE categories SET budget_category=? WHERE name=?',(target,name))
             else:
                 current = next((c for c in categories if c['name']==name),None)
                 if not current or current['protected']:
                     raise ValueError('Denne kategori kan ikke slettes.')
                 replacement = body.get('replacement')
                 if replacement == name or replacement not in [c['name'] for c in categories if c['name'] not in ('Indkomst','Overførsler')]:
-                    raise ValueError('Vælg en anden udgiftskategori til posteringer og budgetter.')
+                    raise ValueError('Vælg en anden udgiftskategori til posteringer.')
                 db.execute('UPDATE transactions SET category=? WHERE category=?',(replacement,name))
                 db.execute('UPDATE category_rules SET category=? WHERE category=?',(replacement,name))
-                for budget in db.execute('SELECT * FROM budgets WHERE category=?',(name,)).fetchall():
-                    db.execute('INSERT INTO budgets VALUES (?,?,?,?,?) ON CONFLICT(source,month,currency,category) DO UPDATE SET amount=budgets.amount+excluded.amount',
-                        (budget['source'],budget['month'],budget['currency'],replacement,budget['amount']))
-                db.execute('DELETE FROM budgets WHERE category=?',(name,))
                 db.execute('DELETE FROM categories WHERE name=?',(name,))
         return jsonify(ok=True,items=stored_categories())
 
@@ -210,7 +217,7 @@ def create_app(config=None):
         source, month, currency = parameters()
         with connect(db_path) as db:
             accounts = [dict(r) for r in db.execute('SELECT id,COALESCE(custom_name,name) name,custom_name,bank,last4,currency,balance,balance_type,synced_at FROM accounts WHERE source=? ORDER BY rowid', (source,))]
-            rows = db.execute('''SELECT t.category,t.amount FROM transactions t JOIN accounts a ON a.id=t.account_id
+            rows = db.execute('''SELECT t.category,t.amount,c.budget_category FROM transactions t LEFT JOIN categories c ON c.name=t.category JOIN accounts a ON a.id=t.account_id
                                  WHERE a.source=? AND t.currency=? AND substr(t.booked_on,1,7)=?''', (source, currency, month)).fetchall()
             budgets = {r['category']: r['amount'] for r in db.execute('SELECT category,amount FROM budgets WHERE source=? AND month=? AND currency=?', (source, month, currency))}
             months = [r[0] for r in db.execute('''SELECT DISTINCT substr(t.booked_on,1,7) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE a.source=? ORDER BY 1 DESC''', (source,))]
@@ -223,12 +230,12 @@ def create_app(config=None):
                  AND substr(t.booked_on,1,7)<=? GROUP BY 1 ORDER BY 1 DESC LIMIT 6''', (source, currency, month))]
         income = sum(r['amount'] for r in rows if r['amount'] > 0 and r['category'] != 'Overførsler')
         expenses = -sum(r['amount'] for r in rows if r['amount'] < 0 and r['category'] != 'Overførsler')
-        categories = [{'name': cat['name'], 'color': cat['color'], 'spent': -sum(r['amount'] for r in rows if r['category'] == cat['name'] and r['amount'] < 0),
-                       'budget': budgets.get(cat['name'], 0)} for cat in stored_categories() if cat['name'] not in ('Indkomst','Overførsler')]
+        categories = [{'name': cat['name'], 'color': cat['color'], 'spent': -sum(r['amount'] for r in rows if r['budget_category'] == cat['name'] and r['amount'] < 0 and r['category'] != 'Overførsler'),
+                       'budget': budgets.get(cat['name'], 0)} for cat in stored_budget_categories()]
         selected = [a for a in accounts if a['currency'] == currency]
         return jsonify(accounts=accounts, connections=connections, income=income, expenses=expenses,
                        balance=sum(a['balance'] for a in selected if a['balance'] is not None), missing_balances=sum(a['balance'] is None for a in selected),
-                       budget=sum(budgets.values()), categories=categories, months=months, history=list(reversed(history)), month=month)
+                       budget=sum(budgets.values()), budget_spent=sum(c['spent'] for c in categories), categories=categories, months=months, history=list(reversed(history)), month=month)
 
     @app.get('/api/transactions')
     def transactions():
@@ -280,14 +287,14 @@ def create_app(config=None):
     def save_budgets():
         source, month, currency = parameters()
         amounts = request.get_json().get('amounts')
-        if not isinstance(amounts, dict) or set(amounts) != {c['name'] for c in stored_categories() if c['name'] not in ('Indkomst','Overførsler')}:
+        if not isinstance(amounts, dict) or set(amounts) != {c['name'] for c in stored_budget_categories()}:
             raise ValueError('Budgettet skal indeholde alle udgiftskategorier.')
         amounts = {cat: cents(value) for cat, value in amounts.items()}
         if any(value < 0 for value in amounts.values()):
             raise ValueError('Et budget kan ikke være negativt.')
         with connect(db_path) as db:
             db.execute('BEGIN IMMEDIATE')
-            if set(amounts) != {c['name'] for c in category_list(db) if c['name'] not in ('Indkomst','Overførsler')}:
+            if set(amounts) != {c['name'] for c in budget_category_list(db)}:
                 raise ValueError('Kategorierne er ændret. Genindlæs siden og prøv igen.')
             for cat, value in amounts.items():
                 db.execute('INSERT INTO budgets VALUES (?,?,?,?,?) ON CONFLICT(source,month,currency,category) DO UPDATE SET amount=excluded.amount', (source, month, currency, cat, value))

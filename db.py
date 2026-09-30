@@ -62,6 +62,7 @@ def initialize(path):
           PRIMARY KEY(source,title));
         CREATE TABLE IF NOT EXISTS categories (
           name TEXT PRIMARY KEY, color TEXT NOT NULL, protected INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS budget_categories (name TEXT PRIMARY KEY, color TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS budgets (
           source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,
@@ -80,10 +81,20 @@ def initialize(path):
         if 'custom_name' not in {row[1] for row in db.execute('PRAGMA table_info(accounts)')}:
             db.execute('ALTER TABLE accounts ADD COLUMN custom_name TEXT')
         seed_demo(db)
+        if not db.execute("SELECT 1 FROM app_migrations WHERE name='separate-budget-categories'").fetchone():
+            db.executemany('INSERT OR IGNORE INTO budget_categories VALUES (?,?)', list(zip(CATEGORIES[:8],COLORS[:8])))
+            db.execute("INSERT OR IGNORE INTO budget_categories SELECT DISTINCT category,'#809087' FROM budgets")
+            db.execute('ALTER TABLE categories ADD COLUMN budget_category TEXT REFERENCES budget_categories(name)')
+            db.execute('UPDATE categories SET budget_category=name WHERE name IN (SELECT name FROM budget_categories)')
+            db.execute("INSERT INTO app_migrations VALUES ('separate-budget-categories')")
 
 
 def category_list(db):
-    return [dict(row) for row in db.execute('SELECT name,color,protected FROM categories ORDER BY rowid')]
+    return [dict(row) for row in db.execute('SELECT name,color,protected,budget_category FROM categories ORDER BY rowid')]
+
+
+def budget_category_list(db):
+    return [dict(row) for row in db.execute('SELECT name,color FROM budget_categories ORDER BY rowid')]
 
 
 def seed_demo(db):

@@ -56,10 +56,10 @@ function renderDashboard() {
   $('balance').textContent=money(d.balance);
   $('balanceNote').textContent=d.missing_balances?`${d.missing_balances} saldi afventer hentning`:`På tværs af konti i ${$('currency').value}`;
   $('income').textContent=money(d.income); $('expenses').textContent=money(d.expenses);
-  $('remaining').textContent=d.budget?money(d.budget-d.expenses):'Intet budget';
-  $('remaining').classList.toggle('negative',!!d.budget && d.expenses>d.budget);
+  $('remaining').textContent=d.budget?money(d.budget-d.budget_spent):'Intet budget';
+  $('remaining').classList.toggle('negative',!!d.budget && d.budget_spent>d.budget);
   $('remainingNote').textContent=d.budget?'Af '+money(d.budget)+' planlagt':'Sæt dit første månedsbudget';
-  $('budgetProgress').innerHTML=`<div class="budget-progress-label"><strong>${esc(money(d.expenses))} brugt</strong><span>${d.budget?esc(money(d.budget))+' i budget':'Intet budget endnu'}</span></div><div class="progress"><div class="progress-fill ${d.budget&&d.expenses>d.budget?'over':''}" style="width:${d.budget?Math.min(100,d.expenses/d.budget*100):0}%"></div></div>`;
+  $('budgetProgress').innerHTML=`<div class="budget-progress-label"><strong>${esc(money(d.budget_spent))} brugt</strong><span>${d.budget?esc(money(d.budget))+' i budget':'Intet budget endnu'}</span></div><div class="progress"><div class="progress-fill ${d.budget&&d.budget_spent>d.budget?'over':''}" style="width:${d.budget?Math.min(100,d.budget_spent/d.budget*100):0}%"></div></div>`;
   $('budgetPreview').innerHTML=budgetRows(d.categories.slice(0,3)); $('budgetFull').innerHTML=budgetRows(d.categories);
   const max=Math.max(1,...d.history.flatMap(h=>[h.income,h.expenses]));
   $('cashflowChart').innerHTML=d.history.length?d.history.map(h=>`<div class="chart-group"><div class="bars"><div class="bar" style="height:${h.income/max*100}%" title="Indtægter: ${esc(money(h.income))}"></div><div class="bar expenses" style="height:${h.expenses/max*100}%" title="Udgifter: ${esc(money(h.expenses))}"></div></div><span class="chart-label">${esc(new Intl.DateTimeFormat('da-DK',{month:'short'}).format(new Date(h.month+'-15T12:00:00')))}</span></div>`).join(''):'<div class="empty-state"><p>Dit overblik vokser med dine posteringer.</p></div>';
@@ -330,7 +330,7 @@ async function loadCategories(){
   const selected=$('categoryFilter').value;
   $('categoryFilter').innerHTML='<option value="">Alle kategorier</option>'+config.categories.map(c=>`<option>${esc(c)}</option>`).join('');
   if(config.categories.includes(selected))$('categoryFilter').value=selected;
-  $('categoryList').innerHTML=result.items.map(c=>`<div class="category-management-row"><span><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span>${c.protected?'<small class="muted">Fast kategori</small>':`<button class="button quiet" data-delete-category="${esc(c.name)}" aria-label="Slet ${esc(c.name)}">Slet</button>`}</div>`).join('');
+  $('categoryList').innerHTML=result.items.map(c=>`<div class="category-management-row"><span><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><label class="category-budget-link">Budgetkategori<select data-budget-link="${esc(c.name)}" aria-label="Budgetkategori for ${esc(c.name)}"><option value="">Ingen budgetkategori</option>${result.budget_categories.map(b=>`<option value="${esc(b.name)}" ${c.budget_category===b.name?'selected':''}>${esc(b.name)}</option>`).join('')}</select></label>${c.protected?'<small class="muted">Fast kategori</small>':`<button class="button quiet" data-delete-category="${esc(c.name)}" aria-label="Slet ${esc(c.name)}">Slet</button>`}</div>`).join('');
 }
 $('categoryCreateForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter;button.disabled=true;showError('categoryError','');
@@ -340,7 +340,7 @@ $('categoryCreateForm').addEventListener('submit',async event=>{
 $('categoryList').addEventListener('click',event=>{
   const button=event.target.closest('[data-delete-category]');if(!button)return;
   const name=button.dataset.deleteCategory;$('categoryDeleteForm').dataset.category=name;
-  $('categoryDeleteText').textContent=`Alle posteringer, regler og budgetbeløb i “${name}” flyttes, før kategorien slettes. Dette gælder både bankdata og demodata.`;
+  $('categoryDeleteText').textContent=`Alle posteringer og regler i “${name}” flyttes, før kategorien slettes. Dette gælder både bankdata og demodata.`;
   $('categoryReplacement').innerHTML=editableCategories.filter(c=>![name,'Indkomst','Overførsler'].includes(c.name)).map(c=>`<option>${esc(c.name)}</option>`).join('');
   $('categoryReplacement').value='Andet';showError('categoryDeleteError','');$('categoryDeleteDialog').showModal();
 });
@@ -348,4 +348,12 @@ $('categoryDeleteForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter;button.disabled=true;showError('categoryDeleteError','');
   try{await api('/api/categories',{method:'DELETE',body:JSON.stringify({name:event.currentTarget.dataset.category,replacement:$('categoryReplacement').value})});await loadCategories();await refresh();$('categoryDeleteDialog').close();toast('Kategorien er slettet, og data er flyttet');}
   catch(error){showError('categoryDeleteError',error.message);}finally{button.disabled=false;}
+});
+
+$('categoryList').addEventListener('change',async event=>{
+  const select=event.target.closest('[data-budget-link]');if(!select)return;
+  select.disabled=true;showError('categoryError','');
+  try{await api('/api/categories',{method:'PATCH',body:JSON.stringify({name:select.dataset.budgetLink,budget_category:select.value || null})});await refresh();toast('Budgettilknytning gemt');}
+  catch(error){showError('categoryError',error.message);await loadCategories();}
+  finally{select.disabled=false;}
 });
