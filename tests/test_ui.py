@@ -52,6 +52,22 @@ class UITests(unittest.TestCase):
         self.assertIn('HTTP 502',message)
         self.assertNotIn('Unexpected token',message)
 
+    def test_custom_account_name_survives_reload_and_updates_filter(self):
+        self.page.locator('[data-rename="demo-daily"]').click()
+        self.page.locator('#accountNameInput').fill('Food <test>')
+        self.page.locator('#saveAccountName').click()
+        expect(self.page.locator('#accountNameDialog')).not_to_be_visible()
+        self.page.reload()
+        expect(self.page.locator('[data-account="demo-daily"]')).to_contain_text('Food <test>')
+        expect(self.page.locator('#accountFilter option[value="demo-daily"]')).to_have_text('Food <test>')
+        self.page.locator('[data-account="demo-daily"]').click()
+        expect(self.page.locator('#accountFilter')).to_have_value('demo-daily')
+        self.page.locator('[data-view="accounts"]').click()
+        self.page.locator('[data-rename="demo-daily"]').click()
+        self.page.locator('#accountNameInput').fill('')
+        self.page.locator('#saveAccountName').click()
+        expect(self.page.locator('#accountNameDialog')).not_to_be_visible()
+
     def test_account_navigation_search_and_category_edit(self):
         self.page.locator('[data-account="demo-daily"]').click()
         expect(self.page.locator('#accountFilter')).to_have_value('demo-daily')

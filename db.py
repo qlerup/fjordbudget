@@ -59,6 +59,9 @@ def initialize(path):
           expires REAL NOT NULL);
         PRAGMA user_version=1;
         ''')
+        db.execute('BEGIN IMMEDIATE')
+        if 'custom_name' not in {row[1] for row in db.execute('PRAGMA table_info(accounts)')}:
+            db.execute('ALTER TABLE accounts ADD COLUMN custom_name TEXT')
         seed_demo(db)
 
 

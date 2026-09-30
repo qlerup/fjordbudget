@@ -79,5 +79,13 @@
 <div id="bankOptions" role="listbox" aria-labelledby="bankSelectLabel"></div><p id="bankSearchEmpty" class="bank-search-empty" hidden>Ingen banker matcher din søgning.</p>
 </div></div><p id="bankAvailability" class="small muted" hidden>Kreditbanken er ikke tilgængelig med denne API-opsætning. Bruger du Sandbox, skal du oprette en Production-applikation og tilknytte dine egne konti hos Enable Banking.</p><button id="connectBank" class="button primary full-width">Fortsæt til bankens godkendelse <span>→</span></button><p class="small muted">Du vælger og godkender kontoadgangen i bankens flow. Tilgængelige konti og historik afhænger af banken.</p></div><button id="editBankCredentials" type="button" class="text-button" hidden>Skift API-oplysninger</button><div id="bankError" class="error-box" role="alert" hidden></div><div id="connections"></div><p class="small"><a href="/privacy" target="_blank" rel="noreferrer">Privatlivspolitik</a> · <a href="/terms" target="_blank" rel="noreferrer">Brugsvilkår</a></p></dialog>
 <dialog id="budgetDialog" aria-labelledby="budgetTitle"><div class="dialog-header"><p class="eyebrow">PLANLÆG DIN MÅNED</p><button class="icon-button" data-close="budgetDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div><h2 id="budgetTitle">Dit månedsbudget</h2><p class="dialog-intro" id="budgetDialogSubtitle"></p><form id="budgetForm"><div id="budgetFields" class="budget-fields"></div><div id="budgetError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetDialog">Annuller</button><button type="submit" class="button primary">Gem budget</button></div></form></dialog>
+<dialog id="accountNameDialog" aria-labelledby="accountNameTitle">
+<div class="dialog-header"><h2 id="accountNameTitle">Navngiv konto</h2><button class="icon-button" data-close="accountNameDialog" aria-label="Luk">×</button></div>
+<p id="accountNameHint" class="muted"></p><form id="accountNameForm">
+<label for="accountNameInput">Kontonavn</label><input id="accountNameInput" class="full-width" maxlength="100" autocomplete="off" placeholder="Fx Kostkonto eller Budgetkonto">
+<p class="small muted">Navnet gemmes kun i FjordBudget og bevares ved opdatering. Lad feltet være tomt for at bruge bankens kontotype igen.</p>
+<div id="accountNameError" class="error-box" role="alert" hidden></div>
+<div class="dialog-actions"><button type="button" class="button quiet" data-close="accountNameDialog">Annuller</button><button id="saveAccountName" class="button primary" type="submit">Gem navn</button></div>
+</form></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 </body></html>

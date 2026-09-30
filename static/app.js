@@ -41,7 +41,7 @@ function switchSource(next) {
 function renderAccounts() {
   const accounts=dashboard.accounts;
   $('accountCount').textContent=accounts.length; $('accountsLabel').textContent=accounts.length;
-  $('accounts').innerHTML=accounts.length?accounts.map(a=>`<button class="account-card" data-account="${esc(a.id)}" data-currency="${esc(a.currency)}"><div class="account-top"><span class="account-bank-icon">${svg('bank')}</span><span class="account-name">${esc(a.name)}<small>${esc(a.bank)}${source==='demo'?' · Demokonto':''}</small></span>${svg('chevron','chevron')}</div><div class="account-bottom"><span class="account-balance">${a.balance===null?'Afventer saldo':esc(money(a.balance,a.currency,2))}</span><span class="account-number">${a.last4?'•• '+esc(a.last4):esc(a.currency)}</span></div></button>`).join(''):`<div class="empty-state">${svg('bank')}<h3>Din første konto starter her</h3><p>Forbind din bank for at se dine egne konti og saldi.</p><button class="button primary" data-connect>Forbind bank</button></div>`;
+  $('accounts').innerHTML=accounts.length?accounts.map(a=>`<div class="account-tile"><button class="account-card" data-account="${esc(a.id)}" data-currency="${esc(a.currency)}"><div class="account-top"><span class="account-bank-icon">${svg('bank')}</span><span class="account-name">${esc(a.name)}<small>${esc(a.bank)}${source==='demo'?' · Demokonto':''}</small></span>${svg('chevron','chevron')}</div><div class="account-bottom"><span class="account-balance">${a.balance===null?'Afventer saldo':esc(money(a.balance,a.currency,2))}</span><span class="account-number">${a.last4?'•• '+esc(a.last4):esc(a.currency)}</span></div></button><button class="text-button rename-account" data-rename="${esc(a.id)}" aria-label="Navngiv konto ${esc(a.name)}">Navngiv konto</button></div>`).join(''):`<div class="empty-state">${svg('bank')}<h3>Din første konto starter her</h3><p>Forbind din bank for at se dine egne konti og saldi.</p><button class="button primary" data-connect>Forbind bank</button></div>`;
   const previous=$('accountFilter').value;
   $('accountFilter').innerHTML='<option value="">Alle konti</option>'+accounts.filter(a=>a.currency===$('currency').value).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
   if ([...$('accountFilter').options].some(o=>o.value===previous)) $('accountFilter').value=previous;
@@ -197,6 +197,15 @@ document.addEventListener('click',async event=>{
   const close=event.target.closest('[data-close]'); if(close){$(close.dataset.close).close();return;}
   const nav=event.target.closest('[data-view]'); if(nav){setView(nav.dataset.view);window.scrollTo({top:0,behavior:'smooth'});return;}
   const mode=event.target.closest('[data-source]'); if(mode){await switchSource(mode.dataset.source);return;}
+  const rename=event.target.closest('[data-rename]'); if(rename){
+    const item=dashboard.accounts.find(a=>a.id===rename.dataset.rename);
+    if(!item)return;
+    $('accountNameForm').dataset.account=item.id;
+    $('accountNameInput').value=item.custom_name ?? item.name;
+    $('accountNameHint').textContent=`${item.bank} · •• ${item.last4}`;
+    showError('accountNameError','');$('accountNameDialog').showModal();
+    $('accountNameInput').focus();$('accountNameInput').select();return;
+  }
   const account=event.target.closest('[data-account]'); if(account){
     $('currency').value=account.dataset.currency;page=1;
     await refresh();$('accountFilter').value=account.dataset.account;setView('transactions');
@@ -272,3 +281,14 @@ async function init(){
 }
 if($('logoutButton'))$('logoutButton').onclick=async()=>{await api('/logout',{method:'POST',body:'{}'});window.location.assign('/login');};
 init();
+
+$('accountNameForm').addEventListener('submit',async event=>{
+  event.preventDefault();const button=$('saveAccountName');button.disabled=true;
+  showError('accountNameError','');
+  try{
+    await api('/api/accounts/'+encodeURIComponent(event.currentTarget.dataset.account)+'/name',{
+      method:'PUT',body:JSON.stringify({name:$('accountNameInput').value})});
+    await refresh();$('accountNameDialog').close();toast('Kontonavnet er gemt');
+  }catch(error){showError('accountNameError',error.message);}
+  finally{button.disabled=false;}
+});

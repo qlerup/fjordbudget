@@ -172,7 +172,7 @@ def create_app(config=None):
     def dashboard():
         source, month, currency = parameters()
         with connect(db_path) as db:
-            accounts = [dict(r) for r in db.execute('SELECT id,name,bank,last4,currency,balance,balance_type,synced_at FROM accounts WHERE source=? ORDER BY rowid', (source,))]
+            accounts = [dict(r) for r in db.execute('SELECT id,COALESCE(custom_name,name) name,custom_name,bank,last4,currency,balance,balance_type,synced_at FROM accounts WHERE source=? ORDER BY rowid', (source,))]
             rows = db.execute('''SELECT t.category,t.amount FROM transactions t JOIN accounts a ON a.id=t.account_id
                                  WHERE a.source=? AND t.currency=? AND substr(t.booked_on,1,7)=?''', (source, currency, month)).fetchall()
             budgets = {r['category']: r['amount'] for r in db.execute('SELECT category,amount FROM budgets WHERE source=? AND month=? AND currency=?', (source, month, currency))}
@@ -216,7 +216,7 @@ def create_app(config=None):
         where = ' AND '.join(conditions)
         with connect(db_path) as db:
             total = db.execute('SELECT count(*) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '+where, values).fetchone()[0]
-            rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,a.name account
+            rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,COALESCE(a.custom_name,a.name) account
                                  FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '''+where+' ORDER BY t.booked_on DESC,t.id DESC LIMIT 30 OFFSET ?', [*values, (page-1)*30]).fetchall()
         return jsonify(items=[dict(r) for r in rows], total=total, page=page, pages=max(1, (total+29)//30))
 
@@ -315,6 +315,21 @@ def create_app(config=None):
             return redirect('/?bank_result=connected')
         except (BankError, KeyError, ValueError):
             return redirect('/?bank_result=failed')
+
+    @app.put('/api/accounts/<account_id>/name')
+    def rename_account(account_id):
+        body = request.get_json()
+        name = body.get('name') if isinstance(body, dict) else None
+        if not isinstance(name, str) or len(name.strip()) > 100:
+            raise ValueError('Kontonavnet må højst være 100 tegn.')
+        name = name.strip()
+        if any(ord(char) < 32 for char in name):
+            raise ValueError('Kontonavnet må ikke indeholde linjeskift eller kontroltegn.')
+        with connect(db_path) as db:
+            changed = db.execute('UPDATE accounts SET custom_name=? WHERE id=?', (name or None, account_id))
+            if not changed.rowcount:
+                return jsonify(error='Kontoen findes ikke.'), 404
+        return jsonify(ok=True)
 
     @app.get('/api/sync')
     def sync_status():
