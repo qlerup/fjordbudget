@@ -18,6 +18,15 @@ class BankError(Exception):
     pass
 
 
+def account_name(account):
+    # Enable Banking's `name` is the holder, not the account label.
+    for field in ('details', 'product'):
+        value = account.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip()[:200]
+    return 'Bankkonto'
+
+
 class EnableBanking:
     def __init__(self, app_id, key_file, credential_store=None, cipher=None):
         self.app_id, self.key_file = app_id, key_file
@@ -36,7 +45,7 @@ class EnableBanking:
 
     def request(self, method, path, **kwargs):
         # Keep the transport itself restricted to account-information services.
-        allowed = ((method == 'GET' and re.fullmatch(r'/(aspsps|application|accounts/[^/]+/(balances|transactions))', path))
+        allowed = ((method == 'GET' and re.fullmatch(r'/(aspsps|application|accounts/[^/]+/(balances|transactions|details))', path))
                    or (method == 'POST' and path in ('/auth', '/sessions'))
                    or (method == 'DELETE' and re.fullmatch(r'/sessions/[^/]+', path)))
         if not allowed:
@@ -153,6 +162,9 @@ def sync_all(db_path, provider, cipher, progress):
             today = date.today()
             items = provider.transactions(uid, (today-timedelta(days=90)).isoformat(), today.isoformat())
             import_account(db_path, account['id'], items, balances)
+            details = provider.request('GET', f'/accounts/{quote(uid, safe="")}/details')
+            with connect(db_path) as db:
+                db.execute('UPDATE accounts SET name=? WHERE id=?', (account_name(details), account['id']))
         except (BankError, ValueError, KeyError) as error:
             errors.append(f'{account["name"]}: {str(error) if isinstance(error, BankError) else "Uventet dataformat fra banken."}')
     if errors:

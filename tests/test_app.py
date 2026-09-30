@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import create_app
-from banking import BankError, EnableBanking, import_account, normalize_transactions
+from banking import BankError, EnableBanking, account_name, import_account, normalize_transactions, sync_all
 from db import CATEGORIES, cents, connect
 
 
@@ -87,6 +87,23 @@ class AppTests(unittest.TestCase):
                 with self.assertRaises(BankError):
                     provider.request(method,path)
                 request.assert_not_called()
+
+    def test_account_label_uses_description_then_product_never_holder(self):
+        self.assertEqual(account_name({'name':'Holder','details':' Holiday ','product':'Savings'}),'Holiday')
+        self.assertEqual(account_name({'name':'Holder','details':' ','product':'Savings'}),'Savings')
+        self.assertEqual(account_name({'name':'Holder'}),'Bankkonto')
+
+    def test_sync_refreshes_existing_account_name(self):
+        self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
+        state=self.provider.calls[-1][2]['json']['state']
+        self.client.get('/bank/callback?state='+state+'&code=abc')
+        with connect(self.db) as db:
+            db.execute("UPDATE accounts SET name='Holder' WHERE source='live'")
+        def response(method,path,**kwargs):
+            return {'name':'Holder','product':'Savings'} if path.endswith('/details') else {'balances':[]}
+        with patch.object(self.provider,'request',side_effect=response), patch.object(self.provider,'transactions',return_value=[],create=True):
+            sync_all(self.db,self.provider,self.app.extensions['cipher'],lambda message:None)
+        self.assertEqual(self.client.get('/api/dashboard?source=live').json['accounts'][0]['name'],'Savings')
 
     def test_authorization_redirect_accepts_both_provider_hosts_only(self):
         for url in ['https://auth.enablebanking.com/ais/start?sessionid=test',

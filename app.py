@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from flask import Flask, g, jsonify, redirect, render_template, request, session
 from werkzeug.exceptions import HTTPException
 
-from banking import BankError, EnableBanking, sync_all
+from banking import BankError, EnableBanking, account_name, sync_all
 from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize
 from hub_auth import register_hub_auth
 
@@ -311,7 +311,7 @@ def create_app(config=None):
                     db.execute('''INSERT INTO accounts(id,source,connection_id,remote_id,name,bank,last4,currency)
                       VALUES (?,'live',?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET connection_id=excluded.connection_id,
                       remote_id=excluded.remote_id,name=excluded.name,currency=excluded.currency''',
-                               (account_id, connection_id, cipher.encrypt(account['uid'].encode()).decode(), account.get('name') or account.get('product') or 'Bankkonto', pending['bank'], iban[-4:], currency))
+                               (account_id, connection_id, cipher.encrypt(account['uid'].encode()).decode(), account_name(account), pending['bank'], iban[-4:], currency))
             return redirect('/?bank_result=connected')
         except (BankError, KeyError, ValueError):
             return redirect('/?bank_result=failed')
