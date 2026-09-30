@@ -1,0 +1,16 @@
+<!doctype html><html lang="da"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log ind · FjordBudget</title><link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/legal.css"><link rel="apple-touch-icon" href="/static/logos/icon-180.png"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"></head>
+<body class="legal-page"><main class="legal-content login-card">
+<img src="/static/logos/wordmark.svg" width="260" height="64" alt="FjordBudget">
+<p class="eyebrow">DIT PRIVATE ØKONOMISKE OVERBLIK</p><h1>Velkommen tilbage</h1>
+<p>Log ind med din FjordHub-konto. Åbner du appen fra FjordHub, bliver du logget ind automatisk.</p>
+{% if error %}<div class="error-box" role="alert">{{ error }}</div>{% endif %}
+<form method="post" action="/login" class="login-form">
+<input type="hidden" name="csrf" value="{{ session.get('csrf','') }}">
+<label for="username">FjordHub-brugernavn</label><input id="username" name="username" autocomplete="username" required maxlength="200" autofocus>
+<label for="password">Adgangskode</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="1024">
+<button class="button primary full-width" type="submit">Log ind</button>
+</form><p class="small">Kun budgettets ejer har adgang. Den første administrator, der logger ind, bliver installationens ejer.</p>
+<p><a href="/privacy">Privatlivspolitik</a> · <a href="/terms">Brugsvilkår</a></p>
+</main></body></html>

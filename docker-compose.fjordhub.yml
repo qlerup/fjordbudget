@@ -1,0 +1,39 @@
+name: fjordbudget
+services:
+  init-data:
+    build: .
+    user: "0:0"
+    command: [python, -c, "import os; os.chown('/data',10001,10001); os.chmod('/data',0o700)"]
+    volumes:
+      - ${DATA_DIR:?Data directory required}:/data
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER]
+    security_opt: [no-new-privileges:true]
+  fjordbudget:
+    build: .
+    container_name: fjordbudget
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+    ports:
+      - "${APP_PORT:-8060}:8080"
+    environment:
+      AUTH_MODE: fjordhub
+      FJORDHUB_URL: ${FJORDHUB_URL:?FjordHub URL required}
+      FJORDHUB_API_KEY: ${FJORDHUB_API_KEY:?FjordHub key required}
+      DATA_DIR: /data
+      TZ: ${TZ:-Europe/Copenhagen}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${DATA_DIR:?Data directory required}:/data
+    restart: unless-stopped
+    init: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

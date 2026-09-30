@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>FjordBudget · Din økonomi, samlet</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+<link rel="apple-touch-icon" href="/static/logos/icon-180.png"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"></head>
+<body>
+<svg class="symbols" aria-hidden="true"><defs>
+  <symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="icon-wallet" viewBox="0 0 24 24"><path d="M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 12h-6v5h6"/><path d="M16 14.5h1"/></symbol>
+  <symbol id="icon-arrows" viewBox="0 0 24 24"><path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"/></symbol>
+  <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 16v-5m5 5V7m5 9V3"/></symbol>
+  <symbol id="icon-bank" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5H3zm0 13h18M5 11v7m7-7v7m7-7v7"/></symbol>
+  <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></symbol>
+  <symbol id="icon-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3z"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 10a8 8 0 0 0-14-5L3 8m0-5v5h5M4 14a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></symbol>
+  <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+</defs></svg>
+<aside class="sidebar">
+  <a class="brand" href="/" aria-label="FjordBudget start"><img src="/static/logos/wordmark.svg" width="182" height="46" alt="FjordBudget"></a>
+  <div class="workspace"><span class="workspace-avatar">P</span><div>Min privatøkonomi<small>Dit personlige overblik</small></div><span class="workspace-dot"></span></div>
+  <p class="nav-label">DIT OVERBLIK</p>
+  <nav aria-label="Hovedmenu">
+    <button class="nav-item active" data-view="overview"><svg><use href="#icon-grid"/></svg>Overblik</button>
+    <button class="nav-item" data-view="accounts"><svg><use href="#icon-wallet"/></svg>Mine konti<span id="accountCount" class="nav-count">0</span></button>
+    <button class="nav-item" data-view="transactions"><svg><use href="#icon-arrows"/></svg>Posteringer</button>
+    <button class="nav-item" data-view="budget"><svg><use href="#icon-chart"/></svg>Mit budget</button>
+  </nav>
+  <p class="nav-label second-label">FORBINDELSER</p>
+  <button class="nav-item" data-connect><svg><use href="#icon-bank"/></svg>Mine banker</button>
+  <div class="sidebar-bottom"><div class="privacy-icon"><svg><use href="#icon-shield"/></svg></div><strong>Din økonomi. Dit overblik.</strong><p>Kun læseadgang til banken.<br>Ingen betalinger eller overførsler.</p><span class="local-status"><i></i> {{ 'Beskyttet med FjordHub-login' if managed else 'Kører lokalt på din computer' }}</span></div>
+  {% if managed %}<button id="logoutButton" class="text-button" type="button">Log ud</button>{% endif %}<div class="sidebar-footer"><span class="avatar">P</span><div>Privat arbejdsrum<small>FjordBudget · {{ 'FjordHub' if managed else 'Lokal version' }}</small></div></div>
+</aside>
+<main>
+  <header class="topbar"><span class="breadcrumb">Privatøkonomi <span>/</span> <strong id="breadcrumb">Overblik</strong></span><div class="topbar-right"><span class="read-badge"><svg><use href="#icon-shield"/></svg>Kun læseadgang</span><span class="avatar">P</span></div></header>
+  <div class="content">
+    <div class="page-heading"><div><p class="eyebrow">LIDT MERE RO I MAVEN</p><h1 id="pageTitle">Din økonomi, samlet.</h1><p id="pageSubtitle">Alle dine konti. Ét enkelt overblik.</p></div><button class="button primary" data-connect><svg><use href="#icon-plus"/></svg>Forbind bank</button></div>
+    <div class="toolbar"><div class="mode-switch" aria-label="Vælg data"><button class="selected" data-source="demo">Prøv med demodata</button><button data-source="live">Mine bankdata</button></div><div class="period-controls"><label class="sr-only" for="currency">Valuta</label><select id="currency"><option>DKK</option></select><label class="sr-only" for="month">Måned</label><input id="month" type="month"></div></div>
+    <div id="demoNotice" class="demo-notice"><span class="notice-dot"></span><span>Du udforsker demovisningen. Konti og posteringer er fiktive.</span><button data-connect>Tilføj din egen bank <span>↗</span></button></div>
+    <div id="loadError" class="error-box" role="alert" hidden></div>
+    <div id="loading" class="loading" role="status">Henter dit overblik …</div>
+    <div id="appContent" hidden>
+      <section class="summary-grid" data-section="summary" aria-label="Økonomisk overblik">
+        <article class="summary-card balance-card"><div class="summary-top">Samlet saldo <svg><use href="#icon-wallet"/></svg></div><div class="metric" id="balance">—</div><div class="metric-footer" id="balanceNote">På tværs af dine konti</div><span class="balance-decoration" aria-hidden="true"></span></article>
+        <article class="summary-card"><div class="summary-top">Indtægter <span class="metric-icon income">↙</span></div><div class="metric" id="income">—</div><div class="metric-footer">Denne måned · uden overførsler</div></article>
+        <article class="summary-card"><div class="summary-top">Udgifter <span class="metric-icon expense">↗</span></div><div class="metric" id="expenses">—</div><div class="metric-footer">Bogførte udgifter denne måned</div></article>
+        <article class="summary-card"><div class="summary-top">Tilbage i budgettet <span class="metric-icon budget-icon">◷</span></div><div class="metric" id="remaining">—</div><div class="metric-footer" id="remainingNote">Af dit månedsbudget</div></article>
+      </section>
+      <section class="accounts-section" data-section="accounts"><div class="section-heading"><div><h2>Mine konti <span class="count" id="accountsLabel">0</span></h2><p>Saldo lige nu, uanset valgt måned</p></div><button id="syncButton" class="button quiet"><svg><use href="#icon-refresh"/></svg>Opdater saldi</button></div><div id="accounts" class="accounts-grid"></div><p id="syncMessage" class="sync-status" role="status"></p></section>
+      <div class="insights" data-section="insights">
+        <section class="panel cashflow"><div class="section-heading"><div><h2>Ind og ud</h2><p>Din økonomi måned for måned</p></div><div class="legend"><span><i class="income-dot"></i>Indtægter</span><span><i class="expense-dot"></i>Udgifter</span></div></div><div id="cashflowChart" class="cashflow-chart"></div><div class="chart-footer"><span>Overførsler mellem konti er ikke medregnet</span><strong id="netCashflow"></strong></div></section>
+        <section class="panel budget-panel"><div class="section-heading"><div><h2>Dit månedsbudget</h2><p>Giv dine penge en retning</p></div><button class="text-button edit-budget">Rediger <span>↗</span></button></div><div id="budgetProgress"></div><div id="budgetPreview"></div><button class="budget-detail text-button" data-view="budget">Se hele budgettet <span>→</span></button></section>
+      </div>
+      <section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><div id="budgetFull"></div></section>
+      <section class="panel transactions-panel" data-section="transactions"><div class="section-heading"><div><h2>Posteringer</h2><p id="transactionSubtitle">Dine bogførte ind- og udbetalinger</p></div><span class="subtle-tag">Kun bogførte</span></div>
+        <div class="transaction-filters"><label class="search-field"><svg><use href="#icon-search"/></svg><input id="search" type="search" placeholder="Søg i posteringer …" aria-label="Søg i posteringer"></label><label class="sr-only" for="accountFilter">Konto</label><select id="accountFilter"><option value="">Alle konti</option></select><label class="sr-only" for="categoryFilter">Kategori</label><select id="categoryFilter"><option value="">Alle kategorier</option></select></div>
+        <div class="table-scroll"><table><thead><tr><th>Postering</th><th>Konto</th><th>Kategori</th><th>Dato</th><th class="amount-cell">Beløb</th></tr></thead><tbody id="transactionRows"></tbody></table></div><div id="emptyTransactions" class="empty-state" hidden><svg><use href="#icon-search"/></svg><h3>Ingen posteringer her endnu</h3><p>Prøv en anden måned eller et andet filter.</p></div><div class="table-footer"><span id="transactionCount"></span><div><button id="previousPage" class="page-button" aria-label="Forrige side">←</button><span id="pageLabel"></span><button id="nextPage" class="page-button" aria-label="Næste side">→</button></div></div>
+      </section>
+    </div>
+    <footer class="main-footer"><span>fjordbudget <span>·</span> Plads til det, der betyder noget.</span><span>Dine data gemmes lokalt</span></footer>
+  </div>
+</main>
+<dialog id="bankDialog" aria-labelledby="bankTitle"><div class="dialog-header"><div class="dialog-icon"><svg><use href="#icon-bank"/></svg></div><button class="icon-button" data-close="bankDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div><p class="eyebrow">DIT OVERBLIK STARTER HER</p><h2 id="bankTitle">Forbind din bank</h2><p class="dialog-intro">Se dine konti og posteringer ét sted. Du giver kun adgang til at læse dine bankdata.</p><div class="permission-box"><svg><use href="#icon-shield"/></svg><div><strong>Kun konti, saldi og posteringer</strong><span>FjordBudget kan ikke betale, overføre penge eller ændre noget i banken. Godkendelse foregår hos banken.</span></div></div><div id="bankSetup" hidden><h3>Bankforbindelsen skal sættes op én gang</h3><p>FjordBudget bruger Enable Banking til at hente bankdata. Du skal have et app-id og en privat API-nøgle fra tjenesten.</p><ol class="setup-steps"><li><strong>Opret en API-applikation</strong><span>Åbn <a href="https://enablebanking.com/cp/applications" target="_blank" rel="noreferrer">Enable Banking ↗</a>. Vælg Sandbox til test eller Production til dine egne konti.</span></li><li><strong>Registrer denne returadresse</strong><code id="callbackUrl"></code><span>Brug appens valgte adresse gennem hele bankgodkendelsen.</span></li><li><strong>Aktivér adgang til dine egne konti</strong><span>Ved Production skal egne konti først tilknyttes applikationen hos Enable Banking.</span></li></ol><p>Oplysninger om appen: <a href="/privacy" target="_blank" rel="noreferrer">Privatlivspolitik</a> · <a href="/terms" target="_blank" rel="noreferrer">Brugsvilkår</a>.</p><p>Privacy URL: <code id="privacyUrl"></code><br>Terms URL: <code id="termsUrl"></code></p><form id="bankCredentialsForm" autocomplete="off">
+<label for="bankAppId">App-id</label><input id="bankAppId" name="app_id" type="text" required maxlength="36" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false" autocapitalize="none">
+<label for="bankPrivateKey">Privat API-nøgle (secret / PEM)</label><textarea id="bankPrivateKey" name="private_key" required rows="5" maxlength="12000" spellcheck="false" autocapitalize="none" autocomplete="off" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+<p>Nøglen gemmes krypteret lokalt og vises ikke igen. Du behøver ikke ændre .env eller genstarte appen.</p>
+<button id="saveBankCredentials" type="submit" class="button primary full-width">Gem og fortsæt</button>
+</form><a class="text-button" href="https://enablebanking.com/docs/faq/" target="_blank" rel="noreferrer">Læs om adgang og vilkår ↗</a></div><div id="bankPicker" hidden><label id="bankSelectLabel" for="bankDropdownButton">Vælg din danske bank</label><select id="bankSelect" hidden aria-hidden="true" tabindex="-1"></select>
+<div id="bankDropdown" class="bank-dropdown">
+<button id="bankDropdownButton" class="bank-dropdown-button" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="bankOptions"><span id="bankSelectedName">Vælg bank</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>
+<div id="bankDropdownPanel" class="bank-dropdown-panel" hidden>
+<input id="bankSearch" type="search" role="combobox" aria-label="Søg efter bank" aria-controls="bankOptions" aria-expanded="false" aria-autocomplete="list" autocomplete="off" placeholder="Søg efter din bank …">
+<div id="bankOptions" role="listbox" aria-labelledby="bankSelectLabel"></div><p id="bankSearchEmpty" class="bank-search-empty" hidden>Ingen banker matcher din søgning.</p>
+</div></div><p id="bankAvailability" class="small muted" hidden>Kreditbanken er ikke tilgængelig med denne API-opsætning. Bruger du Sandbox, skal du oprette en Production-applikation og tilknytte dine egne konti hos Enable Banking.</p><button id="connectBank" class="button primary full-width">Fortsæt til bankens godkendelse <span>→</span></button><p class="small muted">Du vælger og godkender kontoadgangen i bankens flow. Tilgængelige konti og historik afhænger af banken.</p></div><button id="editBankCredentials" type="button" class="text-button" hidden>Skift API-oplysninger</button><div id="bankError" class="error-box" role="alert" hidden></div><div id="connections"></div><p class="small"><a href="/privacy" target="_blank" rel="noreferrer">Privatlivspolitik</a> · <a href="/terms" target="_blank" rel="noreferrer">Brugsvilkår</a></p></dialog>
+<dialog id="budgetDialog" aria-labelledby="budgetTitle"><div class="dialog-header"><p class="eyebrow">PLANLÆG DIN MÅNED</p><button class="icon-button" data-close="budgetDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div><h2 id="budgetTitle">Dit månedsbudget</h2><p class="dialog-intro" id="budgetDialogSubtitle"></p><form id="budgetForm"><div id="budgetFields" class="budget-fields"></div><div id="budgetError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetDialog">Annuller</button><button type="submit" class="button primary">Gem budget</button></div></form></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+</body></html>

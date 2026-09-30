@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Privatlivspolitik · FjordBudget</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/legal.css">
+<link rel="apple-touch-icon" href="assets/icon-180.png"><meta name="theme-color" content="#28533f"><link rel="manifest" href="assets/site.webmanifest"></head>
+<body class="legal-page">
+  <header class="legal-header"><a href="https://github.com/qlerup/fjordbudget" class="legal-brand">FjordBudget</a><a href="https://github.com/qlerup/fjordbudget">FjordBudget på GitHub →</a></header>
+  <main class="legal-content">
+    <p class="eyebrow">PERSONLIG ØKONOMI · EGEN INSTALLATION</p>
+    <h1>Privatlivspolitik</h1>
+    <p class="legal-date">Senest opdateret 30. september 2026</p>
+    
+    <p class="legal-intro">FjordBudget er en selvhostet budgetapp til én persons egne bankkonti. Denne politik beskriver, hvordan denne installation behandler oplysninger.</p>
+    <h2>Formål og drift</h2>
+    <p>Appen bruges til at samle konti, saldi og bogførte posteringer samt kategorisere udgifter og planlægge budgetter. Installationen drives af ejeren på ejerens egen computer eller FjordHub-server. Ejeren administrerer data, adgang og backup. Kontaktoplysningen for denne private installation er den e-mailadresse, ejeren angiver ved registrering af sin API-applikation hos Enable Banking.</p>
+    <h2>Oplysninger i appen</h2>
+    <p>Efter din godkendelse henter appen kontonavne, banknavn, valuta, saldi og posteringer med dato, beløb og beskrivelse. Tekster fra banken kan indeholde navne på betalingsmodparter. Appen gemmer kontoidentifikatorer til at genkende konti og de sidste fire tegn i et tilgængeligt IBAN. Egne budgetter, kategorier og oplysninger om bankens læsesamtykke gemmes også.</p>
+    <p>Demodata er fiktive og holdes adskilt fra bankdata. Appen indsamler ikke dit MitID-login eller din adgangskode til banken.</p>
+    <h2>Bankforbindelse og eksterne tjenester</h2>
+    <p>Bankdata hentes gennem Enable Bankings Account Information Services, når du forbinder banken og opdaterer data. Godkendelsen foregår i Enable Bankings og bankens flow. De behandler de oplysninger, der er nødvendige for forbindelsen, efter deres egne vilkår og privatlivspolitikker. Appen foretager ikke betalinger eller overførsler.</p>
+    <p>Læs <a href="https://enablebanking.com/privacy/" rel="noreferrer">Enable Bankings privatlivspolitik</a> og bankens oplysninger i godkendelsesflowet. FjordBudget indeholder ikke annoncer, analyseværktøjer eller eksterne sporingsscripts.</p>
+    <h2>Lokal lagring og beskyttelse</h2>
+    <p>Konti, posteringer og budgetter ligger i en lokal database i appens vedvarende Docker-datavolumen. API-oplysninger indsat i appen, bankens sessions-id'er og fjernkonto-id'er gemmes krypteret. Krypteringsnøglen ligger i samme datavolumen; denne beskyttelse erstatter derfor ikke beskyttelse af computeren og backup. Posteringer og budgetter er ikke krypteret i databasen. Ved den valgfrie filopsætning opbevarer ejeren selv sin private API-nøgle i en lokal nøglefil.</p>
+    <p>Browseren bruger en sessionscookie til at beskytte handlinger, login og bankgodkendelse. I FjordHub-tilstand valideres brugeren hos FjordHub, og ejerens bruger-id gemmes i installationen. Sessionen gælder højst 12 timer; fjernet app-adgang i FjordHub lukker også adgangen til budgettet. Valget mellem demo og egne data gemmes lokalt i browseren. Tekniske fejl kan registreres i lokale containerlogs.</p>
+    <h2>Opbevaring, afbrydelse og sletning</h2>
+    <p>Hentede posteringer og budgetter bevares, indtil ejeren sletter dem eller installationens data. Der er ingen automatisk udløbsfrist for lokal historik. Når samtykket udløber, kræver ny hentning en ny bankgodkendelse.</p>
+    <p>Under <strong>Mine banker → Afbryd bankadgang</strong> kan du tilbagekalde forbindelsen hos udbyderen. Det sletter ikke tidligere hentede oplysninger. Fuld lokal sletning kræver, at ejeren fjerner appens datavolumen og eventuelle nøglefiler og backups. Browserens lokale data kan slettes i browserindstillingerne. Sletning af den lokale kopi sletter ikke bankens eller Enable Bankings egne oplysninger.</p>
+    
+  </main>
+  <footer class="legal-footer"><a href="privacy.html">Privatlivspolitik</a><a href="terms.html">Brugsvilkår</a><a href="https://github.com/qlerup/fjordbudget">Se projektet</a></footer>
+</body>
+</html>

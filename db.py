@@ -1,0 +1,104 @@
+import calendar
+import sqlite3
+from contextlib import contextmanager
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
+
+CATEGORIES = ['Mad & indkøb', 'Bolig', 'Transport', 'Shopping', 'Fritid', 'Abonnementer', 'Sundhed', 'Andet', 'Indkomst', 'Overførsler']
+COLORS = ['#4b8266', '#7184b9', '#d9a453', '#b08ba4', '#74a7a2', '#a58b61', '#b97472', '#8e9594', '#377d65', '#929eae']
+CURRENCIES = {'DKK', 'EUR', 'USD', 'GBP', 'SEK', 'NOK', 'CHF', 'PLN'}
+
+
+def cents(value):
+    try:
+        amount = Decimal(str(value)) * 100
+        if not amount.is_finite() or amount != amount.to_integral_value() or abs(amount) > 10**14:
+            raise ValueError('Beløbet skal have højst to decimaler.')
+        return int(amount)
+    except (InvalidOperation, TypeError):
+        raise ValueError('Ugyldigt beløb.') from None
+
+
+@contextmanager
+def connect(path):
+    conn = sqlite3.connect(path, timeout=20)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA foreign_keys=ON')
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
+def initialize(path):
+    with connect(path) as db:
+        db.execute('PRAGMA journal_mode=WAL')
+        db.executescript('''
+        CREATE TABLE IF NOT EXISTS connections (
+          id TEXT PRIMARY KEY, bank TEXT NOT NULL, session_token TEXT NOT NULL,
+          valid_until TEXT NOT NULL, created_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS accounts (
+          id TEXT PRIMARY KEY, source TEXT NOT NULL CHECK(source IN ('demo','live')),
+          connection_id TEXT REFERENCES connections(id), remote_id TEXT,
+          name TEXT NOT NULL, bank TEXT NOT NULL, last4 TEXT NOT NULL,
+          currency TEXT NOT NULL, balance INTEGER, balance_type TEXT, synced_at TEXT);
+        CREATE TABLE IF NOT EXISTS transactions (
+          id INTEGER PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id),
+          external_id TEXT NOT NULL, booked_on TEXT NOT NULL, description TEXT NOT NULL,
+          amount INTEGER NOT NULL, currency TEXT NOT NULL, category TEXT NOT NULL,
+          category_manual INTEGER NOT NULL DEFAULT 0,
+          UNIQUE(account_id,external_id));
+        CREATE INDEX IF NOT EXISTS tx_account_date ON transactions(account_id,booked_on DESC);
+        CREATE TABLE IF NOT EXISTS budgets (
+          source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,
+          category TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>=0),
+          PRIMARY KEY(source,month,currency,category));
+        CREATE TABLE IF NOT EXISTS oauth_states (
+          state_hash TEXT PRIMARY KEY, browser_hash TEXT NOT NULL, bank TEXT NOT NULL,
+          expires REAL NOT NULL);
+        PRAGMA user_version=1;
+        ''')
+        seed_demo(db)
+
+
+def seed_demo(db):
+    if db.execute("SELECT 1 FROM accounts WHERE source='demo'").fetchone():
+        return
+    today = date.today()
+    for aid, name, tail, balance in [('daily', 'Lønkonto', '4821', 2487650), ('bills', 'Budgetkonto', '9036', 1260000), ('save', 'Opsparing', '7150', 6840000)]:
+        db.execute('INSERT INTO accounts (id,source,name,bank,last4,currency,balance,balance_type,synced_at) VALUES (?,?,?,?,?,?,?,?,?)',
+                   ('demo-'+aid, 'demo', name, 'Eksempelbanken', tail, 'DKK', balance, 'CLBD', today.isoformat()))
+    shops = [('REMA 1000', 'Mad & indkøb', -38650), ('Netto', 'Mad & indkøb', -21495), ('DSB', 'Transport', -9600),
+             ('Bageriet på hjørnet', 'Mad & indkøb', -6800), ('Café Central', 'Fritid', -18500), ('Matas', 'Sundhed', -14995),
+             ('Føtex', 'Mad & indkøb', -57320), ('ARKET', 'Shopping', -49900), ('Q8', 'Transport', -46250)]
+    for months_back in range(4):
+        ordinal = today.year * 12 + today.month - 1 - months_back
+        year, m0 = divmod(ordinal, 12)
+        first = date(year, m0+1, 1)
+        last = min(calendar.monthrange(year, m0+1)[1], today.day) if months_back == 0 else calendar.monthrange(year, m0+1)[1]
+        rows = [(1, 'daily', 'Løn', 3250000, 'Indkomst'), (1, 'bills', 'Husleje', -820000, 'Bolig'),
+                (2, 'bills', 'Internet · Waoo', -29900, 'Abonnementer'), (3, 'daily', 'Spotify', -10900, 'Abonnementer'),
+                (1, 'daily', 'Til budgetkonto', -1100000, 'Overførsler'), (1, 'bills', 'Fra lønkonto', 1100000, 'Overførsler'),
+                (2, 'daily', 'Til opsparing', -350000, 'Overførsler'), (2, 'save', 'Fra lønkonto', 350000, 'Overførsler')]
+        for day in range(2, last+1):
+            label, cat, amount = shops[(day+months_back*2) % len(shops)]
+            rows.append((day, 'daily', label, amount - (day % 3)*100, cat))
+        for i, (day, aid, label, amount, cat) in enumerate(rows):
+            if day > last:
+                continue
+            booked = first.replace(day=day).isoformat()
+            db.execute('INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category) VALUES (?,?,?,?,?,?,?)',
+                       ('demo-'+aid, f'{first}-{i}', booked, label, amount, 'DKK', cat))
+        for cat, amount in zip(CATEGORIES[:8], [450000, 850000, 180000, 150000, 180000, 80000, 70000, 120000]):
+            db.execute('INSERT INTO budgets VALUES (?,?,?,?,?)', ('demo', first.strftime('%Y-%m'), 'DKK', cat, amount))
+
+
+def categorize(description, amount):
+    label = description.casefold()
+    for terms, cat in [(['overførsel', 'opsparing'], 'Overførsler'), (['netto', 're ma', 'rema', 'føtex', 'lidl', 'superbrugsen', 'bager'], 'Mad & indkøb'),
+                       (['husleje', 'realkredit'], 'Bolig'), (['dsb', 'rejsekort', 'q8', 'circle k'], 'Transport'),
+                       (['netflix', 'spotify', 'waoo', 'yousee'], 'Abonnementer')]:
+        if any(term in label for term in terms):
+            return cat
+    return 'Indkomst' if amount > 0 else 'Andet'
