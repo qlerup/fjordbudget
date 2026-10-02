@@ -221,6 +221,9 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#accountFilter')).to_have_value('demo-daily')
         self.page.locator('#search').fill('Netto')
         expect(self.page.locator('#transactionRows')).to_contain_text('Netto')
+        for text in self.page.locator('.merchant-kind').all_text_contents():
+            self.assertIn(' \u00b7 ',text)
+            self.assertNotIn('?',text)
         expect(self.page.locator('#transactionRows')).not_to_contain_text('Spotify')
         category=self.page.locator('#transactionRows .category-select').first
         category.select_option('Fritid')
