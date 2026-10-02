@@ -171,10 +171,76 @@ def create_app(config=None):
                 db.execute('DELETE FROM categories WHERE name=?',(name,))
         return jsonify(ok=True,items=stored_categories())
 
+    @app.route('/api/budget-categories', methods=['POST', 'DELETE'])
+    def manage_budget_categories():
+        body = request.get_json()
+        name = body.get('name') if isinstance(body, dict) else None
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 60 or any(ord(c) < 32 for c in name):
+            raise ValueError('Kategorinavnet skal være på 1–60 tegn uden linjeskift.')
+        name = name.strip()
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            categories = budget_category_list(db)
+            if request.method == 'POST':
+                if any(transaction_title(c['name']) == transaction_title(name) for c in categories):
+                    raise ValueError('Budgetkategorien findes allerede.')
+                db.execute('INSERT INTO budget_categories(name,color) VALUES (?,?)',
+                           (name, COLORS[len(categories) % len(COLORS)]))
+            else:
+                if name not in [c['name'] for c in categories]:
+                    raise ValueError('Budgetkategorien findes ikke.')
+                db.execute('UPDATE categories SET budget_category=NULL WHERE budget_category=?', (name,))
+                db.execute('DELETE FROM budgets WHERE category=?', (name,))
+                db.execute('DELETE FROM budget_categories WHERE name=?', (name,))
+        return jsonify(ok=True)
+
+    @app.route('/api/savings-goals', methods=['GET', 'POST'])
+    @app.route('/api/savings-goals/<int:goal_id>', methods=['PUT', 'DELETE'])
+    def savings_goals(goal_id=None):
+        source, _, currency = parameters()
+        if request.method == 'GET':
+            with connect(db_path) as db:
+                items = [dict(row) for row in db.execute(
+                    'SELECT id,name,target_amount,deadline,currency FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id',
+                    (source, currency))]
+            return jsonify(items=items)
+        if request.method != 'DELETE':
+            body = request.get_json()
+            name = body.get('name') if isinstance(body, dict) else None
+            if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or any(ord(c)<32 for c in name):
+                raise ValueError('Navnet skal være på 1–80 tegn uden linjeskift.')
+            amount = cents(body.get('target_amount'))
+            if amount <= 0:
+                raise ValueError('Opsparingsmålet skal være større end 0.')
+            deadline = body.get('deadline')
+            if not isinstance(deadline, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', deadline):
+                raise ValueError('Vælg en gyldig deadline.')
+            try:
+                date.fromisoformat(deadline)
+            except ValueError:
+                raise ValueError('Vælg en gyldig deadline.') from None
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            if goal_id is not None and not db.execute(
+                'SELECT 1 FROM savings_goals WHERE id=? AND source=? AND currency=?',
+                (goal_id, source, currency)).fetchone():
+                return jsonify(error='Opsparingsmålet findes ikke.'), 404
+            if request.method == 'POST':
+                goal_id = db.execute('INSERT INTO savings_goals(source,currency,name,target_amount,deadline) VALUES (?,?,?,?,?)',
+                                    (source, currency, name.strip(), amount, deadline)).lastrowid
+            elif request.method == 'PUT':
+                db.execute('UPDATE savings_goals SET name=?,target_amount=?,deadline=? WHERE id=?',
+                           (name.strip(), amount, deadline, goal_id))
+            else:
+                db.execute('DELETE FROM savings_goals WHERE id=?', (goal_id,))
+        return jsonify(ok=True, id=goal_id)
+
     @app.get('/api/config')
     def configuration():
         categories = stored_categories()
-        return jsonify(provider_configured=provider.configured, callback_url=public_url()+'/bank/callback',
+        with connect(db_path) as db:
+            has_bank_connections = db.execute('SELECT 1 FROM connections LIMIT 1').fetchone() is not None
+        return jsonify(has_bank_connections=has_bank_connections, provider_configured=provider.configured, callback_url=public_url()+'/bank/callback',
                        privacy_url=public_url()+'/privacy', terms_url=public_url()+'/terms',
                        categories=[c['name'] for c in categories], colors=[c['color'] for c in categories], currencies=sorted(CURRENCIES),
                        month=date.today().strftime('%Y-%m'), read_only=True)
@@ -216,6 +282,7 @@ def create_app(config=None):
     def dashboard():
         source, month, currency = parameters()
         with connect(db_path) as db:
+            has_bank_connections = db.execute('SELECT 1 FROM connections LIMIT 1').fetchone() is not None
             accounts = [dict(r) for r in db.execute('SELECT id,COALESCE(custom_name,name) name,custom_name,bank,last4,currency,balance,balance_type,synced_at FROM accounts WHERE source=? ORDER BY rowid', (source,))]
             rows = db.execute('''SELECT t.category,t.amount,c.budget_category FROM transactions t LEFT JOIN categories c ON c.name=t.category JOIN accounts a ON a.id=t.account_id
                                  WHERE a.source=? AND t.currency=? AND substr(t.booked_on,1,7)=?''', (source, currency, month)).fetchall()
@@ -233,7 +300,7 @@ def create_app(config=None):
         categories = [{'name': cat['name'], 'color': cat['color'], 'spent': -sum(r['amount'] for r in rows if r['budget_category'] == cat['name'] and r['amount'] < 0 and r['category'] != 'Overførsler'),
                        'budget': budgets.get(cat['name'], 0)} for cat in stored_budget_categories()]
         selected = [a for a in accounts if a['currency'] == currency]
-        return jsonify(accounts=accounts, connections=connections, income=income, expenses=expenses,
+        return jsonify(has_bank_connections=has_bank_connections, accounts=accounts, connections=connections, income=income, expenses=expenses,
                        balance=sum(a['balance'] for a in selected if a['balance'] is not None), missing_balances=sum(a['balance'] is None for a in selected),
                        budget=sum(budgets.values()), budget_spent=sum(c['spent'] for c in categories), categories=categories, months=months, history=list(reversed(history)), month=month)
 

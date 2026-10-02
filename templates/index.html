@@ -7,6 +7,7 @@
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
+  <script src="/static/savings.js" defer></script>
 <link rel="apple-touch-icon" href="/static/logos/icon-180.png"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"></head>
 <body>
 <svg class="symbols" aria-hidden="true"><defs>
@@ -21,6 +22,7 @@
   <symbol id="icon-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3z"/><path d="m8 12 3 3 5-6"/></symbol>
   <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 10a8 8 0 0 0-14-5L3 8m0-5v5h5M4 14a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></symbol>
   <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
 </defs></svg>
 <aside class="sidebar">
   <a class="brand" href="/" aria-label="FjordBudget start"><img src="/static/logos/wordmark.svg" width="182" height="46" alt="FjordBudget"></a>
@@ -31,6 +33,7 @@
     <button class="nav-item" data-view="accounts"><svg><use href="#icon-wallet"/></svg>Mine konti<span id="accountCount" class="nav-count">0</span></button>
     <button class="nav-item" data-view="transactions"><svg><use href="#icon-arrows"/></svg>Posteringer</button>
     <button class="nav-item" data-view="budget"><svg><use href="#icon-chart"/></svg>Mit budget</button>
+    <button class="nav-item" data-view="savings" aria-label="Opsparingsmål"><svg><use href="#icon-target"/></svg>Opsparingsmål</button>
   <button class="nav-item" data-view="categories" aria-label="Kategorier"><svg><use href="#icon-grid"/></svg>Kategorier</button></nav>
   <p class="nav-label second-label">FORBINDELSER</p>
   <button class="nav-item" data-connect><svg><use href="#icon-bank"/></svg>Mine banker</button>
@@ -41,8 +44,8 @@
   <header class="topbar"><span class="breadcrumb">Privatøkonomi <span>/</span> <strong id="breadcrumb">Overblik</strong></span><div class="topbar-right"><span class="read-badge"><svg><use href="#icon-shield"/></svg>Kun læseadgang</span><span class="avatar">P</span></div></header>
   <div class="content">
     <div class="page-heading"><div><p class="eyebrow">LIDT MERE RO I MAVEN</p><h1 id="pageTitle">Din økonomi, samlet.</h1><p id="pageSubtitle">Alle dine konti. Ét enkelt overblik.</p></div><button class="button primary" data-connect><svg><use href="#icon-plus"/></svg>Forbind bank</button></div>
-    <div class="toolbar"><div class="mode-switch" aria-label="Vælg data"><button class="selected" data-source="demo">Prøv med demodata</button><button data-source="live">Mine bankdata</button></div><div class="period-controls"><label class="sr-only" for="currency">Valuta</label><select id="currency"><option>DKK</option></select><label class="sr-only" for="month">Måned</label><input id="month" type="month"></div></div>
-    <div id="demoNotice" class="demo-notice"><span class="notice-dot"></span><span>Du udforsker demovisningen. Konti og posteringer er fiktive.</span><button data-connect>Tilføj din egen bank <span>↗</span></button></div>
+    <div class="toolbar"><div class="mode-switch" hidden aria-label="Vælg data"><button class="selected" data-source="demo">Prøv med demodata</button><button data-source="live">Mine bankdata</button></div><div class="period-controls"><label class="sr-only" for="currency">Valuta</label><select id="currency"><option>DKK</option></select><label class="sr-only" for="month">Måned</label><input id="month" type="month"></div></div>
+    <div id="demoNotice" class="demo-notice" hidden><span class="notice-dot"></span><span>Du udforsker demovisningen. Konti og posteringer er fiktive.</span><button data-connect>Tilføj din egen bank <span>↗</span></button></div>
     <div id="loadError" class="error-box" role="alert" hidden></div>
     <div id="loading" class="loading" role="status">Henter dit overblik …</div>
     <div id="appContent" hidden>
@@ -63,7 +66,8 @@
 <div id="categoryError" class="error-box" role="alert" hidden></div><div id="categoryList"></div>
 <p class="small muted">Andet, Indkomst og Overførsler er faste kategorier, som bruges i overblikkets beregninger. Ved sletning flyttes posteringer og regler til den kategori, du vælger. Budgetkategorier og budgetbeløb bevares.</p>
 </section>
-<section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><div id="budgetFull"></div></section>
+{% include 'savings.html' %}
+<section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><form id="budgetCategoryCreateForm" class="budget-category-create"><label for="newBudgetCategoryName">Ny budgetkategori</label><div><input id="newBudgetCategoryName" maxlength="60" required placeholder="Fx Ferie eller Bil"><button class="button quiet" type="submit">Tilføj budgetkategori</button></div></form><p class="small muted">Tilknyt posteringernes kategorier til dit budget under <button type="button" class="text-button" data-view="categories">Kategorier</button>.</p><div id="budgetCategoryError" class="error-box" role="alert" hidden></div><div id="budgetFull"></div></section>
       <section class="panel transactions-panel" data-section="transactions"><div class="section-heading"><div><h2>Posteringer</h2><p id="transactionSubtitle">Dine bogførte ind- og udbetalinger</p></div><span class="subtle-tag">Kun bogførte</span></div>
         <p class="small muted">Når du ændrer en kategori, gælder det alle eksisterende og fremtidige posteringer med samme titel på tværs af dine konti.</p>
         <div class="transaction-filters"><label class="search-field"><svg><use href="#icon-search"/></svg><input id="search" type="search" placeholder="Søg i posteringer …" aria-label="Søg i posteringer"></label><label class="sr-only" for="accountFilter">Konto</label><select id="accountFilter"><option value="">Alle konti</option></select><label class="sr-only" for="categoryFilter">Kategori</label><select id="categoryFilter"><option value="">Alle kategorier</option></select></div>
@@ -85,6 +89,19 @@
 <input id="bankSearch" type="search" role="combobox" aria-label="Søg efter bank" aria-controls="bankOptions" aria-expanded="false" aria-autocomplete="list" autocomplete="off" placeholder="Søg efter din bank …">
 <div id="bankOptions" role="listbox" aria-labelledby="bankSelectLabel"></div><p id="bankSearchEmpty" class="bank-search-empty" hidden>Ingen banker matcher din søgning.</p>
 </div></div><p id="bankAvailability" class="small muted" hidden>Kreditbanken er ikke tilgængelig med denne API-opsætning. Bruger du Sandbox, skal du oprette en Production-applikation og tilknytte dine egne konti hos Enable Banking.</p><button id="connectBank" class="button primary full-width">Fortsæt til bankens godkendelse <span>→</span></button><p class="small muted">Du vælger og godkender kontoadgangen i bankens flow. Tilgængelige konti og historik afhænger af banken.</p></div><button id="editBankCredentials" type="button" class="text-button" hidden>Skift API-oplysninger</button><div id="bankError" class="error-box" role="alert" hidden></div><div id="connections"></div><p class="small"><a href="/privacy" target="_blank" rel="noreferrer">Privatlivspolitik</a> · <a href="/terms" target="_blank" rel="noreferrer">Brugsvilkår</a></p></dialog>
+<dialog id="savingsDialog" aria-labelledby="savingsDialogTitle">
+  <div class="dialog-header"><h2 id="savingsDialogTitle">Nyt opsparingsmål</h2><button type="button" class="icon-button" data-close="savingsDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+  <p id="savingsContext" class="dialog-intro"></p>
+  <form id="savingsForm" class="savings-form">
+    <label for="savingsName">Hvad sparer du op til?</label><input id="savingsName" name="name" maxlength="80" required placeholder="Fx sommerferie, bil eller bolig">
+    <label for="savingsAmount">Hvor meget vil du spare op?</label><input id="savingsAmount" name="target_amount" type="number" min="0.01" max="1000000000000" step="0.01" required inputmode="decimal">
+    <label for="savingsDeadline">Hvornår skal målet være nået?</label><input id="savingsDeadline" name="deadline" type="date" required>
+    <div id="savingsFormError" class="error-box" role="alert" hidden></div>
+    <div class="dialog-actions"><button type="button" class="button quiet" data-close="savingsDialog">Annuller</button><button type="submit" class="button primary">Gem opsparingsmål</button></div>
+  </form>
+</dialog>
+<dialog id="savingsDeleteDialog" aria-labelledby="savingsDeleteTitle"><h2 id="savingsDeleteTitle">Slet opsparingsmål</h2><p id="savingsDeleteText"></p><form id="savingsDeleteForm"><div id="savingsDeleteError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="savingsDeleteDialog">Annuller</button><button type="submit" class="button primary">Slet mål</button></div></form></dialog>
+<dialog id="budgetCategoryDeleteDialog" aria-labelledby="budgetCategoryDeleteTitle"><h2 id="budgetCategoryDeleteTitle">Fjern budgetkategori</h2><p id="budgetCategoryDeleteText"></p><form id="budgetCategoryDeleteForm"><div id="budgetCategoryDeleteError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetCategoryDeleteDialog">Annuller</button><button type="submit" class="button primary">Fjern budgetkategori</button></div></form></dialog>
 <dialog id="budgetDialog" aria-labelledby="budgetTitle"><div class="dialog-header"><p class="eyebrow">PLANLÆG DIN MÅNED</p><button class="icon-button" data-close="budgetDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div><h2 id="budgetTitle">Dit månedsbudget</h2><p class="dialog-intro" id="budgetDialogSubtitle"></p><form id="budgetForm"><div id="budgetFields" class="budget-fields"></div><div id="budgetError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetDialog">Annuller</button><button type="submit" class="button primary">Gem budget</button></div></form></dialog>
 <dialog id="accountNameDialog" aria-labelledby="accountNameTitle">
 <div class="dialog-header"><h2 id="accountNameTitle">Navngiv konto</h2><button class="icon-button" data-close="accountNameDialog" aria-label="Luk">×</button></div>

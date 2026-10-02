@@ -31,3 +31,69 @@
 .category-create{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:22px 0}.category-create input{padding:12px;border:1px solid var(--line);border-radius:8px;min-width:0}.category-management-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--line);padding:14px 0}.category-management-row>span{display:flex;align-items:center;gap:10px;overflow-wrap:anywhere;min-width:0}#categoryReplacement{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:8px}@media(max-width:760px){.category-create input{width:100%}.sidebar{gap:5px}.sidebar nav{flex-shrink:0}}
 
 .category-management-row{flex-wrap:wrap}.category-budget-link{display:flex;flex-direction:column;gap:6px;font-size:11px;margin-left:auto}.category-budget-link select{max-width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}@media(max-width:760px){.category-management-row>span{width:100%}.category-budget-link{margin-left:0;max-width:100%}}
+/* Readable typography for navigation, controls and transaction details. */
+:root{--muted:#56675d}
+.workspace{font-size:14px}
+.workspace small,.sidebar-footer small,.local-status{font-size:12px;color:var(--muted)}
+.nav-label{font-size:11px;color:var(--muted)}
+.nav-item{color:#506357}
+.sidebar-bottom strong{font-size:14px}
+.sidebar-bottom p{font-size:13px;color:var(--muted)}
+.eyebrow{font-size:11px;color:var(--muted)}
+.page-heading p:last-child{font-size:15px;line-height:1.6}
+.button,.mode-switch button,select,input[type=month]{font-size:14px}
+.quiet,.mode-switch button{color:#506357}
+.section-heading h2{font-size:18px}
+.section-heading p,.small,.table-footer{font-size:13px;color:var(--muted);line-height:1.6}
+.search-field input,.transaction-filters select{font-size:14px;min-height:42px}
+.search-field input::placeholder{color:var(--muted);opacity:1}
+.transaction-filters select{max-width:220px}
+.subtle-tag{font-size:12px;color:#506357}
+.transactions-panel th{font-size:13px;font-weight:600;color:#506357;padding-top:12px;padding-bottom:12px}
+.transactions-panel td{font-size:14px;color:var(--muted);line-height:1.5}
+.merchant-name{font-size:15px;font-weight:600;color:var(--ink)}
+.merchant-kind{font-size:12px;color:var(--muted)}
+.merchant-logo{color:#506357;font-size:13px}
+.category-select{font-size:13px;color:#40543e;min-height:36px;max-width:170px}
+.transactions-panel td.amount-cell{font-size:15px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums}
+.transactions-panel td.amount-cell.positive{color:#285a44!important}
+@media(max-width:760px){
+  .page-heading{flex-wrap:wrap}
+  .page-heading>.button,.section-heading .button{font-size:13px}
+  .transaction-filters select{max-width:none}
+  .merchant-name{white-space:normal;overflow-wrap:anywhere}
+  .category-select{max-width:100%}
+}
+@media(max-width:380px){
+  .sidebar{flex-wrap:wrap;gap:8px}
+  .sidebar nav{width:100%;justify-content:space-between}
+}
+
+.budget-category-create{margin:20px 0 12px}
+.budget-category-create label{display:block;font-size:14px;font-weight:600;margin-bottom:8px}
+.budget-category-create>div{display:flex;gap:10px;flex-wrap:wrap}
+.budget-category-create input{min-width:0;flex:1;max-width:360px;border:1px solid var(--line);border-radius:8px;padding:11px;font-size:15px;color:var(--ink)}
+#budgetFull .budget-category{flex-wrap:wrap;overflow-wrap:anywhere;min-width:0}
+#budgetFull .budget-category .text-button{font-size:13px;color:var(--muted);margin-left:8px}
+#budgetFull .budget-row{column-gap:12px}
+@media(max-width:760px){.budget-category-create>div{flex-direction:column}.budget-category-create input{max-width:none;width:100%}#budgetFull .budget-row{grid-template-columns:minmax(0,1fr)}#budgetFull .budget-value{text-align:left}#budgetFull .progress{grid-column:1}}
+.savings-panel{margin-top:25px}
+.savings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:18px;margin-top:24px}
+.savings-card{border:1px solid var(--line);border-radius:12px;padding:24px;min-width:0;background:#fafbf8}
+.savings-icon{display:inline-flex;padding:10px;border-radius:10px;background:var(--pale);color:var(--green)}
+.savings-card h3{font-size:18px;line-height:1.4;margin:18px 0 12px;overflow-wrap:anywhere}
+.savings-target{font-size:26px;font-weight:650;letter-spacing:-.5px;margin:0 0 12px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.savings-deadline,.savings-status{font-size:14px;line-height:1.6;color:var(--muted);margin:8px 0}
+.savings-status{color:#8a4935}
+.savings-actions{display:flex;align-items:center;gap:20px;margin-top:24px}
+.savings-actions .text-button{font-size:14px;color:var(--muted)}
+.savings-form{display:grid;gap:10px;margin-top:20px}
+.savings-form label{font-size:14px;font-weight:600;margin-top:8px}
+.savings-form input{width:100%;min-width:0;max-width:100%;padding:12px;border:1px solid #ccd6cb;border-radius:8px;background:white;color:var(--ink);font-size:16px}
+.savings-form .dialog-actions{margin-top:16px;flex-wrap:wrap}
+@media(max-width:760px){.sidebar{flex-wrap:wrap;gap:8px}.sidebar nav{width:100%;justify-content:space-between}.savings-card{padding:20px}.savings-panel .section-heading{flex-wrap:wrap}}
+
+.mode-switch[hidden]+.period-controls{margin-left:auto}
+.category-management-row>[data-delete-category]{align-self:flex-end;min-height:42px}
+.category-budget-link select{min-height:42px}
+@media(min-width:761px){.sidebar{overflow-y:auto}.sidebar>*{flex-shrink:0}}

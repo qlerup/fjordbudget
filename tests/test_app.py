@@ -57,6 +57,61 @@ class AppTests(unittest.TestCase):
         euro=self.client.get('/api/dashboard?source=demo&currency=EUR').json
         self.assertEqual((euro['balance'],euro['income'],euro['expenses']),(0,0,0))
 
+    def test_budget_category_lifecycle_preserves_transactions(self):
+        endpoint = '/api/budget-categories'
+        self.assertEqual(self.client.post(endpoint, json={'name':'Ferie'}).status_code, 403)
+        for name in ['', 'x'*61, 'bad\nname']:
+            self.assertEqual(self.client.post(endpoint, json={'name':name}, headers=self.headers).status_code, 400)
+        self.assertEqual(self.client.post(endpoint, json={'name':'Ferie'}, headers=self.headers).status_code, 200)
+        self.assertEqual(self.client.post(endpoint, json={'name':' ferie '}, headers=self.headers).status_code, 400)
+        with connect(self.db) as db:
+            before = [tuple(r) for r in db.execute('SELECT * FROM transactions')]
+            db.execute("UPDATE categories SET budget_category='Ferie' WHERE name='Transport'")
+            for source in ['demo','live']:
+                db.execute('INSERT INTO budgets VALUES (?,?,?,?,?)', (source,self.month,'DKK','Ferie',12300))
+        result = self.client.delete(endpoint, json={'name':'Ferie'}, headers=self.headers)
+        self.assertEqual(result.status_code, 200)
+        with connect(self.db) as db:
+            self.assertEqual(before, [tuple(r) for r in db.execute('SELECT * FROM transactions')])
+            self.assertIsNone(db.execute("SELECT budget_category FROM categories WHERE name='Transport'").fetchone()[0])
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM budgets WHERE category='Ferie'").fetchone()[0], 0)
+        self.assertEqual(self.client.delete(endpoint, json={'name':'Ferie'}, headers=self.headers).status_code, 400)
+        self.client.delete(endpoint, json={'name':'Transport'}, headers=self.headers)
+        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        self.assertNotIn('Transport', [c['name'] for c in self.client.get('/api/categories').json['budget_categories']])
+
+    def test_savings_goals_validation_scope_persistence_and_delete(self):
+        endpoint='/api/savings-goals'
+        body={'name':'Ferie', 'target_amount':'12345.67', 'deadline':'2027-06-01'}
+        self.assertEqual(self.client.post(endpoint,json=body).status_code,403)
+        for field,value in [('name',''),('name','x'*81),('name','bad\nname'),('target_amount','0'),('target_amount','-1'),('target_amount','NaN'),('target_amount','0.001'),('deadline','2027-02-30'),('deadline',None)]:
+            with self.subTest(field=field,value=value):
+                self.assertEqual(self.client.post(endpoint,json={**body,field:value},headers=self.headers).status_code,400)
+        result=self.client.post(endpoint+'?source=live',json=body,headers=self.headers)
+        self.assertEqual(result.status_code,200)
+        goal_id=result.json['id']
+        self.assertEqual(self.client.get(endpoint).json['items'],[])
+        self.assertEqual(self.client.get(endpoint+'?source=live&currency=EUR').json['items'],[])
+        item=self.client.get(endpoint+'?source=live&month=2028-01').json['items'][0]
+        self.assertEqual(item['target_amount'],1234567)
+        self.assertEqual(self.client.delete(f'{endpoint}/{goal_id}',headers=self.headers).status_code,404)
+        self.assertEqual(self.client.put(f'{endpoint}/{goal_id}?source=live',json={**body,'name':'Bil','target_amount':'20000'},headers=self.headers).status_code,200)
+        restarted=create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider}).test_client()
+        self.assertEqual(restarted.get(endpoint+'?source=live').json['items'][0]['name'],'Bil')
+        self.assertEqual(self.client.delete(f'{endpoint}/{goal_id}?source=live',headers=self.headers).status_code,200)
+        self.assertEqual(self.client.get(endpoint+'?source=live').json['items'],[])
+
+    def test_demo_availability_depends_on_bank_connection_not_accounts(self):
+        self.assertFalse(self.client.get('/api/config').json['has_bank_connections'])
+        with connect(self.db) as db:
+            db.execute("INSERT INTO connections VALUES ('bank-test','Test Bank','unused','2027-12-31','2026-10-02')")
+        self.assertTrue(self.client.get('/api/config').json['has_bank_connections'])
+        for source in ['live','demo']:
+            self.assertTrue(self.client.get('/api/dashboard?source='+source).json['has_bank_connections'])
+        with connect(self.db) as db:
+            db.execute("DELETE FROM connections WHERE id='bank-test'")
+        self.assertFalse(self.client.get('/api/config').json['has_bank_connections'])
+
     def test_amounts_are_exact_and_invalid_precision_rejected(self):
         self.assertEqual(cents('0.29'),29)
         self.assertEqual(cents('-573.20'),-57320)

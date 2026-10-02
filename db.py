@@ -63,6 +63,12 @@ def initialize(path):
         CREATE TABLE IF NOT EXISTS categories (
           name TEXT PRIMARY KEY, color TEXT NOT NULL, protected INTEGER NOT NULL DEFAULT 0);
         CREATE TABLE IF NOT EXISTS budget_categories (name TEXT PRIMARY KEY, color TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS savings_goals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source TEXT NOT NULL CHECK(source IN ('demo','live')),
+          currency TEXT NOT NULL, name TEXT NOT NULL,
+          target_amount INTEGER NOT NULL CHECK(target_amount>0),
+          deadline TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS budgets (
           source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,

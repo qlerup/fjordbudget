@@ -42,6 +42,91 @@ class UITests(unittest.TestCase):
         self.assertEqual(self.errors,[])
         self.context.close()
 
+    def test_connected_bank_hides_demo_and_overrides_saved_source(self):
+        from db import connect
+        db_path=self.app.extensions['db_path']
+        expect(self.page.locator('.mode-switch')).to_be_visible()
+        with connect(db_path) as db:
+            db.execute("INSERT INTO connections VALUES ('demo-hide-test','Test Bank','unused','2027-12-31','2026-10-02')")
+        try:
+            # A bank connected in another tab is detected on refresh too.
+            self.page.locator('#currency').select_option('EUR')
+            expect(self.page.locator('.mode-switch')).to_be_hidden()
+            expect(self.page.locator('#demoNotice')).to_be_hidden()
+            self.assertEqual(self.page.evaluate("localStorage.getItem('fjordbudget-source')"),'live')
+            self.page.evaluate("localStorage.setItem('fjordbudget-source','demo')")
+            self.page.reload()
+            expect(self.page.locator('#appContent')).to_be_visible()
+            expect(self.page.locator('.mode-switch')).to_be_hidden()
+            expect(self.page.locator('#demoNotice')).to_be_hidden()
+            self.assertEqual(self.page.evaluate("localStorage.getItem('fjordbudget-source')"),'live')
+            expect(self.page.locator('#accountCount')).to_have_text('0')
+        finally:
+            with connect(db_path) as db:
+                db.execute("DELETE FROM connections WHERE id='demo-hide-test'")
+        self.page.reload()
+        expect(self.page.locator('#appContent')).to_be_visible()
+        expect(self.page.locator('.mode-switch')).to_be_visible()
+
+    def test_savings_goals_create_edit_source_switch_and_delete(self):
+        self.page.set_viewport_size({'width':390,'height':844})
+        self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
+        expect(self.page.locator('#savingsList')).to_contain_text('Hvad drømmer du om?')
+        expect(self.page.locator('#month')).to_be_hidden()
+        self.page.locator('#newSavingsGoal').click()
+        self.page.locator('#savingsName').fill('Ferie <familie>')
+        self.page.locator('#savingsAmount').fill('25000.50')
+        self.page.locator('#savingsDeadline').fill('2027-07-01')
+        self.page.locator('#savingsForm button[type=submit]').click()
+        expect(self.page.locator('.savings-card')).to_contain_text('Ferie <familie>')
+        expect(self.page.locator('.savings-target')).to_contain_text('25.000,50')
+        self.page.reload()
+        self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
+        self.page.locator('[data-edit-savings]').click()
+        expect(self.page.locator('#savingsDeadline')).to_have_value('2027-07-01')
+        self.page.locator('#savingsName').fill('Ny bil')
+        self.page.locator('#savingsForm button[type=submit]').click()
+        expect(self.page.locator('.savings-card h3')).to_have_text('Ny bil')
+        self.page.locator('[data-source="live"]').click()
+        expect(self.page.locator('#savingsList')).to_contain_text('Hvad drømmer du om?')
+        self.page.locator('[data-source="demo"]').click()
+        expect(self.page.locator('.savings-card h3')).to_have_text('Ny bil')
+        self.page.locator('[data-delete-savings]').click()
+        self.page.locator('[data-close="savingsDeleteDialog"]').click()
+        expect(self.page.locator('.savings-card')).to_have_count(1)
+        self.page.locator('[data-delete-savings]').click()
+        self.page.locator('#savingsDeleteForm button[type=submit]').click()
+        expect(self.page.locator('#savingsList')).to_contain_text('Hvad drømmer du om?')
+        self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
+        self.page.get_by_role('button',name='Mit budget',exact=True).click()
+        expect(self.page.locator('#month')).to_be_visible()
+
+    def test_budget_category_create_delete_and_reload(self):
+        self.page.set_viewport_size({'width':390,'height':844})
+        self.page.locator('[data-view="budget"]').first.click()
+        self.page.locator('#newBudgetCategoryName').fill('Ferie <familie>')
+        self.page.locator('#budgetCategoryCreateForm button').click()
+        expect(self.page.locator('#budgetFull')).to_contain_text('Ferie <familie>')
+        self.page.locator('.full-budget .edit-budget').click()
+        expect(self.page.get_by_label('Budget for Ferie <familie>', exact=True)).to_be_visible()
+        self.page.get_by_label('Budget for Ferie <familie>', exact=True).fill('1234')
+        self.page.locator('#budgetForm button[type=submit]').click()
+        expect(self.page.locator('#budgetDialog')).not_to_be_visible()
+        self.page.reload()
+        self.page.locator('[data-view="budget"]').first.click()
+        button=self.page.get_by_role('button',name='Fjern budgetkategori Ferie <familie>',exact=True)
+        button.click()
+        self.page.locator('[data-close="budgetCategoryDeleteDialog"]').click()
+        expect(button).to_be_visible()
+        button.click()
+        self.page.locator('#budgetCategoryDeleteForm button[type=submit]').click()
+        expect(self.page.locator('#budgetCategoryDeleteDialog')).not_to_be_visible()
+        expect(button).to_have_count(0)
+        self.page.reload()
+        self.page.locator('[data-view="budget"]').first.click()
+        expect(button).to_have_count(0)
+        self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
+
     def test_account_setup_after_bank_sync_and_no_repeat_after_save(self):
         data=self.app.test_client().get('/api/dashboard?source=demo').json
         data['accounts'][0]['custom_name']='Already named'
@@ -78,7 +163,7 @@ class UITests(unittest.TestCase):
 
     def test_category_create_budget_delete_and_mobile(self):
         self.page.set_viewport_size({'width':390,'height':844})
-        self.page.locator('[data-view="categories"]').click()
+        self.page.locator('nav [data-view="categories"]').click()
         self.page.locator('#newCategoryName').fill('Holiday <test>')
         self.page.get_by_role('button',name='Tilføj kategori',exact=True).click()
         expect(self.page.locator('#categoryList')).to_contain_text('Holiday <test>')
@@ -92,13 +177,13 @@ class UITests(unittest.TestCase):
         expect(self.page.get_by_label('Budget for Holiday <test>')).to_have_count(0)
         expect(self.page.get_by_label('Budget for Fritid',exact=True)).to_be_visible()
         self.page.keyboard.press('Escape')
-        self.page.locator('[data-view="categories"]').click()
+        self.page.locator('nav [data-view="categories"]').click()
         self.page.get_by_role('button',name='Slet Holiday <test>',exact=True).click()
         self.page.get_by_role('button',name='Flyt og slet',exact=True).click()
         expect(self.page.locator('#categoryDeleteDialog')).not_to_be_visible()
         expect(self.page.locator('#categoryList')).not_to_contain_text('Holiday <test>')
         self.page.reload()
-        self.page.locator('[data-view="categories"]').click()
+        self.page.locator('nav [data-view="categories"]').click()
         expect(self.page.locator('#categoryList')).not_to_contain_text('Holiday <test>')
 
     def test_api_handles_html_gateway_error(self):
@@ -128,6 +213,10 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#accountNameDialog')).not_to_be_visible()
 
     def test_account_navigation_search_and_category_edit(self):
+        # A completed demo month always contains Netto, including early in a month.
+        month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]
+        self.page.locator('#month').fill(month)
+        self.page.locator('#month').dispatch_event('change')
         self.page.locator('[data-account="demo-daily"]').click()
         expect(self.page.locator('#accountFilter')).to_have_value('demo-daily')
         self.page.locator('#search').fill('Netto')
@@ -137,6 +226,8 @@ class UITests(unittest.TestCase):
         category.select_option('Fritid')
         expect(self.page.locator('#toast')).to_contain_text('Huskes fremover.')
         self.page.reload()
+        self.page.locator('#month').fill(month)
+        self.page.locator('#month').dispatch_event('change')
         self.page.locator('#search').fill('Netto')
         expect(self.page.locator('#transactionRows .category-select').first).to_have_value('Fritid')
 
