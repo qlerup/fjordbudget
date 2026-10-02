@@ -201,7 +201,7 @@ def create_app(config=None):
         if request.method == 'GET':
             with connect(db_path) as db:
                 items = [dict(row) for row in db.execute(
-                    'SELECT id,name,target_amount,deadline,currency FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id',
+                    'SELECT id,name,target_amount,substr(deadline,1,7) AS deadline,currency FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id',
                     (source, currency))]
             return jsonify(items=items)
         if request.method != 'DELETE':
@@ -213,12 +213,13 @@ def create_app(config=None):
             if amount <= 0:
                 raise ValueError('Opsparingsmålet skal være større end 0.')
             deadline = body.get('deadline')
-            if not isinstance(deadline, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', deadline):
+            if not isinstance(deadline, str) or not re.fullmatch(r'\d{4}-\d{2}(?:-\d{2})?', deadline):
                 raise ValueError('Vælg en gyldig deadline.')
             try:
-                date.fromisoformat(deadline)
+                date.fromisoformat(deadline + '-01' if len(deadline) == 7 else deadline)
             except ValueError:
                 raise ValueError('Vælg en gyldig deadline.') from None
+            deadline = deadline[:7]
         with connect(db_path) as db:
             db.execute('BEGIN IMMEDIATE')
             if goal_id is not None and not db.execute(

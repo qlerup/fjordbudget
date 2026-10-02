@@ -30,10 +30,10 @@ async function loadSavings(){
     const result=await api('/api/savings-goals?'+scope);
     if(generation!==savingsGeneration || scope!==savingsScope())return;
     savingsGoals=result.items;savingsLoadedScope=scope;
-    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Copenhagen'}).format(new Date());
+    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Copenhagen'}).format(new Date()).slice(0,7);
     $('savingsList').innerHTML=savingsGoals.length?savingsGoals.map(goal=>{
-      const deadline=new Intl.DateTimeFormat('da-DK',{day:'numeric',month:'long',year:'numeric'}).format(new Date(goal.deadline+'T12:00:00'));
-      return `<article class="savings-card"><span class="savings-icon">${svg('target')}</span><h3>${esc(goal.name)}</h3><p class="savings-target">${esc(money(goal.target_amount,goal.currency,2))}</p><p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>${goal.deadline<today?'<p class="savings-status">Deadline er passeret</p>':goal.deadline===today?'<p class="savings-status">Deadline er i dag</p>':''}<div class="savings-actions"><button type="button" class="button quiet" data-edit-savings="${goal.id}" aria-label="Rediger ${esc(goal.name)}">Rediger</button><button type="button" class="text-button" data-delete-savings="${goal.id}" aria-label="Slet ${esc(goal.name)}">Slet</button></div></article>`;
+      const deadline=new Intl.DateTimeFormat('da-DK',{month:'long',year:'numeric'}).format(new Date(goal.deadline+'-01T12:00:00'));
+      return `<article class="savings-card"><span class="savings-icon">${svg('target')}</span><h3>${esc(goal.name)}</h3><p class="savings-target">${esc(money(goal.target_amount,goal.currency,2))}</p><p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>${goal.deadline<today?'<p class="savings-status">Deadline er passeret</p>':goal.deadline===today?'<p class="savings-status">Deadline er denne måned</p>':''}<div class="savings-actions"><button type="button" class="button quiet" data-edit-savings="${goal.id}" aria-label="Rediger ${esc(goal.name)}">Rediger</button><button type="button" class="text-button" data-delete-savings="${goal.id}" aria-label="Slet ${esc(goal.name)}">Slet</button></div></article>`;
     }).join(''):'<div class="empty-state"><h3>Hvad drømmer du om?</h3><p>Opret dit første opsparingsmål med et beløb og en deadline.</p></div>';
   }catch(error){if(generation===savingsGeneration){$('savingsList').innerHTML='';showError('savingsError',error.message);}}
 }

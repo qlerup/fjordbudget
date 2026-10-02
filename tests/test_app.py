@@ -82,9 +82,9 @@ class AppTests(unittest.TestCase):
 
     def test_savings_goals_validation_scope_persistence_and_delete(self):
         endpoint='/api/savings-goals'
-        body={'name':'Ferie', 'target_amount':'12345.67', 'deadline':'2027-06-01'}
+        body={'name':'Ferie', 'target_amount':'12345.67', 'deadline':'2027-06'}
         self.assertEqual(self.client.post(endpoint,json=body).status_code,403)
-        for field,value in [('name',''),('name','x'*81),('name','bad\nname'),('target_amount','0'),('target_amount','-1'),('target_amount','NaN'),('target_amount','0.001'),('deadline','2027-02-30'),('deadline',None)]:
+        for field,value in [('name',''),('name','x'*81),('name','bad\nname'),('target_amount','0'),('target_amount','-1'),('target_amount','NaN'),('target_amount','0.001'),('deadline','2027-02-30'),('deadline','2027-13'),('deadline','2027-00'),('deadline','0000-01'),('deadline',None)]:
             with self.subTest(field=field,value=value):
                 self.assertEqual(self.client.post(endpoint,json={**body,field:value},headers=self.headers).status_code,400)
         result=self.client.post(endpoint+'?source=live',json=body,headers=self.headers)
@@ -94,6 +94,10 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.client.get(endpoint+'?source=live&currency=EUR').json['items'],[])
         item=self.client.get(endpoint+'?source=live&month=2028-01').json['items'][0]
         self.assertEqual(item['target_amount'],1234567)
+        self.assertEqual(item['deadline'],'2027-06')
+        with connect(self.db) as db:
+            db.execute('UPDATE savings_goals SET deadline=? WHERE id=?', ('2027-06-25',goal_id))
+        self.assertEqual(self.client.get(endpoint+'?source=live').json['items'][0]['deadline'],'2027-06')
         self.assertEqual(self.client.delete(f'{endpoint}/{goal_id}',headers=self.headers).status_code,404)
         self.assertEqual(self.client.put(f'{endpoint}/{goal_id}?source=live',json={**body,'name':'Bil','target_amount':'20000'},headers=self.headers).status_code,200)
         restarted=create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider}).test_client()
