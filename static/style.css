@@ -56,7 +56,8 @@
 .merchant-logo{color:#506357;font-size:13px}
 .category-select{font-size:13px;color:#40543e;min-height:36px;max-width:170px}
 .transactions-panel td.amount-cell{font-size:15px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums}
-.transactions-panel td.amount-cell.positive{color:#285a44!important}
+.transactions-panel td.amount-cell.positive{color:#16803c!important}
+.transactions-panel td.amount-cell.negative{color:#c62828!important}
 @media(max-width:760px){
   .page-heading{flex-wrap:wrap}
   .page-heading>.button,.section-heading .button{font-size:13px}
