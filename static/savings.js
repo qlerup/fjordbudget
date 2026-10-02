@@ -1,6 +1,26 @@
 'use strict';
 let savingsGoals=[], savingsGeneration=0, savingsLoadedScope='';
 function savingsScope(){return new URLSearchParams({source,currency:$('currency').value}).toString();}
+function formatSavingsAmount(value){
+  if(!/^[\d.]+(?:,\d{0,2})?$/.test(value))return value;
+  const [whole, fraction]=value.replaceAll('.','').split(',');
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+(fraction===undefined?'':','+fraction);
+}
+$('savingsAmount').addEventListener('input',event=>{
+  const input=event.target, position=input.selectionStart;
+  const count=input.value.slice(0,position).replaceAll('.','').length;
+  input.value=formatSavingsAmount(input.value);
+  let caret=0, seen=0;
+  while(caret<input.value.length && seen<count){if(input.value[caret]!=='.')seen++;caret++;}
+  input.setSelectionRange(caret,caret);
+});
+$('savingsAmount').addEventListener('beforeinput',event=>{
+  const input=event.target, start=input.selectionStart, end=input.selectionEnd;
+  if(start!==end)return;
+  // Delete a digit along with an adjacent grouping dot, so deletion never gets stuck.
+  if(event.inputType==='deleteContentBackward' && input.value[start-1]==='.')input.setSelectionRange(start-2,start);
+  if(event.inputType==='deleteContentForward' && input.value[start]==='.')input.setSelectionRange(start,start+2);
+});
 async function loadSavings(){
   const generation=++savingsGeneration, scope=savingsScope();
   savingsLoadedScope='';savingsGoals=[];
@@ -23,7 +43,7 @@ function openSavings(goal=null){
   $('savingsForm').dataset.scope=savingsScope();
   $('savingsDialogTitle').textContent=goal?'Rediger opsparingsmål':'Nyt opsparingsmål';
   $('savingsContext').textContent=(source==='demo'?'Demodata':'Mine bankdata')+' · '+$('currency').value;
-  if(goal){$('savingsName').value=goal.name;$('savingsAmount').value=goal.target_amount/100;$('savingsDeadline').value=goal.deadline;}
+  if(goal){$('savingsName').value=goal.name;$('savingsAmount').value=formatSavingsAmount((goal.target_amount/100).toFixed(2).replace('.',','));$('savingsDeadline').value=goal.deadline;}
   showError('savingsFormError','');$('savingsDialog').showModal();$('savingsName').focus();
 }
 $('newSavingsGoal').addEventListener('click',()=>openSavings());
@@ -38,7 +58,9 @@ $('savingsList').addEventListener('click',event=>{
 $('savingsForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter, form=event.currentTarget;button.disabled=true;showError('savingsFormError','');
   try{
-    await api('/api/savings-goals'+(form.dataset.id?'/'+form.dataset.id:'')+'?'+form.dataset.scope,{method:form.dataset.id?'PUT':'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});
+    const values=Object.fromEntries(new FormData(form));
+    values.target_amount=values.target_amount.replaceAll('.','').replace(',','.');
+    await api('/api/savings-goals'+(form.dataset.id?'/'+form.dataset.id:'')+'?'+form.dataset.scope,{method:form.dataset.id?'PUT':'POST',body:JSON.stringify(values)});
     $('savingsDialog').close();toast('Opsparingsmålet er gemt');await loadSavings();
   }catch(error){showError('savingsFormError',error.message);}finally{button.disabled=false;}
 });
