@@ -21,6 +21,7 @@ from werkzeug.exceptions import HTTPException
 from banking import BankError, EnableBanking, account_name, sync_all
 from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, category_list, budget_category_list
 from hub_auth import register_hub_auth
+from insights import build_insights
 
 
 def persistent_key(path, factory):
@@ -199,19 +200,22 @@ def create_app(config=None):
     def savings_goals(goal_id=None):
         source, _, currency = parameters()
         if request.method == 'GET':
-            with connect(db_path) as db:
-                items = [dict(row) for row in db.execute(
-                    'SELECT id,name,target_amount,substr(deadline,1,7) AS deadline,currency FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id',
-                    (source, currency))]
-            return jsonify(items=items)
+            result = build_insights(db_path, source, currency)
+            return jsonify(items=result['goals'], profile=result['profile'])
         if request.method != 'DELETE':
-            body = request.get_json()
+            body = request.get_json(silent=True)
             name = body.get('name') if isinstance(body, dict) else None
             if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or any(ord(c)<32 for c in name):
                 raise ValueError('Navnet skal være på 1–80 tegn uden linjeskift.')
             amount = cents(body.get('target_amount'))
+            saved_amount = cents(body.get('saved_amount', 0))
             if amount <= 0:
                 raise ValueError('Opsparingsmålet skal være større end 0.')
+            if saved_amount < 0 or saved_amount > amount:
+                raise ValueError('Allerede opsparet skal være mellem 0 og målbeløbet.')
+            featured = body.get('featured', False)
+            if type(featured) is not bool:
+                raise ValueError('Ugyldigt valg for visning på overblikket.')
             deadline = body.get('deadline')
             if not isinstance(deadline, str) or not re.fullmatch(r'\d{4}-\d{2}(?:-\d{2})?', deadline):
                 raise ValueError('Vælg en gyldig deadline.')
@@ -227,16 +231,31 @@ def create_app(config=None):
                 (goal_id, source, currency)).fetchone():
                 return jsonify(error='Opsparingsmålet findes ikke.'), 404
             if request.method == 'POST':
-                goal_id = db.execute('INSERT INTO savings_goals(source,currency,name,target_amount,deadline) VALUES (?,?,?,?,?)',
-                                    (source, currency, name.strip(), amount, deadline)).lastrowid
+                existing = db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? LIMIT 1', (source, currency)).fetchone()
+                has_featured = db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? AND featured=1 LIMIT 1', (source, currency)).fetchone()
+                make_featured = bool(featured or not existing or not has_featured)
+                if make_featured:
+                    db.execute('UPDATE savings_goals SET featured=0 WHERE source=? AND currency=?', (source, currency))
+                goal_id = db.execute('''INSERT INTO savings_goals(source,currency,name,target_amount,saved_amount,deadline,featured)
+                                    VALUES (?,?,?,?,?,?,?)''',
+                                    (source, currency, name.strip(), amount, saved_amount, deadline, int(make_featured))).lastrowid
             elif request.method == 'PUT':
-                db.execute('UPDATE savings_goals SET name=?,target_amount=?,deadline=? WHERE id=?',
-                           (name.strip(), amount, deadline, goal_id))
+                if featured:
+                    db.execute('UPDATE savings_goals SET featured=0 WHERE source=? AND currency=?', (source, currency))
+                db.execute('UPDATE savings_goals SET name=?,target_amount=?,saved_amount=?,deadline=?,featured=? WHERE id=?',
+                           (name.strip(), amount, saved_amount, deadline, int(featured), goal_id))
+                if not db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? AND featured=1 LIMIT 1', (source, currency)).fetchone():
+                    fallback = db.execute('SELECT id FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id LIMIT 1', (source, currency)).fetchone()
+                    if fallback:
+                        db.execute('UPDATE savings_goals SET featured=1 WHERE id=?', (fallback['id'],))
             else:
                 db.execute('DELETE FROM savings_goals WHERE id=?', (goal_id,))
+                if not db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? AND featured=1 LIMIT 1', (source, currency)).fetchone():
+                    fallback = db.execute('SELECT id FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id LIMIT 1', (source, currency)).fetchone()
+                    if fallback:
+                        db.execute('UPDATE savings_goals SET featured=1 WHERE id=?', (fallback['id'],))
         return jsonify(ok=True, id=goal_id)
-
-    @app.get('/api/config')
+    @app.get('/api/config')    @app.get('/api/config')
     def configuration():
         categories = stored_categories()
         with connect(db_path) as db:
@@ -301,9 +320,11 @@ def create_app(config=None):
         categories = [{'name': cat['name'], 'color': cat['color'], 'spent': -sum(r['amount'] for r in rows if r['budget_category'] == cat['name'] and r['amount'] < 0 and r['category'] != 'Overførsler'),
                        'budget': budgets.get(cat['name'], 0)} for cat in stored_budget_categories()]
         selected = [a for a in accounts if a['currency'] == currency]
+        goal_insights = build_insights(db_path, source, currency)
         return jsonify(has_bank_connections=has_bank_connections, accounts=accounts, connections=connections, income=income, expenses=expenses,
                        balance=sum(a['balance'] for a in selected if a['balance'] is not None), missing_balances=sum(a['balance'] is None for a in selected),
-                       budget=sum(budgets.values()), budget_spent=sum(c['spent'] for c in categories), categories=categories, months=months, history=list(reversed(history)), month=month)
+                       budget=sum(budgets.values()), budget_spent=sum(c['spent'] for c in categories), categories=categories, months=months,
+                       history=list(reversed(history)), month=month, featured_goal=goal_insights['featured_goal'])
 
     @app.get('/api/transactions')
     def transactions():
@@ -318,8 +339,8 @@ def create_app(config=None):
             conditions.append('a.id=?')
             values.append(account)
         if query:
-            conditions.append('instr(lower(t.description),lower(?))>0')
-            values.append(query)
+            conditions.append("(instr(lower(t.description),lower(?))>0 OR instr(lower(COALESCE(t.merchant,'')),lower(?))>0)")
+            values.extend([query, query])
         if category:
             if category not in [c['name'] for c in stored_categories()]:
                 raise ValueError('Ukendt kategori.')
@@ -328,7 +349,8 @@ def create_app(config=None):
         where = ' AND '.join(conditions)
         with connect(db_path) as db:
             total = db.execute('SELECT count(*) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '+where, values).fetchone()[0]
-            rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,COALESCE(a.custom_name,a.name) account
+            rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,t.merchant,t.merchant_manual,
+                                        COALESCE(a.custom_name,a.name) account
                                  FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '''+where+' ORDER BY t.booked_on DESC,t.id DESC LIMIT 30 OFFSET ?', [*values, (page-1)*30]).fetchall()
         return jsonify(items=[dict(r) for r in rows], total=total, page=page, pages=max(1, (total+29)//30))
 
@@ -350,6 +372,40 @@ def create_app(config=None):
               (category, title, row['source']))
             updated = result.rowcount
         return jsonify(ok=True, updated=updated, rule_saved=True)
+
+    @app.patch('/api/transactions/<int:transaction_id>/merchant')
+    def update_merchant(transaction_id):
+        body = request.get_json(silent=True)
+        merchant = body.get('merchant') if isinstance(body, dict) else None
+        remember = body.get('remember', True) if isinstance(body, dict) else True
+        if not isinstance(merchant, str) or len(merchant.strip()) > 100 or any(ord(c) < 32 for c in merchant):
+            raise ValueError('Forhandlernavnet skal være på højst 100 tegn uden linjeskift.')
+        if type(remember) is not bool:
+            raise ValueError('Ugyldigt valg for huskeregel.')
+        merchant = merchant.strip() or None
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('''SELECT t.description,a.source FROM transactions t
+                                JOIN accounts a ON a.id=t.account_id WHERE t.id=?''', (transaction_id,)).fetchone()
+            if row is None:
+                return jsonify(error='Posteringen blev ikke fundet.'), 404
+            title = transaction_title(row['description'])
+            if remember:
+                if merchant:
+                    db.execute('''INSERT INTO merchant_rules(source,title,merchant) VALUES (?,?,?)
+                                  ON CONFLICT(source,title) DO UPDATE SET merchant=excluded.merchant''',
+                               (row['source'], title, merchant))
+                else:
+                    db.execute('DELETE FROM merchant_rules WHERE source=? AND title=?', (row['source'], title))
+                result = db.execute('''UPDATE transactions SET merchant=?,merchant_manual=1
+                                       WHERE transaction_title(description)=?
+                                         AND account_id IN (SELECT id FROM accounts WHERE source=?)''',
+                                    (merchant, title, row['source']))
+            else:
+                result = db.execute('UPDATE transactions SET merchant=?,merchant_manual=1 WHERE id=?',
+                                    (merchant, transaction_id))
+            updated = result.rowcount
+        return jsonify(ok=True, updated=updated, rule_saved=remember)
 
     @app.put('/api/budgets')
     def save_budgets():

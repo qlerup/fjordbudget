@@ -54,11 +54,16 @@ def initialize(path):
           external_id TEXT NOT NULL, booked_on TEXT NOT NULL, description TEXT NOT NULL,
           amount INTEGER NOT NULL, currency TEXT NOT NULL, category TEXT NOT NULL,
           category_manual INTEGER NOT NULL DEFAULT 0,
+          merchant TEXT, merchant_manual INTEGER NOT NULL DEFAULT 0,
           UNIQUE(account_id,external_id));
         CREATE INDEX IF NOT EXISTS tx_account_date ON transactions(account_id,booked_on DESC);
         CREATE TABLE IF NOT EXISTS category_rules (
           source TEXT NOT NULL CHECK(source IN ('demo','live')),
           title TEXT NOT NULL, category TEXT NOT NULL,
+          PRIMARY KEY(source,title));
+        CREATE TABLE IF NOT EXISTS merchant_rules (
+          source TEXT NOT NULL CHECK(source IN ('demo','live')),
+          title TEXT NOT NULL, merchant TEXT NOT NULL,
           PRIMARY KEY(source,title));
         CREATE TABLE IF NOT EXISTS categories (
           name TEXT PRIMARY KEY, color TEXT NOT NULL, protected INTEGER NOT NULL DEFAULT 0);
@@ -68,7 +73,9 @@ def initialize(path):
           source TEXT NOT NULL CHECK(source IN ('demo','live')),
           currency TEXT NOT NULL, name TEXT NOT NULL,
           target_amount INTEGER NOT NULL CHECK(target_amount>0),
-          deadline TEXT NOT NULL);
+          saved_amount INTEGER NOT NULL DEFAULT 0 CHECK(saved_amount>=0),
+          deadline TEXT NOT NULL,
+          featured INTEGER NOT NULL DEFAULT 0 CHECK(featured IN (0,1)));
         CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS budgets (
           source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,
@@ -86,7 +93,23 @@ def initialize(path):
             db.execute("INSERT INTO app_migrations VALUES ('categories')")
         if 'custom_name' not in {row[1] for row in db.execute('PRAGMA table_info(accounts)')}:
             db.execute('ALTER TABLE accounts ADD COLUMN custom_name TEXT')
+        transaction_columns = {row[1] for row in db.execute('PRAGMA table_info(transactions)')}
+        if 'merchant' not in transaction_columns:
+            db.execute('ALTER TABLE transactions ADD COLUMN merchant TEXT')
+        if 'merchant_manual' not in transaction_columns:
+            db.execute('ALTER TABLE transactions ADD COLUMN merchant_manual INTEGER NOT NULL DEFAULT 0')
+        goal_columns = {row[1] for row in db.execute('PRAGMA table_info(savings_goals)')}
+        if 'saved_amount' not in goal_columns:
+            db.execute('ALTER TABLE savings_goals ADD COLUMN saved_amount INTEGER NOT NULL DEFAULT 0')
+        if 'featured' not in goal_columns:
+            db.execute('ALTER TABLE savings_goals ADD COLUMN featured INTEGER NOT NULL DEFAULT 0')
+        db.execute('CREATE INDEX IF NOT EXISTS tx_merchant ON transactions(merchant)')
         seed_demo(db)
+        if not db.execute("SELECT 1 FROM app_migrations WHERE name='demo-merchants'").fetchone():
+            db.execute("""UPDATE transactions SET merchant=description
+                          WHERE account_id IN (SELECT id FROM accounts WHERE source='demo')
+                            AND amount<0 AND category!='Overførsler' AND merchant IS NULL""")
+            db.execute("INSERT INTO app_migrations VALUES ('demo-merchants')")
         if not db.execute("SELECT 1 FROM app_migrations WHERE name='separate-budget-categories'").fetchone():
             db.executemany('INSERT OR IGNORE INTO budget_categories VALUES (?,?)', list(zip(CATEGORIES[:8],COLORS[:8])))
             db.execute("INSERT OR IGNORE INTO budget_categories SELECT DISTINCT category,'#809087' FROM budgets")
@@ -129,8 +152,9 @@ def seed_demo(db):
             if day > last:
                 continue
             booked = first.replace(day=day).isoformat()
-            db.execute('INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category) VALUES (?,?,?,?,?,?,?)',
-                       ('demo-'+aid, f'{first}-{i}', booked, label, amount, 'DKK', cat))
+            db.execute('INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,merchant) VALUES (?,?,?,?,?,?,?,?)',
+                       ('demo-'+aid, f'{first}-{i}', booked, label, amount, 'DKK', cat,
+                        label if amount < 0 and cat != 'Overførsler' else None))
         for cat, amount in zip(CATEGORIES[:8], [450000, 850000, 180000, 150000, 180000, 80000, 70000, 120000]):
             db.execute('INSERT INTO budgets VALUES (?,?,?,?,?)', ('demo', first.strftime('%Y-%m'), 'DKK', cat, amount))
 

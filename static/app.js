@@ -67,6 +67,7 @@ function renderDashboard() {
   $('cashflowChart').innerHTML=d.history.length?d.history.map(h=>`<div class="chart-group"><div class="bars"><div class="bar" style="height:${h.income/max*100}%" title="Indtægter: ${esc(money(h.income))}"></div><div class="bar expenses" style="height:${h.expenses/max*100}%" title="Udgifter: ${esc(money(h.expenses))}"></div></div><span class="chart-label">${esc(new Intl.DateTimeFormat('da-DK',{month:'short'}).format(new Date(h.month+'-15T12:00:00')))}</span></div>`).join(''):'<div class="empty-state"><p>Dit overblik vokser med dine posteringer.</p></div>';
   $('cashflowChart').setAttribute('role','img'); $('cashflowChart').setAttribute('aria-label',d.history.map(h=>`${monthName(h.month)}: indtægter ${money(h.income)}, udgifter ${money(h.expenses)}`).join('. ')||'Ingen posteringer');
   $('netCashflow').textContent=(d.income-d.expenses>=0?'+':'')+money(d.income-d.expenses)+' denne måned';
+  window.renderFeaturedGoal?.(d.featured_goal);
   renderAccounts();
 }
 async function loadTransactions() {
@@ -74,7 +75,11 @@ async function loadTransactions() {
   const data=await api('/api/transactions?'+query({page,account:$('accountFilter').value,q:$('search').value,category:$('categoryFilter').value}));
   if(generation!==transactionsGeneration)return;
   pages=data.pages;
-  $('transactionRows').innerHTML=data.items.map(t=>`<tr><td><div class="merchant"><span class="merchant-logo">${esc(t.description.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(t.description)}</span><span class="merchant-kind">${esc(dateName(t.booked_on))} &middot; ${t.amount>=0?'Indgående':'Udgående'}</span></span></div></td><td>${esc(t.account)}</td><td><select class="category-select" data-transaction="${t.id}" aria-label="Kategori for ${esc(t.description)}">${config.categories.map(c=>`<option ${c===t.category?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`).join('');
+  $('transactionRows').innerHTML=data.items.map(t=>{
+    const display=t.merchant || t.description;
+    const subtitle=t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler');
+    return `<tr><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span><button type="button" class="text-button merchant-edit" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}">${t.merchant?'Ret forhandler':'Angiv forhandler'}</button></span></div></td><td>${esc(t.account)}</td><td><select class="category-select" data-transaction="${t.id}" aria-label="Kategori for ${esc(t.description)}">${config.categories.map(c=>`<option ${c===t.category?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
+  }).join('');
   $('emptyTransactions').hidden=!!data.items.length;
   $('transactionCount').textContent=data.total?`${(page-1)*30+1}–${Math.min(page*30,data.total)} af ${data.total} posteringer`:'0 posteringer';
   $('pageLabel').textContent=`${page} / ${pages}`;

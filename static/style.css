@@ -98,3 +98,23 @@
 .category-management-row>[data-delete-category]{align-self:flex-end;min-height:42px}
 .category-budget-link select{min-height:42px}
 @media(min-width:761px){.sidebar{overflow-y:auto}.sidebar>*{flex-shrink:0}}
+
+/* Spending insights, learned merchants and goal planning. */
+.featured-goal-panel{margin-top:24px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(260px,.8fr);gap:28px;align-items:center}
+.featured-goal-panel[hidden]{display:none}
+.featured-goal-copy h2{margin:4px 0 10px;font-size:24px}.featured-goal-copy p{margin:0 0 10px;color:var(--muted);line-height:1.6}
+.featured-goal-numbers{display:grid;gap:10px}.featured-goal-numbers>span{font-size:14px;font-weight:600}.featured-goal-numbers>strong{font-size:13px}.featured-goal-numbers small{color:var(--muted);line-height:1.5}
+.good,.complete{color:#377d65}.warning{color:#8b652c}.danger{color:var(--red)}.neutral{color:var(--muted)}
+.merchant-edit{display:block;font-size:11px;margin-top:4px}#merchantBankText{display:block;margin:8px 0 16px;overflow-wrap:anywhere}
+#merchantForm>label:not(.checkbox-row){display:block;font-size:14px;font-weight:600;margin:12px 0 8px}#merchantName{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:16px;color:var(--ink)}
+.checkbox-row{display:flex;align-items:flex-start;gap:10px;margin:16px 0;font-size:13px;line-height:1.5;color:var(--muted)}.checkbox-row input{margin-top:3px}
+.savings-profile{margin:24px 0}.savings-profile-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.savings-profile-summary article{border:1px solid var(--line);border-radius:12px;padding:18px;background:#fafbf8}.savings-profile-summary span{display:block;color:var(--muted);font-size:12px}.savings-profile-summary strong{display:block;margin-top:8px;font-size:20px}
+.spending-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}.spending-breakdown>div{border:1px solid var(--line);border-radius:12px;padding:18px}.spending-breakdown h3{margin:0 0 12px}
+.spending-breakdown ol,.goal-suggestions ul{list-style:none;padding:0;margin:0}.spending-breakdown li,.goal-suggestions li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}.spending-breakdown li:first-child,.goal-suggestions li:first-child{border-top:0}
+.spending-breakdown li span{min-width:0;overflow-wrap:anywhere}.spending-breakdown li small,.goal-suggestions li span{display:block;color:var(--muted);font-size:11px;margin-top:3px}.analysis-note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:12px}
+.savings-card.featured{box-shadow:inset 0 0 0 1px #b8c9aa}.savings-card-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.goal-featured{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--green);font-weight:700}
+.savings-target small{font-size:13px;color:var(--muted);font-weight:500}.goal-status{margin-top:18px;padding:12px;border-radius:9px;background:#f5f7f0;display:grid;gap:5px}.goal-status strong{font-size:13px}.goal-status span{font-size:12px;line-height:1.5;color:var(--muted)}
+.goal-numbers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;font-size:12px;color:var(--muted)}.goal-numbers b{display:block;color:var(--ink);font-size:14px;margin-top:3px}
+.goal-suggestions{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}.goal-suggestions h4{margin:0 0 7px;font-size:13px}.goal-suggestions li b{white-space:nowrap;color:var(--green)}.goal-suggestions p{font-size:11px;margin:10px 0 0}.savings-form .checkbox-row{margin-top:10px}
+@media(max-width:760px){.featured-goal-panel,.spending-breakdown{grid-template-columns:1fr}.savings-profile-summary{grid-template-columns:1fr}.goal-numbers{grid-template-columns:1fr}}

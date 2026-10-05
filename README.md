@@ -116,6 +116,27 @@ Officielle kilder:
 - Alle sider fra banken hentes før kontoens import gemmes. Fejl på én konto
   sletter ikke historik og forhindrer ikke de øvrige konti i at blive opdateret.
 
+## Forbrugsanalyse og opsparingsmål
+
+FjordBudget analyserer de seneste måneders bogførte indtægter og udgifter for at vise,
+hvor pengene går hen, og hvor stort et historisk råderum der har været. Overførsler
+mellem egne konti holdes ude af beregningen.
+
+På en postering kan du manuelt angive den rigtige forhandler og vælge **Husk fremover**.
+Reglen knyttes til den normaliserede, fulde banktekst. FjordBudget gætter ikke en
+forhandler ud fra enkelte forkortelser som korttype eller terminaltekst. Bankens
+originale posteringstekst bevares altid.
+
+Opsparingsmål kan indeholde målbeløb, allerede opsparet beløb og deadline. Ét mål
+markeres som aktivt og vises på overblikket. Appen beregner, hvor meget der kræves
+pr. måned, sammenholder det med historisk råderum og markerer målet som realistisk,
+stramt, muligt med ændringer eller ikke realistisk med den nuværende økonomi.
+
+Besparelsesforslag tager udgangspunkt i faktisk forbrug. Lærte forhandlere vises
+først, så forslag kan være konkrete; resterende forbrug kan vises på kategoriniveau.
+Forslagene er konservative muligheder og ændrer aldrig budget eller posteringer
+automatisk.
+
 ## Data og backup
 
 Docker-volumen `fjordbudget_budget_data` indeholder SQLite-database samt

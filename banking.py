@@ -134,18 +134,24 @@ def import_account(db_path, account_id, transactions, balances):
         db.execute('BEGIN IMMEDIATE')
         account = db.execute('SELECT * FROM accounts WHERE id=?', (account_id,)).fetchone()
         rules = dict(db.execute('SELECT title,category FROM category_rules WHERE source=?', (account['source'],)).fetchall())
+        merchant_rules = dict(db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?', (account['source'],)).fetchall())
         eligible = [b for b in balances if b.get('balance_type') in ranking and b.get('balance_amount', {}).get('currency') == account['currency']]
         balance = min(eligible, key=lambda b: ranking[b['balance_type']]) if eligible else None
         categories = {c['name'] for c in category_list(db)}
         for row in rows:
-            rule = rules.get(transaction_title(row[2]))
+            title = transaction_title(row[2])
+            rule = rules.get(title)
+            merchant_rule = merchant_rules.get(title)
             row = (*row[:-1], rule or (row[-1] if row[-1] in categories else 'Andet'), int(rule is not None))
-            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual)
-              VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
+            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual,merchant,merchant_manual)
+              VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
               booked_on=excluded.booked_on, description=excluded.description, amount=excluded.amount,
-              currency=excluded.currency, category=CASE WHEN excluded.category_manual=1 THEN excluded.category WHEN transactions.category_manual=1 THEN transactions.category ELSE excluded.category END,
-              category_manual=MAX(transactions.category_manual,excluded.category_manual)''',
-                       (account_id, *row))
+              currency=excluded.currency,
+              category=CASE WHEN excluded.category_manual=1 THEN excluded.category WHEN transactions.category_manual=1 THEN transactions.category ELSE excluded.category END,
+              category_manual=MAX(transactions.category_manual,excluded.category_manual),
+              merchant=CASE WHEN transactions.merchant_manual=1 THEN transactions.merchant WHEN excluded.merchant_manual=1 THEN excluded.merchant ELSE excluded.merchant END,
+              merchant_manual=MAX(transactions.merchant_manual,excluded.merchant_manual)''',
+                       (account_id, *row, merchant_rule, int(merchant_rule is not None)))
         db.execute('UPDATE accounts SET balance=?,balance_type=?,synced_at=? WHERE id=?',
                    (cents(balance['balance_amount']['amount']) if balance else None,
                     balance['balance_type'] if balance else None, datetime.now(timezone.utc).isoformat(), account_id))
