@@ -255,7 +255,7 @@ def create_app(config=None):
                     if fallback:
                         db.execute('UPDATE savings_goals SET featured=1 WHERE id=?', (fallback['id'],))
         return jsonify(ok=True, id=goal_id)
-    @app.get('/api/config')    @app.get('/api/config')
+    @app.get('/api/config')
     def configuration():
         categories = stored_categories()
         with connect(db_path) as db:
