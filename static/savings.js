@@ -76,7 +76,7 @@ async function loadSavings(){
       return `<article class="savings-card ${goal.featured?'featured':''}">
         <div class="savings-card-top"><span class="savings-icon">${svg('target')}</span>${goal.featured?'<span class="goal-featured">Vises på overblikket</span>':''}</div>
         <h3>${esc(goal.name)}</h3>
-        <p class="savings-target">${esc(money(goal.saved_amount,goal.currency,0))} <small>af ${esc(money(goal.target_amount,goal.currency,0))}</small></p>
+        <p class="savings-target">${esc(money(goal.saved_amount,goal.currency,2))} <small>af ${esc(money(goal.target_amount,goal.currency,2))}</small></p>
         <div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div>
         <p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>
         <div class="goal-status ${tone}"><strong>${esc(label)}</strong><span>${esc(text)}</span></div>

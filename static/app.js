@@ -77,7 +77,8 @@ async function loadTransactions() {
   pages=data.pages;
   $('transactionRows').innerHTML=data.items.map(t=>{
     const display=t.merchant || t.description;
-    const subtitle=t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler');
+    const detail=t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler');
+    const subtitle=dateName(t.booked_on)+' · '+detail;
     return `<tr><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span><button type="button" class="text-button merchant-edit" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}">${t.merchant?'Ret forhandler':'Angiv forhandler'}</button></span></div></td><td>${esc(t.account)}</td><td><select class="category-select" data-transaction="${t.id}" aria-label="Kategori for ${esc(t.description)}">${config.categories.map(c=>`<option ${c===t.category?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
   }).join('');
   $('emptyTransactions').hidden=!!data.items.length;
