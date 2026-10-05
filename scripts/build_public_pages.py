@@ -1,6 +1,7 @@
 """Export only public information, without importing the app or reading its data."""
 from pathlib import Path
 from shutil import copyfile
+import re
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 root = Path(__file__).resolve().parents[1]
@@ -12,7 +13,9 @@ for page, title in [('privacy','Privatlivspolitik'),('terms','Brugsvilkår')]:
     for source, target in [('/static/style.css','assets/style.css'),('/static/legal.css','assets/legal.css'),
         ('/static/icon.svg','assets/icon.svg'),('/static/logos/icon-180.png','assets/icon-180.png'),
         ('/privacy','privacy.html'),('/terms','terms.html'),('/static/site.webmanifest','assets/site.webmanifest')]:
-        html = html.replace('href="'+source+'"','href="'+target+'"')
+        # Preserve cache versions while making URLs work on GitHub Pages.
+        html = re.sub(r'href="' + re.escape(source) + r'(\?[^"<>]*)?"',
+                      lambda match: 'href="' + target + (match.group(1) or '') + '"', html)
     html = html.replace('href="/"','href="https://github.com/qlerup/fjordbudget"').replace('Tilbage til appen →','FjordBudget på GitHub →').replace('Åbn FjordBudget','Se projektet')
     (docs/(page+'.html')).write_text(html,encoding='utf-8')
 for source, target in [('style.css','style.css'),('legal.css','legal.css'),('icon.svg','icon.svg'),

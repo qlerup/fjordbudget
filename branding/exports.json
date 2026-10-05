@@ -1,0 +1,122 @@
+{
+  "name": "FjordBudget",
+  "exports": [
+    {
+      "path": "docs/assets/icon-180.png",
+      "size": [
+        180,
+        180
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "docs/assets/icon.svg",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "docs/assets/social.png",
+      "size": [
+        1200,
+        630
+      ],
+      "kind": "social",
+      "background": "#084738"
+    },
+    {
+      "path": "static/icon.svg",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "static/logos/favicon.ico",
+      "size": [
+        256,
+        256
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "static/logos/icon-180.png",
+      "size": [
+        180,
+        180
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "static/logos/icon-192.png",
+      "size": [
+        192,
+        192
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "static/logos/icon-32.png",
+      "size": [
+        32,
+        32
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "static/logos/icon-512.png",
+      "size": [
+        512,
+        512
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "static/logos/mark.svg",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "icon"
+    },
+    {
+      "path": "static/logos/social.png",
+      "size": [
+        1200,
+        630
+      ],
+      "kind": "social",
+      "background": "#084738"
+    },
+    {
+      "path": "static/logos/social.svg",
+      "size": [
+        1200,
+        630
+      ],
+      "kind": "social",
+      "background": "#084738"
+    },
+    {
+      "path": "static/logos/wordmark-light.svg",
+      "size": [
+        520,
+        128
+      ],
+      "kind": "horizontal",
+      "ink": "#edf3f7"
+    },
+    {
+      "path": "static/logos/wordmark.svg",
+      "size": [
+        520,
+        128
+      ],
+      "kind": "horizontal",
+      "ink": "#172c36"
+    }
+  ]
+}
