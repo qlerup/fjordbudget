@@ -256,6 +256,11 @@ class UITests(unittest.TestCase):
             self.assertIn(' \u00b7 ',text)
             self.assertNotIn('?',text)
         expect(self.page.locator('#transactionRows')).not_to_contain_text('Spotify')
+        self.assertEqual(self.page.evaluate("transactionState({amount:-6792,category:'Andet',merchant:null}).className"),'transaction-partial')
+        self.assertEqual(self.page.evaluate("transactionState({amount:-6792,category:'',merchant:null}).className"),'transaction-incomplete')
+        self.assertEqual(self.page.evaluate("transactionState({amount:-6792,category:'Andet',merchant:'McDonald\\'s'}).className"),'transaction-complete')
+        merchant_control=self.page.locator('#transactionRows .merchant-picker-button').first
+        expect(merchant_control).to_be_visible()
         category=self.page.locator('#transactionRows .category-picker-button').first
         category.click()
         expect(self.page.locator('#categoryDialog')).to_be_visible()

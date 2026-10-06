@@ -9,6 +9,17 @@ if (!['demo','live'].includes(source)) source='demo';
 const money = (value, currency=$('currency').value || 'DKK', decimals=0) => new Intl.NumberFormat('da-DK', {style:'currency', currency, minimumFractionDigits:decimals, maximumFractionDigits:decimals}).format(value / 100);
 const monthName = month => new Intl.DateTimeFormat('da-DK', {month:'long', year:'numeric'}).format(new Date(month+'-15T12:00:00'));
 const dateName = date => new Intl.DateTimeFormat('da-DK', {day:'numeric', month:'short'}).format(new Date(date+'T12:00:00'));
+function transactionState(t) {
+  if (t.amount >= 0) return {className:'', title:''};
+  const hasMerchant=!!String(t.merchant || '').trim();
+  const hasCategory=!!String(t.category || '').trim();
+  const completed=(hasMerchant?1:0)+(hasCategory?1:0);
+  return completed===2
+    ? {className:'transaction-complete', title:'Forhandler og kategori er på plads'}
+    : completed===1
+      ? {className:'transaction-partial', title:'Mangler enten forhandler eller kategori'}
+      : {className:'transaction-incomplete', title:'Mangler både forhandler og kategori'};
+}
 
 async function api(url, options={}) {
   const response = await fetch(url, {...options, headers:{'Content-Type':'application/json', 'X-CSRF-Token':csrf, ...options.headers}});
@@ -80,10 +91,8 @@ async function loadTransactions() {
     const display=t.merchant || t.description;
     const detail=t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler');
     const subtitle=dateName(t.booked_on)+' · '+detail;
-    const completed=(t.merchant?1:0)+(t.category_manual?1:0);
-    const rowState=t.amount>=0?'':completed===2?'transaction-complete':completed===1?'transaction-partial':'transaction-incomplete';
-    const rowTitle=t.amount>=0?'':completed===2?'Forhandler og kategori er på plads':completed===1?'Mangler enten forhandler eller bekræftet kategori':'Mangler både forhandler og bekræftet kategori';
-    return `<tr class="${rowState}" title="${esc(rowTitle)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span><button type="button" class="text-button merchant-edit" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}">${t.merchant?'Ret forhandler':'Angiv forhandler'}</button></span></div></td><td>${esc(t.account)}</td><td><button type="button" class="category-picker-button ${t.category_manual?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category)}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
+    const state=transactionState(t);
+    return `<tr class="${state.className}" title="${esc(state.title)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span><button type="button" class="merchant-picker-button ${t.merchant?'confirmed':''}" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}" aria-label="Forhandler for ${esc(t.description)}"><span>${esc(t.merchant || 'Vælg forhandler')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button></span></div></td><td>${esc(t.account)}</td><td><button type="button" class="category-picker-button ${t.category?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category || 'Vælg kategori')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
   }).join('');
   $('emptyTransactions').hidden=!!data.items.length;
   $('transactionCount').textContent=data.total?`${(page-1)*30+1}–${Math.min(page*30,data.total)} af ${data.total} posteringer`:'0 posteringer';
