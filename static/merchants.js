@@ -193,3 +193,61 @@ $('categoryPickerForm').addEventListener('submit',async event=>{
   }catch(error){showError('categoryPickerError',error.message);}
   finally{button.disabled=false;}
 });
+
+
+async function loadMerchantLibrary(){
+  showError('merchantLibraryError','');
+  const result=await api('/api/merchant-library?source='+encodeURIComponent(source));
+  $('merchantLibraryCount').textContent=result.items.length;
+  $('merchantLibrary').innerHTML=result.items.length?result.items.map(item=>{
+    const rules=item.rules.length?item.rules.map(rule=>{
+      const normalized=rule.bank_text===rule.title?'':`<small>Gemt mønster: ${esc(rule.title)}</small>`;
+      return `<div class="merchant-rule-row"><div><strong>${esc(rule.bank_text)}</strong>${normalized}</div><button type="button" class="text-button merchant-rule-delete" data-delete-merchant-rule="${esc(rule.title)}" data-rule-merchant="${esc(item.name)}" aria-label="Slet banktekst ${esc(rule.bank_text)}">Slet banktekst</button></div>`;
+    }).join(''):'<p class="small muted merchant-no-rules">Ingen gemte banktekster. Forhandleren findes kun på eksisterende posteringer.</p>';
+    return `<article class="merchant-library-card" data-library-merchant="${esc(item.name)}"><div class="merchant-library-head"><div><h3>${esc(item.name)}</h3><p>${item.transactions} ${item.transactions===1?'postering':'posteringer'} · ${item.rule_count} ${item.rule_count===1?'gemt banktekst':'gemte banktekster'}</p></div><button type="button" class="button quiet merchant-delete-button" data-delete-library-merchant="${esc(item.name)}">Slet forhandler</button></div><div class="merchant-rules">${rules}</div></article>`;
+  }).join(''):'<div class="empty-state"><svg><use href="#icon-store"/></svg><h3>Ingen forhandlere endnu</h3><p>Når du tilknytter forhandlere til posteringer, vises de her.</p></div>';
+}
+window.loadMerchantLibrary=loadMerchantLibrary;
+
+$('merchantLibrary').addEventListener('click',event=>{
+  const rule=event.target.closest('[data-delete-merchant-rule]');
+  if(rule){
+    $('merchantDeleteForm').dataset.mode='rule';
+    $('merchantDeleteForm').dataset.title=rule.dataset.deleteMerchantRule;
+    $('merchantDeleteForm').dataset.merchant='';
+    $('merchantDeleteTitle').textContent='Slet gemt banktekst?';
+    $('merchantDeleteText').textContent=`Bankteksten fjernes fra “${rule.dataset.ruleMerchant}”. Eksisterende posteringer beholder deres forhandler, men denne tekst genkendes ikke automatisk fremover.`;
+    $('confirmMerchantDelete').textContent='Slet banktekst';
+    showError('merchantDeleteError','');
+    $('merchantDeleteDialog').showModal();
+    return;
+  }
+  const merchant=event.target.closest('[data-delete-library-merchant]');
+  if(merchant){
+    $('merchantDeleteForm').dataset.mode='merchant';
+    $('merchantDeleteForm').dataset.merchant=merchant.dataset.deleteLibraryMerchant;
+    $('merchantDeleteForm').dataset.title='';
+    $('merchantDeleteTitle').textContent='Slet hele forhandleren?';
+    $('merchantDeleteText').textContent=`“${merchant.dataset.deleteLibraryMerchant}” fjernes sammen med alle gemte banktekster. Forhandlernavnet fjernes også fra eksisterende posteringer.`;
+    $('confirmMerchantDelete').textContent='Slet forhandler';
+    showError('merchantDeleteError','');
+    $('merchantDeleteDialog').showModal();
+  }
+});
+
+$('merchantDeleteForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget, button=$('confirmMerchantDelete');
+  button.disabled=true;showError('merchantDeleteError','');
+  try{
+    const body=form.dataset.mode==='rule'?{title:form.dataset.title}:{merchant:form.dataset.merchant};
+    const result=await api('/api/merchant-library?source='+encodeURIComponent(source),{method:'DELETE',body:JSON.stringify(body)});
+    $('merchantDeleteDialog').close();
+    merchantChoicesSource='';
+    await loadMerchantLibrary();
+    await refresh();
+    if(view==='merchants')setView('merchants');
+    toast(form.dataset.mode==='rule'?'Bankteksten er slettet':`Forhandleren er slettet · ${result.cleared_transactions} posteringer opdateret`);
+  }catch(error){showError('merchantDeleteError',error.message);}
+  finally{button.disabled=false;}
+});

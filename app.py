@@ -164,6 +164,88 @@ def create_app(config=None):
         items = [{'name': item['name'], 'uses': item['uses']} for item in merged.values()]
         return sorted(items, key=lambda item: (-item['uses'], item['name'].casefold()))
 
+    def merchant_library_items(db, source):
+        examples = {row['title']: row['display_text'] for row in db.execute(
+            '''SELECT transaction_title(t.description) title,MIN(t.description) display_text
+               FROM transactions t JOIN accounts a ON a.id=t.account_id
+               WHERE a.source=? GROUP BY transaction_title(t.description)''', (source,))}
+        grouped = {}
+
+        def ensure(name, weight=0):
+            key = merchant_key(name)
+            item = grouped.get(key)
+            if item is None:
+                item = {'name': name, 'transactions': 0, 'rules': [], '_best': weight}
+                grouped[key] = item
+            elif weight > item['_best']:
+                item['name'], item['_best'] = name, weight
+            return item
+
+        for row in db.execute(
+            '''SELECT t.merchant,COUNT(*) transactions
+               FROM transactions t JOIN accounts a ON a.id=t.account_id
+               WHERE a.source=? AND t.merchant IS NOT NULL AND trim(t.merchant)!=''
+               GROUP BY t.merchant''', (source,)):
+            item = ensure(row['merchant'], int(row['transactions']))
+            item['transactions'] += int(row['transactions'])
+
+        for row in db.execute('SELECT title,merchant FROM merchant_rules WHERE source=? ORDER BY merchant,title', (source,)):
+            item = ensure(row['merchant'])
+            item['rules'].append({
+                'title': row['title'],
+                'bank_text': examples.get(row['title'], row['title']),
+            })
+
+        result = []
+        for item in grouped.values():
+            item.pop('_best', None)
+            item['rules'].sort(key=lambda rule: rule['bank_text'].casefold())
+            item['rule_count'] = len(item['rules'])
+            result.append(item)
+        return sorted(result, key=lambda item: item['name'].casefold())
+
+    @app.route('/api/merchant-library', methods=['GET', 'DELETE'])
+    def merchant_library():
+        source = request.args.get('source', 'demo')
+        if source not in ('demo', 'live'):
+            raise ValueError('Ugyldig datakilde.')
+        if request.method == 'GET':
+            with connect(db_path) as db:
+                return jsonify(items=merchant_library_items(db, source))
+
+        body = request.get_json(silent=True)
+        merchant = body.get('merchant') if isinstance(body, dict) else None
+        title = body.get('title') if isinstance(body, dict) else None
+        if bool(merchant) == bool(title):
+            raise ValueError('Vælg enten en forhandler eller én gemt banktekst.')
+
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            if title:
+                if not isinstance(title, str) or not 1 <= len(title) <= 1000:
+                    raise ValueError('Ugyldig banktekst.')
+                removed = db.execute('DELETE FROM merchant_rules WHERE source=? AND title=?', (source, title))
+                if not removed.rowcount:
+                    return jsonify(error='Den gemte banktekst findes ikke længere.'), 404
+                return jsonify(ok=True, deleted_rules=removed.rowcount, cleared_transactions=0)
+
+            if not isinstance(merchant, str) or not 1 <= len(merchant.strip()) <= 100:
+                raise ValueError('Ugyldig forhandler.')
+            target = merchant_key(merchant.strip())
+            rules = [row for row in db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?', (source,))
+                     if merchant_key(row['merchant']) == target]
+            transactions = [row for row in db.execute(
+                '''SELECT t.id,t.merchant FROM transactions t JOIN accounts a ON a.id=t.account_id
+                   WHERE a.source=? AND t.merchant IS NOT NULL AND trim(t.merchant)!='' ''', (source,))
+                            if merchant_key(row['merchant']) == target]
+            if not rules and not transactions:
+                return jsonify(error='Forhandleren findes ikke længere.'), 404
+            for row in rules:
+                db.execute('DELETE FROM merchant_rules WHERE source=? AND title=?', (source, row['title']))
+            for row in transactions:
+                db.execute('UPDATE transactions SET merchant=NULL,merchant_manual=0 WHERE id=?', (row['id'],))
+        return jsonify(ok=True, deleted_rules=len(rules), cleared_transactions=len(transactions))
+
     @app.route('/api/categories', methods=['GET', 'POST', 'PATCH', 'DELETE'])
     def manage_categories():
         if request.method == 'GET':

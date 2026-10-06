@@ -39,11 +39,11 @@ function showError(id, message) { $(id).textContent=message; $(id).hidden=!messa
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false; toastTimer=setTimeout(()=>{$('toast').hidden=true;},5000); }
 function setView(next) {
   view=next;
-  $('month').hidden=next==='savings';
-  const titles={savings:['Dine drømme, dine mål.','Planlæg det, du vil spare op til.','Opsparingsmål'],categories:['Dine kategorier.','Tilpas kategorier til din økonomi.','Kategorier'],overview:['Din økonomi, samlet.','Alle dine konti. Ét enkelt overblik.','Overblik'], accounts:['Alle konti. Helt enkelt.','Se din saldo, og gå på opdagelse i dine posteringer.','Mine konti'], transactions:['De små tal fortæller.','Find og kategorisér dine bogførte posteringer.','Posteringer'], budget:['Plads til dine planer.','Sæt et budget, der passer til din hverdag.','Mit budget']};
+  $('month').hidden=next==='savings' || next==='merchants';
+  const titles={savings:['Dine drømme, dine mål.','Planlæg det, du vil spare op til.','Opsparingsmål'],merchants:['Dine forhandlere.','Se og administrer de forhandlere og banktekster, FjordBudget har lært.','Forhandlere'],categories:['Dine kategorier.','Tilpas kategorier til din økonomi.','Kategorier'],overview:['Din økonomi, samlet.','Alle dine konti. Ét enkelt overblik.','Overblik'], accounts:['Alle konti. Helt enkelt.','Se din saldo, og gå på opdagelse i dine posteringer.','Mine konti'], transactions:['De små tal fortæller.','Find og kategorisér dine bogførte posteringer.','Posteringer'], budget:['Plads til dine planer.','Sæt et budget, der passer til din hverdag.','Mit budget']};
   $('pageTitle').textContent=titles[next][0]; $('pageSubtitle').textContent=titles[next][1]; $('breadcrumb').textContent=titles[next][2];
   document.querySelectorAll('.nav-item[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===next); b.setAttribute('aria-current',b.dataset.view===next?'page':'false');});
-  document.querySelectorAll('[data-section]').forEach(el=>{ const section=el.dataset.section; el.hidden=next==='overview'? ['budget','categories','savings'].includes(section) : next==='budget'?!['summary','budget'].includes(section):section!==next; });
+  document.querySelectorAll('[data-section]').forEach(el=>{ const section=el.dataset.section; el.hidden=next==='overview'? ['budget','categories','savings','merchants'].includes(section) : next==='budget'?!['summary','budget'].includes(section):section!==next; });
 }
 function switchSource(next) {
   source=config?.has_bank_connections?'live':next; localStorage.setItem('fjordbudget-source',source);
@@ -124,6 +124,7 @@ async function refresh() {
     $('loading').hidden=true; $('appContent').hidden=false;
     setView(view);
     if(view==='savings')await loadSavings();
+    if(view==='merchants')await window.loadMerchantLibrary?.();
   } catch(error) { if(generation===dashboardGeneration){$('loading').hidden=true;showError('loadError',error.message);} }
 }
 let bankChoices = [], bankActive = -1;
@@ -260,7 +261,13 @@ async function pollSync() {
 document.addEventListener('click',async event=>{
   const connect=event.target.closest('[data-connect]'); if(connect){await openBank();return;}
   const close=event.target.closest('[data-close]'); if(close){$(close.dataset.close).close();return;}
-  const nav=event.target.closest('[data-view]'); if(nav){if(nav.dataset.view==='categories'){try{await loadCategories();}catch(error){showError('loadError',error.message);}}setView(nav.dataset.view);if(nav.dataset.view==='savings')await loadSavings();window.scrollTo({top:0,behavior:'smooth'});return;}
+  const nav=event.target.closest('[data-view]'); if(nav){
+    if(nav.dataset.view==='categories'){try{await loadCategories();}catch(error){showError('loadError',error.message);}}
+    setView(nav.dataset.view);
+    if(nav.dataset.view==='savings')await loadSavings();
+    if(nav.dataset.view==='merchants'){try{await window.loadMerchantLibrary?.();}catch(error){showError('merchantLibraryError',error.message);}}
+    window.scrollTo({top:0,behavior:'smooth'});return;
+  }
   const mode=event.target.closest('[data-source]'); if(mode){await switchSource(mode.dataset.source);return;}
   const rename=event.target.closest('[data-rename]'); if(rename){
     const item=dashboard.accounts.find(a=>a.id===rename.dataset.rename);

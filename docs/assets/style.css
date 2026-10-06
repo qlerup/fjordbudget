@@ -262,3 +262,11 @@
 #categoryRenameForm label{display:block;font-size:14px;font-weight:600;margin:14px 0 8px}
 #categoryRenameInput{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:12px;background:white;color:var(--ink);font-size:16px}
 @media(max-width:760px){.category-row-actions{width:100%}.category-row-actions .button{flex:1}}
+
+/* Merchant library management. */
+.merchant-library-panel{margin-top:25px}.merchant-library{display:grid;gap:14px}.merchant-library-card{border:1px solid var(--line);border-radius:13px;background:#fafbf8;padding:18px}
+.merchant-library-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.merchant-library-head h3{margin:0;color:var(--ink);font-size:17px}.merchant-library-head p{margin:6px 0 0;color:var(--muted);font-size:12px}
+.merchant-rules{margin-top:15px;border-top:1px solid var(--line)}.merchant-rule-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid var(--line)}
+.merchant-rule-row>div{min-width:0}.merchant-rule-row strong{display:block;font-size:13px;overflow-wrap:anywhere}.merchant-rule-row small{display:block;color:var(--muted);font-size:10px;margin-top:4px;overflow-wrap:anywhere}.merchant-rule-delete{flex:none;color:#9a554d}.merchant-delete-button{color:#9a554d;border-color:#e4c4bf}.merchant-no-rules{margin:14px 0 0}
+.merchant-library-note{margin-top:16px}.danger-button{background:#a64d45;color:white;border-color:#a64d45}.danger-button:hover{background:#8d403a}
+@media(max-width:760px){.merchant-library-card{padding:15px}.merchant-library-head{flex-direction:column}.merchant-delete-button{width:100%}.merchant-rule-row{align-items:flex-start;flex-direction:column}.merchant-rule-delete{font-size:13px}.merchant-library-panel{margin-top:18px}}

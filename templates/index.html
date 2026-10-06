@@ -24,6 +24,7 @@
   <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 10a8 8 0 0 0-14-5L3 8m0-5v5h5M4 14a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></symbol>
   <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
   <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+  <symbol id="icon-store" viewBox="0 0 24 24"><path d="M4 10v10h16V10M3 10l2-6h14l2 6"/><path d="M3 10c0 2 3 3 4.5 1.5C9 13 12 12 12 10c0 2 3 3 4.5 1.5C18 13 21 12 21 10M8 20v-5h4v5"/></symbol>
 </defs></svg>
 <aside class="sidebar">
   <a class="brand" href="/" aria-label="FjordBudget start"><img src="/static/logos/wordmark.svg?v=brand-budget-green-20261005" width="182" height="46" alt="FjordBudget"></a>
@@ -35,7 +36,8 @@
     <button class="nav-item" data-view="transactions"><svg><use href="#icon-arrows"/></svg>Posteringer</button>
     <button class="nav-item" data-view="budget"><svg><use href="#icon-chart"/></svg>Mit budget</button>
     <button class="nav-item" data-view="savings" aria-label="Opsparingsmål"><svg><use href="#icon-target"/></svg>Opsparingsmål</button>
-  <button class="nav-item" data-view="categories" aria-label="Kategorier"><svg><use href="#icon-grid"/></svg>Kategorier</button></nav>
+  <button class="nav-item" data-view="categories" aria-label="Kategorier"><svg><use href="#icon-grid"/></svg>Kategorier</button>
+  <button class="nav-item" data-view="merchants" aria-label="Forhandlere"><svg><use href="#icon-store"/></svg>Forhandlere</button></nav>
   <p class="nav-label second-label">FORBINDELSER</p>
   <button class="nav-item" data-connect><svg><use href="#icon-bank"/></svg>Mine banker</button>
   <div class="sidebar-bottom"><div class="privacy-icon"><svg><use href="#icon-shield"/></svg></div><strong>Din økonomi. Dit overblik.</strong><p>Kun læseadgang til banken.<br>Ingen betalinger eller overførsler.</p><span class="local-status"><i></i> {{ 'Beskyttet med FjordHub-login' if managed else 'Kører lokalt på din computer' }}</span></div>
@@ -67,6 +69,12 @@
 <form id="categoryCreateForm" class="category-create"><label for="newCategoryName">Ny kategori</label><input id="newCategoryName" maxlength="60" required placeholder="Fx Børn eller Ferie"><button class="button primary" type="submit">Tilføj kategori</button></form>
 <div id="categoryError" class="error-box" role="alert" hidden></div><div id="categoryList"></div>
 <p class="small muted">Andet, Indkomst og Overførsler er faste kategorier, som bruges i overblikkets beregninger. Ved sletning flyttes posteringer og regler til den kategori, du vælger. Budgetkategorier og budgetbeløb bevares.</p>
+</section>
+<section class="panel merchant-library-panel" data-section="merchants" hidden>
+  <div class="section-heading"><div><h2>Dine forhandlere <span class="count" id="merchantLibraryCount">0</span></h2><p>Se hvilke banktekster FjordBudget har lært, og fjern regler eller hele forhandlere.</p></div></div>
+  <div id="merchantLibraryError" class="error-box" role="alert" hidden></div>
+  <div id="merchantLibrary" class="merchant-library"></div>
+  <p class="small muted merchant-library-note">Sletter du kun en banktekst, beholdes forhandleren på historiske posteringer. Sletter du hele forhandleren, fjernes forhandlernavnet også fra eksisterende posteringer.</p>
 </section>
 {% include 'savings.html' %}
 <section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><form id="budgetCategoryCreateForm" class="budget-category-create"><label for="newBudgetCategoryName">Ny budgetkategori</label><div><input id="newBudgetCategoryName" maxlength="60" required placeholder="Fx Ferie eller Bil"><button class="button quiet" type="submit">Tilføj budgetkategori</button></div></form><p class="small muted">Tilknyt posteringernes kategorier til dit budget under <button type="button" class="text-button" data-view="categories">Kategorier</button>.</p><div id="budgetCategoryError" class="error-box" role="alert" hidden></div><div id="budgetFull"></div></section>
@@ -120,6 +128,13 @@
     <label class="checkbox-row"><input id="merchantRemember" type="checkbox" checked> <span>Husk forhandleren fremover ved præcis samme normaliserede banktekst</span></label>
     <div id="merchantError" class="error-box" role="alert" hidden></div>
     <div class="dialog-actions"><button id="clearMerchant" type="button" class="text-button">Fjern forhandler</button><button type="button" class="button quiet" data-close="merchantDialog">Annuller</button><button id="saveMerchant" type="submit" class="button primary">Gem forhandler</button></div>
+  </form>
+</dialog>
+<dialog id="merchantDeleteDialog" aria-labelledby="merchantDeleteTitle">
+  <div class="dialog-header"><h2 id="merchantDeleteTitle">Slet?</h2><button type="button" class="icon-button" data-close="merchantDeleteDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+  <p id="merchantDeleteText" class="dialog-intro"></p>
+  <form id="merchantDeleteForm"><div id="merchantDeleteError" class="error-box" role="alert" hidden></div>
+    <div class="dialog-actions"><button type="button" class="button quiet" data-close="merchantDeleteDialog">Annuller</button><button id="confirmMerchantDelete" type="submit" class="button danger-button">Slet</button></div>
   </form>
 </dialog>
 <dialog id="categoryDialog" aria-labelledby="categoryPickerTitle">

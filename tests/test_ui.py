@@ -369,6 +369,37 @@ class UITests(unittest.TestCase):
         created=next(item for item in categories if item['name']=='Børn test')
         self.assertEqual(created['requires_merchant'],1)
 
+    def test_merchant_library_lists_and_deletes_saved_bank_texts_and_merchants(self):
+        month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]
+        self.page.locator('#month').fill(month)
+        self.page.locator('#month').dispatch_event('change')
+        self.page.locator('#search').fill('Netto')
+        row=self.page.locator('#transactionRows tr').first
+        row.locator('.merchant-picker-button').click()
+        self.page.locator('#merchantName').fill('UI Merchant')
+        self.page.locator('#saveMerchant').click()
+        expect(self.page.locator('#merchantDialog')).not_to_be_visible()
+
+        self.page.get_by_role('button',name='Forhandlere',exact=True).click()
+        expect(self.page.locator('[data-section="merchants"]')).to_be_visible()
+        card=self.page.locator('[data-library-merchant="UI Merchant"]')
+        expect(card).to_be_visible()
+        expect(card.locator('[data-delete-merchant-rule]')).to_have_count(1)
+
+        card.locator('[data-delete-merchant-rule]').click()
+        expect(self.page.locator('#merchantDeleteDialog')).to_be_visible()
+        expect(self.page.locator('#merchantDeleteText')).to_contain_text('beholder deres forhandler')
+        self.page.locator('#confirmMerchantDelete').click()
+        expect(self.page.locator('#merchantDeleteDialog')).not_to_be_visible()
+        card=self.page.locator('[data-library-merchant="UI Merchant"]')
+        expect(card).to_be_visible()
+        expect(card.locator('[data-delete-merchant-rule]')).to_have_count(0)
+
+        card.locator('[data-delete-library-merchant]').click()
+        expect(self.page.locator('#merchantDeleteText')).to_contain_text('fjernes også fra eksisterende posteringer')
+        self.page.locator('#confirmMerchantDelete').click()
+        expect(self.page.locator('[data-library-merchant="UI Merchant"]')).to_have_count(0)
+
     def test_budget_saved_after_reload_and_live_data_empty(self):
         self.page.locator('.edit-budget').first.click()
         self.page.get_by_label('Budget for Mad & indkøb').fill('4567.89')

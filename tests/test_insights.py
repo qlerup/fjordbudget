@@ -105,6 +105,42 @@ class InsightTests(unittest.TestCase):
                     if item['id'] == second['id'])
         self.assertEqual(item['category_manual'], 1)
 
+    def test_merchant_library_can_delete_rule_or_entire_merchant(self):
+        with connect(self.db) as db:
+            rows = db.execute("""SELECT id,description FROM transactions
+                                 WHERE account_id='demo-daily' AND amount<0
+                                 ORDER BY id LIMIT 2""").fetchall()
+        first, second = rows
+        for row in (first, second):
+            response=self.client.patch(
+                f"/api/transactions/{row['id']}/merchant",
+                json={'merchant':'Test Merchant','remember':True},headers=self.headers)
+            self.assertEqual(response.status_code,200)
+
+        library=self.client.get('/api/merchant-library?source=demo').json['items']
+        merchant=next(item for item in library if item['name']=='Test Merchant')
+        self.assertEqual(merchant['rule_count'],2)
+        first_rule=merchant['rules'][0]
+        response=self.client.delete('/api/merchant-library?source=demo',
+                                    json={'title':first_rule['title']},headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json['cleared_transactions'],0)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute('SELECT merchant FROM transactions WHERE id=?',(first['id'],)).fetchone()[0],'Test Merchant')
+        merchant=next(item for item in self.client.get('/api/merchant-library?source=demo').json['items']
+                      if item['name']=='Test Merchant')
+        self.assertEqual(merchant['rule_count'],1)
+
+        response=self.client.delete('/api/merchant-library?source=demo',
+                                    json={'merchant':'Test Merchant'},headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertGreaterEqual(response.json['cleared_transactions'],2)
+        self.assertFalse(any(item['name']=='Test Merchant'
+                             for item in self.client.get('/api/merchant-library?source=demo').json['items']))
+        with connect(self.db) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM merchant_rules WHERE source='demo' AND merchant='Test Merchant'").fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT count(*) FROM transactions WHERE merchant='Test Merchant'").fetchone()[0],0)
+
     def test_goal_analysis_flags_unrealistic_goal_and_tracks_featured_progress(self):
         body = {
             'name': 'Stor drøm',
