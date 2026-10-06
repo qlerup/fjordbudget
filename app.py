@@ -181,9 +181,24 @@ def create_app(config=None):
                     raise ValueError('Kategorien findes allerede.')
                 db.execute('INSERT INTO categories(name,color,protected) VALUES (?,?,0)', (name,COLORS[len(categories)%len(COLORS)]))
             elif request.method == 'PATCH':
-                if not any(c['name']==name for c in categories):
+                current = next((c for c in categories if c['name']==name), None)
+                if current is None:
                     raise ValueError('Kategorien findes ikke.')
                 updates, values = [], []
+                rename_to = None
+                if 'new_name' in body:
+                    new_name = body.get('new_name')
+                    if (not isinstance(new_name, str) or not 1 <= len(new_name.strip()) <= 60
+                            or any(ord(c) < 32 for c in new_name)):
+                        raise ValueError('Det nye kategorinavn skal være på 1–60 tegn uden linjeskift.')
+                    if current['protected']:
+                        raise ValueError('Faste kategorier kan ikke omdøbes.')
+                    new_name = new_name.strip()
+                    if any(c['name'] != name and transaction_title(c['name']) == transaction_title(new_name) for c in categories):
+                        raise ValueError('Kategorien findes allerede.')
+                    rename_to = new_name
+                    updates.append('name=?')
+                    values.append(rename_to)
                 if 'budget_category' in body:
                     target = body.get('budget_category')
                     if target is not None and target not in [c['name'] for c in budget_category_list(db)]:
@@ -199,6 +214,9 @@ def create_app(config=None):
                 if not updates:
                     raise ValueError('Der er ingen kategoriindstillinger at gemme.')
                 db.execute('UPDATE categories SET '+','.join(updates)+' WHERE name=?', (*values,name))
+                if rename_to and rename_to != name:
+                    db.execute('UPDATE transactions SET category=? WHERE category=?', (rename_to,name))
+                    db.execute('UPDATE category_rules SET category=? WHERE category=?', (rename_to,name))
             else:
                 current = next((c for c in categories if c['name']==name),None)
                 if not current or current['protected']:

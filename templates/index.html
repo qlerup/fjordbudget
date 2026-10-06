@@ -156,6 +156,12 @@
 <h2 id="accountSetupTitle">Giv dine konti et navn</h2><p class="dialog-intro">Brug saldoen og kontonummerets sidste cifre til at kende dine konti. Navnene gemmes i FjordBudget, så dit overblik bliver nemt at bruge.</p>
 <form id="accountSetupForm"><div id="accountSetupFields"></div><div id="accountSetupError" class="error-box" role="alert" hidden></div>
 <div class="dialog-actions"><button type="button" class="button quiet" data-close="accountSetupDialog">Gør det senere</button><button id="saveAccountSetup" type="submit" class="button primary">Gem og kom i gang</button></div></form></dialog>
+<dialog id="categoryRenameDialog" aria-labelledby="categoryRenameTitle">
+<div class="dialog-header"><h2 id="categoryRenameTitle">Omdøb kategori</h2><button type="button" class="icon-button" data-close="categoryRenameDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+<p class="dialog-intro">Det nye navn bruges også på eksisterende posteringer og huskeregler.</p>
+<form id="categoryRenameForm"><label for="categoryRenameInput">Kategorinavn</label><input id="categoryRenameInput" maxlength="60" required autocomplete="off">
+<div id="categoryRenameError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="categoryRenameDialog">Annuller</button><button id="saveCategoryRename" class="button primary" type="submit">Gem navn</button></div></form>
+</dialog>
 <dialog id="categoryDeleteDialog" aria-labelledby="categoryDeleteTitle"><h2 id="categoryDeleteTitle">Slet kategori</h2><p id="categoryDeleteText"></p><form id="categoryDeleteForm"><label for="categoryReplacement">Flyt til kategori</label><select id="categoryReplacement" class="full-width" required></select><div id="categoryDeleteError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="categoryDeleteDialog">Annuller</button><button class="button primary" type="submit">Flyt og slet</button></div></form></dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 </body></html>

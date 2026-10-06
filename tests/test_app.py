@@ -371,6 +371,28 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(normalize_transactions([raw])[0][0],)).fetchone()[0],'Andet')
 
+    def test_custom_category_can_be_renamed_with_transactions_and_rules(self):
+        url='/api/categories'
+        self.assertEqual(self.client.post(url,json={'name':'Old name'},headers=self.headers).status_code,200)
+        self.client.patch(url,json={'name':'Old name','requires_merchant':False},headers=self.headers)
+        with connect(self.db) as db:
+            db.execute("""INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                          VALUES ('demo-daily','rename-category',?,'Rename purchase',-1000,'DKK','Old name')""",
+                       (self.month+'-01',))
+            db.execute("INSERT INTO category_rules(source,title,category) VALUES ('demo','rename purchase','Old name')")
+        response=self.client.patch(url,json={'name':'Old name','new_name':'New name'},headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        items=response.json['items']
+        renamed=next(c for c in items if c['name']=='New name')
+        self.assertFalse(renamed['requires_merchant'])
+        self.assertNotIn('Old name',[c['name'] for c in items])
+        with connect(self.db) as db:
+            self.assertEqual(db.execute("SELECT category FROM transactions WHERE external_id='rename-category'").fetchone()[0],'New name')
+            self.assertEqual(db.execute("SELECT category FROM category_rules WHERE title='rename purchase'").fetchone()[0],'New name')
+        self.assertIn('New name',self.client.get('/api/config').json['categories'])
+        self.assertEqual(self.client.patch(url,json={'name':'Andet','new_name':'Other'},headers=self.headers).status_code,400)
+        self.assertEqual(self.client.patch(url,json={'name':'New name','new_name':'Fritid'},headers=self.headers).status_code,400)
+
     def test_optional_budget_mapping_groups_categories_without_changing_spending(self):
         self.client.post('/api/categories',json={'name':'Custom'},headers=self.headers)
         with connect(self.db) as db:

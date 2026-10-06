@@ -399,7 +399,7 @@ async function loadCategories(){
   const selected=$('categoryFilter').value;
   $('categoryFilter').innerHTML='<option value="">Alle kategorier</option>'+config.categories.map(c=>`<option>${esc(c)}</option>`).join('');
   if(config.categories.includes(selected))$('categoryFilter').value=selected;
-  $('categoryList').innerHTML=result.items.map(c=>`<div class="category-management-row"><span><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><div class="category-settings"><label class="category-merchant-setting"><span>Kræver forhandler</span><input type="checkbox" data-merchant-required="${esc(c.name)}" ${c.requires_merchant?'checked':''} aria-label="Kræver forhandler for ${esc(c.name)}"><i class="setting-switch" aria-hidden="true"></i></label><label class="category-budget-link">Budgetkategori<select data-budget-link="${esc(c.name)}" aria-label="Budgetkategori for ${esc(c.name)}"><option value="">Ingen budgetkategori</option>${result.budget_categories.map(b=>`<option value="${esc(b.name)}" ${c.budget_category===b.name?'selected':''}>${esc(b.name)}</option>`).join('')}</select></label></div>${c.protected?'<small class="muted">Fast kategori</small>':`<button class="button quiet" data-delete-category="${esc(c.name)}" aria-label="Slet ${esc(c.name)}">Slet</button>`}</div>`).join('');
+  $('categoryList').innerHTML=result.items.map(c=>`<div class="category-management-row"><span><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><div class="category-settings"><label class="category-merchant-setting"><span>Kræver forhandler</span><input type="checkbox" data-merchant-required="${esc(c.name)}" ${c.requires_merchant?'checked':''} aria-label="Kræver forhandler for ${esc(c.name)}"><i class="setting-switch" aria-hidden="true"></i></label><label class="category-budget-link">Budgetkategori<select data-budget-link="${esc(c.name)}" aria-label="Budgetkategori for ${esc(c.name)}"><option value="">Ingen budgetkategori</option>${result.budget_categories.map(b=>`<option value="${esc(b.name)}" ${c.budget_category===b.name?'selected':''}>${esc(b.name)}</option>`).join('')}</select></label></div>${c.protected?'<small class="muted">Fast kategori</small>':`<div class="category-row-actions"><button class="button quiet" type="button" data-rename-category="${esc(c.name)}" aria-label="Omdøb ${esc(c.name)}">Omdøb</button><button class="button quiet" type="button" data-delete-category="${esc(c.name)}" aria-label="Slet ${esc(c.name)}">Slet</button></div>`}</div>`).join('');
 }
 $('categoryCreateForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter;button.disabled=true;showError('categoryError','');
@@ -407,11 +407,37 @@ $('categoryCreateForm').addEventListener('submit',async event=>{
   catch(error){showError('categoryError',error.message);}finally{button.disabled=false;}
 });
 $('categoryList').addEventListener('click',event=>{
+  const rename=event.target.closest('[data-rename-category]');
+  if(rename){
+    const name=rename.dataset.renameCategory;
+    $('categoryRenameForm').dataset.category=name;
+    $('categoryRenameInput').value=name;
+    showError('categoryRenameError','');
+    $('categoryRenameDialog').showModal();
+    $('categoryRenameInput').focus();
+    $('categoryRenameInput').select();
+    return;
+  }
   const button=event.target.closest('[data-delete-category]');if(!button)return;
   const name=button.dataset.deleteCategory;$('categoryDeleteForm').dataset.category=name;
   $('categoryDeleteText').textContent=`Alle posteringer og regler i “${name}” flyttes, før kategorien slettes. Dette gælder alle gemte data.`;
   $('categoryReplacement').innerHTML=editableCategories.filter(c=>![name,'Indkomst','Overførsler'].includes(c.name)).map(c=>`<option>${esc(c.name)}</option>`).join('');
   $('categoryReplacement').value='Andet';showError('categoryDeleteError','');$('categoryDeleteDialog').showModal();
+});
+$('categoryRenameForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget, button=event.submitter;
+  button.disabled=true;showError('categoryRenameError','');
+  try{
+    const oldName=form.dataset.category;
+    const newName=$('categoryRenameInput').value.trim();
+    await api('/api/categories',{method:'PATCH',body:JSON.stringify({name:oldName,new_name:newName})});
+    await loadCategories();
+    await refresh();
+    $('categoryRenameDialog').close();
+    toast(`Kategorien er omdøbt til “${newName}”`);
+  }catch(error){showError('categoryRenameError',error.message);}
+  finally{button.disabled=false;}
 });
 $('categoryDeleteForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter;button.disabled=true;showError('categoryDeleteError','');

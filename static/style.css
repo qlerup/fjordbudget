@@ -256,3 +256,9 @@
 .choice-create-option:disabled{opacity:.55;cursor:wait}
 .choice-create-plus{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#e4efe0;font-size:17px;line-height:1}
 @media(max-width:760px){.choice-create-option{font-size:16px;padding:13px 12px}}
+
+/* Category rename controls. */
+.category-row-actions{display:flex;gap:8px;align-items:center}
+#categoryRenameForm label{display:block;font-size:14px;font-weight:600;margin:14px 0 8px}
+#categoryRenameInput{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:12px;background:white;color:var(--ink);font-size:16px}
+@media(max-width:760px){.category-row-actions{width:100%}.category-row-actions .button{flex:1}}

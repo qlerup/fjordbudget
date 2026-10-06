@@ -222,6 +222,27 @@ class UITests(unittest.TestCase):
         self.page.locator('nav [data-view="categories"]').click()
         expect(self.page.locator('#categoryList')).not_to_contain_text('Holiday <test>')
 
+    def test_custom_category_can_be_renamed_from_category_menu(self):
+        self.page.set_viewport_size({'width':390,'height':844})
+        self.page.locator('nav [data-view="categories"]').click()
+        self.page.locator('#newCategoryName').fill('Omdøb mig')
+        self.page.get_by_role('button',name='Tilføj kategori',exact=True).click()
+        rename=self.page.get_by_role('button',name='Omdøb Omdøb mig',exact=True)
+        expect(rename).to_be_visible()
+        rename.click()
+        expect(self.page.locator('#categoryRenameDialog')).to_be_visible()
+        expect(self.page.locator('#categoryRenameInput')).to_have_value('Omdøb mig')
+        self.page.locator('#categoryRenameInput').fill('Nyt kategorinavn')
+        self.page.locator('#saveCategoryRename').click()
+        expect(self.page.locator('#categoryRenameDialog')).not_to_be_visible()
+        expect(self.page.locator('#categoryList')).to_contain_text('Nyt kategorinavn')
+        expect(self.page.locator('#categoryList')).not_to_contain_text('Omdøb mig')
+        expect(self.page.get_by_role('button',name='Omdøb Nyt kategorinavn',exact=True)).to_be_visible()
+        self.page.reload()
+        self.page.locator('nav [data-view="categories"]').click()
+        expect(self.page.locator('#categoryList')).to_contain_text('Nyt kategorinavn')
+        expect(self.page.get_by_role('button',name='Omdøb Andet',exact=True)).to_have_count(0)
+
     def test_api_handles_html_gateway_error(self):
         self.page.route('**/api/bank/connect', lambda route: route.fulfill(
             status=502, content_type='text/html', body='<!DOCTYPE html><h1>Bad gateway</h1>'))
