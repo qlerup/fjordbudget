@@ -337,6 +337,12 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#categoryFilter option')).to_contain_text(['Børn test'])
         self.page.locator('#savePickedCategory').click()
         expect(self.page.locator('#categoryDialog')).not_to_be_visible()
+        expect(self.page.locator('#toast')).to_contain_text('Kategori gemt')
+        self.page.reload()
+        expect(self.page.locator('#appContent')).to_be_visible()
+        self.page.locator('#month').fill(month)
+        self.page.locator('#month').dispatch_event('change')
+        self.page.locator('#search').fill('Netto')
         expect(self.page.locator('#transactionRows .category-picker-button').first).to_contain_text('Børn test')
         categories=self.app.test_client().get('/api/categories').json['items']
         created=next(item for item in categories if item['name']=='Børn test')
