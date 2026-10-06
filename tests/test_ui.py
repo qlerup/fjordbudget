@@ -349,6 +349,10 @@ class UITests(unittest.TestCase):
         self.page.locator('.nav-item[data-view="transactions"]').click()
         expect(self.page.locator('.transactions-panel')).to_be_visible()
         self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
+        self.assertEqual(self.page.locator('#search').evaluate("el=>getComputedStyle(el).fontSize"),'16px')
+        self.assertEqual(self.page.locator('#accountFilter').evaluate("el=>getComputedStyle(el).fontSize"),'16px')
+        self.assertEqual(self.page.locator('#categoryFilter').evaluate("el=>getComputedStyle(el).fontSize"),'16px')
+        self.assertEqual(self.page.locator('#merchantName').evaluate("el=>getComputedStyle(el).fontSize"),'16px')
         amount=self.page.locator('td.amount-cell').first.bounding_box()
         self.assertLessEqual(amount['x']+amount['width'],390)
         colored=self.page.locator('#transactionRows tr.transaction-complete, #transactionRows tr.transaction-partial, #transactionRows tr.transaction-incomplete').first

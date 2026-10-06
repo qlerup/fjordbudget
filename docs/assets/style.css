@@ -228,3 +228,24 @@
 .category-merchant-setting>input:checked~.setting-switch:after{transform:translateX(18px)}
 .category-merchant-setting:has(input:focus-visible) .setting-switch{outline:2px solid #91ab7d;outline-offset:2px}
 @media(max-width:760px){.category-settings{width:100%;margin-left:0;justify-content:space-between;align-items:flex-end}.category-merchant-setting{min-width:120px}}
+
+/* Prevent iOS Safari from auto-zooming focused form controls. */
+@media(max-width:760px){
+  input,
+  select,
+  textarea{
+    font-size:16px!important;
+  }
+  .choice-search input,
+  .search-field input,
+  .transaction-filters select,
+  .category-budget-link select,
+  #categoryReplacement,
+  #accountNameInput,
+  #bankCredentialsForm input,
+  #bankCredentialsForm textarea,
+  .bank-dropdown-panel input,
+  .savings-form input{
+    font-size:16px!important;
+  }
+}
