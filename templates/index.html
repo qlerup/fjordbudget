@@ -57,7 +57,7 @@
         <article class="summary-card"><div class="summary-top">Tilbage i budgettet <span class="metric-icon budget-icon">◷</span></div><div class="metric" id="remaining">—</div><div class="metric-footer" id="remainingNote">Af dit månedsbudget</div></article>
       </section>
       <section id="featuredGoalPanel" class="panel featured-goal-panel" data-section="insights" hidden aria-live="polite"></section>
-      <section class="accounts-section" data-section="accounts"><div class="section-heading"><div><h2>Mine konti <span class="count" id="accountsLabel">0</span></h2><p>Saldo lige nu, uanset valgt måned</p></div><button id="syncButton" class="button quiet"><svg><use href="#icon-refresh"/></svg>Opdater saldi</button></div><div id="accounts" class="accounts-grid"></div><p id="syncMessage" class="sync-status" role="status"></p></section>
+      <section class="accounts-section" data-section="accounts"><div class="section-heading"><div><h2>Mine konti <span class="count" id="accountsLabel">0</span></h2><p>Saldo lige nu, uanset valgt måned</p></div><div class="account-heading-actions"><button id="manageAccountsButton" class="button quiet" type="button"><svg><use href="#icon-grid"/></svg>Administrer konti</button><button id="syncButton" class="button quiet"><svg><use href="#icon-refresh"/></svg>Opdater saldi</button></div></div><div id="accounts" class="accounts-grid"></div><p id="syncMessage" class="sync-status" role="status"></p></section>
       <div class="insights" data-section="insights">
         <section class="panel cashflow"><div class="section-heading"><div><h2>Ind og ud</h2><p>Din økonomi måned for måned</p></div><div class="legend"><span><i class="income-dot"></i>Indtægter</span><span><i class="expense-dot"></i>Udgifter</span></div></div><div id="cashflowChart" class="cashflow-chart"></div><div class="chart-footer"><span>Overførsler mellem konti er ikke medregnet</span><strong id="netCashflow"></strong></div></section>
         <section class="panel budget-panel"><div class="section-heading"><div><h2>Dit månedsbudget</h2><p>Giv dine penge en retning</p></div><button class="text-button edit-budget">Rediger <span>↗</span></button></div><div id="budgetProgress"></div><div id="budgetPreview"></div><button class="budget-detail text-button" data-view="budget">Se hele budgettet <span>→</span></button></section>
@@ -145,6 +145,12 @@
 <div id="accountNameError" class="error-box" role="alert" hidden></div>
 <div class="dialog-actions"><button type="button" class="button quiet" data-close="accountNameDialog">Annuller</button><button id="saveAccountName" class="button primary" type="submit">Gem navn</button></div>
 </form></dialog>
+<dialog id="accountVisibilityDialog" aria-labelledby="accountVisibilityTitle">
+<div class="dialog-header"><div><p class="eyebrow">VÆLG DINE KONTI</p><h2 id="accountVisibilityTitle">Hvilke konti skal være med?</h2></div><button class="icon-button" data-close="accountVisibilityDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+<p id="accountVisibilityIntro" class="dialog-intro">Kun de konti, du vælger, bruges i saldo, posteringer, budgetanalyse og opsparingsmål. Fravalgte konti gemmes, men holdes helt ude af overblikket.</p>
+<form id="accountVisibilityForm"><div id="accountVisibilityFields" class="account-visibility-list"></div><div id="accountVisibilityError" class="error-box" role="alert" hidden></div>
+<div class="dialog-actions"><button type="button" class="button quiet" data-close="accountVisibilityDialog">Gør det senere</button><button id="saveAccountVisibility" type="submit" class="button primary">Gem kontovalg</button></div></form>
+</dialog>
 <dialog id="accountSetupDialog" aria-labelledby="accountSetupTitle">
 <div class="dialog-header"><p class="eyebrow">KOM GODT I GANG</p><button class="icon-button" data-close="accountSetupDialog" aria-label="Luk">×</button></div>
 <h2 id="accountSetupTitle">Giv dine konti et navn</h2><p class="dialog-intro">Brug saldoen og kontonummerets sidste cifre til at kende dine konti. Navnene gemmes i FjordBudget, så dit overblik bliver nemt at bruge.</p>

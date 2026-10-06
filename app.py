@@ -145,7 +145,8 @@ def create_app(config=None):
         rows = db.execute('''SELECT merchant,COUNT(*) uses FROM (
                                SELECT t.merchant merchant FROM transactions t
                                JOIN accounts a ON a.id=t.account_id
-                               WHERE a.source=? AND t.merchant IS NOT NULL AND trim(t.merchant)!=''
+                               WHERE a.source=? AND a.included=1 AND a.selection_pending=0
+                                 AND t.merchant IS NOT NULL AND trim(t.merchant)!=''
                                UNION ALL
                                SELECT merchant FROM merchant_rules WHERE source=?
                              ) GROUP BY merchant''', (source, source)).fetchall()
@@ -329,17 +330,19 @@ def create_app(config=None):
         source, month, currency = parameters()
         with connect(db_path) as db:
             has_bank_connections = db.execute('SELECT 1 FROM connections LIMIT 1').fetchone() is not None
-            accounts = [dict(r) for r in db.execute('SELECT id,COALESCE(custom_name,name) name,custom_name,bank,last4,currency,balance,balance_type,synced_at FROM accounts WHERE source=? ORDER BY rowid', (source,))]
+            accounts = [dict(r) for r in db.execute('''SELECT id,COALESCE(custom_name,name) name,custom_name,bank,last4,currency,balance,balance_type,synced_at
+                                                        FROM accounts WHERE source=? AND included=1 AND selection_pending=0 ORDER BY rowid''', (source,))]
+            hidden_account_count = db.execute('SELECT count(*) FROM accounts WHERE source=? AND (included=0 OR selection_pending=1)', (source,)).fetchone()[0]
             rows = db.execute('''SELECT t.category,t.amount,c.budget_category FROM transactions t LEFT JOIN categories c ON c.name=t.category JOIN accounts a ON a.id=t.account_id
-                                 WHERE a.source=? AND t.currency=? AND substr(t.booked_on,1,7)=?''', (source, currency, month)).fetchall()
+                                 WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7)=?''', (source, currency, month)).fetchall()
             budgets = {r['category']: r['amount'] for r in db.execute('SELECT category,amount FROM budgets WHERE source=? AND month=? AND currency=?', (source, month, currency))}
-            months = [r[0] for r in db.execute('''SELECT DISTINCT substr(t.booked_on,1,7) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE a.source=? ORDER BY 1 DESC''', (source,))]
+            months = [r[0] for r in db.execute('''SELECT DISTINCT substr(t.booked_on,1,7) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE a.source=? AND a.included=1 AND a.selection_pending=0 ORDER BY 1 DESC''', (source,))]
             connections = [dict(r) for r in db.execute('SELECT id,bank,valid_until,created_at FROM connections ORDER BY created_at DESC')] if source == 'live' else []
             history = [dict(r) for r in db.execute('''SELECT substr(t.booked_on,1,7) month,
                  SUM(CASE WHEN t.amount>0 THEN t.amount ELSE 0 END) income,
                  SUM(CASE WHEN t.amount<0 THEN -t.amount ELSE 0 END) expenses
                  FROM transactions t JOIN accounts a ON a.id=t.account_id
-                 WHERE a.source=? AND t.currency=? AND t.category!='Overførsler'
+                 WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND t.category!='Overførsler'
                  AND substr(t.booked_on,1,7)<=? GROUP BY 1 ORDER BY 1 DESC LIMIT 6''', (source, currency, month))]
         income = sum(r['amount'] for r in rows if r['amount'] > 0 and r['category'] != 'Overførsler')
         expenses = -sum(r['amount'] for r in rows if r['amount'] < 0 and r['category'] != 'Overførsler')
@@ -350,7 +353,8 @@ def create_app(config=None):
         return jsonify(has_bank_connections=has_bank_connections, accounts=accounts, connections=connections, income=income, expenses=expenses,
                        balance=sum(a['balance'] for a in selected if a['balance'] is not None), missing_balances=sum(a['balance'] is None for a in selected),
                        budget=sum(budgets.values()), budget_spent=sum(c['spent'] for c in categories), categories=categories, months=months,
-                       history=list(reversed(history)), month=month, featured_goal=goal_insights['featured_goal'])
+                       history=list(reversed(history)), month=month, featured_goal=goal_insights['featured_goal'],
+                       hidden_account_count=hidden_account_count)
 
     @app.get('/api/transactions')
     def transactions():
@@ -359,7 +363,7 @@ def create_app(config=None):
         account = request.args.get('account', '')
         query = request.args.get('q', '').strip()[:200]
         category = request.args.get('category', '')
-        conditions = ['a.source=?', 't.currency=?', 'substr(t.booked_on,1,7)=?']
+        conditions = ['a.source=?', 'a.included=1', 'a.selection_pending=0', 't.currency=?', 'substr(t.booked_on,1,7)=?']
         values = [source, currency, month]
         if account:
             conditions.append('a.id=?')
@@ -389,6 +393,35 @@ def create_app(config=None):
             items = merchant_items(db, source)
         return jsonify(items=items)
 
+    @app.get('/api/accounts/manage')
+    def manage_accounts_list():
+        pending_only = request.args.get('pending') == '1'
+        with connect(db_path) as db:
+            where = "source='live'" + (" AND selection_pending=1" if pending_only else "")
+            rows = [dict(row) for row in db.execute(f'''SELECT id,COALESCE(custom_name,name) name,custom_name,bank,last4,currency,
+                                                              balance,synced_at,included,selection_pending,
+                                                              CASE WHEN connection_id IS NULL THEN 0 ELSE 1 END connected
+                                                       FROM accounts WHERE {where}
+                                                       ORDER BY bank,COALESCE(custom_name,name),id''')]
+        return jsonify(items=rows)
+
+    @app.put('/api/accounts/manage')
+    def manage_accounts_save():
+        body = request.get_json(silent=True)
+        included = body.get('included') if isinstance(body, dict) else None
+        if not isinstance(included, dict) or not included:
+            raise ValueError('Vælg hvilke konti der skal være med.')
+        if any(not isinstance(account_id, str) or type(value) is not bool for account_id, value in included.items()):
+            raise ValueError('Ugyldigt kontovalg.')
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            rows = {row['id'] for row in db.execute("SELECT id FROM accounts WHERE source='live'")}
+            if not set(included).issubset(rows):
+                raise ValueError('En af kontiene findes ikke længere. Genindlæs siden.')
+            for account_id, value in included.items():
+                db.execute('UPDATE accounts SET included=?,selection_pending=0 WHERE id=?', (int(value), account_id))
+            active = db.execute("SELECT count(*) FROM accounts WHERE source='live' AND included=1 AND selection_pending=0").fetchone()[0]
+        return jsonify(ok=True, active=active)
     @app.patch('/api/transactions/<int:transaction_id>')
     def update_category(transaction_id):
         category = request.get_json().get('category')
@@ -527,8 +560,8 @@ def create_app(config=None):
                     currency = account.get('currency', 'DKK')
                     if currency not in CURRENCIES:
                         raise BankError('En kontovaluta understøttes endnu ikke.')
-                    db.execute('''INSERT INTO accounts(id,source,connection_id,remote_id,name,bank,last4,currency)
-                      VALUES (?,'live',?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET connection_id=excluded.connection_id,
+                    db.execute('''INSERT INTO accounts(id,source,connection_id,remote_id,name,bank,last4,currency,included,selection_pending)
+                      VALUES (?,'live',?,?,?,?,?,?,0,1) ON CONFLICT(id) DO UPDATE SET connection_id=excluded.connection_id,
                       remote_id=excluded.remote_id,name=excluded.name,currency=excluded.currency''',
                                (account_id, connection_id, cipher.encrypt(account['uid'].encode()).decode(), account_name(account), pending['bank'], iban[-4:], currency))
             return redirect('/?bank_result=connected')
@@ -547,7 +580,9 @@ def create_app(config=None):
                 if (not isinstance(name, str) or not 1 <= len(name.strip()) <= 100
                         or any(ord(char) < 32 for char in name)):
                     raise ValueError('Hver konto skal have et navn på 1–100 tegn uden linjeskift.')
-                account = db.execute("SELECT custom_name FROM accounts WHERE id=? AND source='live'", (account_id,)).fetchone()
+                account = db.execute("""SELECT custom_name FROM accounts
+                                        WHERE id=? AND source='live' AND included=1 AND selection_pending=0""",
+                                     (account_id,)).fetchone()
                 if account is None:
                     raise ValueError('En af kontiene findes ikke længere. Genindlæs siden.')
                 if not account['custom_name']:

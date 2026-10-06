@@ -147,3 +147,14 @@
 /* Keep a comfortable gap between period controls and summary cards when the demo notice is hidden. */
 #demoNotice[hidden] ~ #appContent:not([hidden]) .summary-grid{margin-top:20px}
 @media(max-width:760px){#demoNotice[hidden] ~ #appContent:not([hidden]) .summary-grid{margin-top:18px}}
+
+/* Account inclusion controls. */
+.account-heading-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.account-visibility-list{display:grid;gap:10px;margin:18px 0}
+.account-visibility-row{position:relative;display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:15px 16px;cursor:pointer;background:#fafbf8}
+.account-visibility-row>input{position:absolute;opacity:0;pointer-events:none}.account-visibility-row span{min-width:0}.account-visibility-row strong{display:block;font-size:14px;color:var(--ink);overflow-wrap:anywhere}.account-visibility-row small{display:block;margin-top:5px;font-size:11px;color:var(--muted);line-height:1.5}
+.visibility-switch{width:42px;height:24px;border-radius:999px;background:#d9ded5;position:relative;transition:.15s;box-shadow:inset 0 0 0 1px #cbd2c5}
+.visibility-switch:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:white;box-shadow:0 1px 4px #17221925;transition:.15s}
+.account-visibility-row>input:checked~.visibility-switch{background:var(--green)}.account-visibility-row>input:checked~.visibility-switch:after{transform:translateX(18px)}
+.account-visibility-row:has(input:focus-visible){outline:2px solid #91ab7d;outline-offset:2px}
+@media(max-width:760px){.account-heading-actions{width:100%;justify-content:stretch}.account-heading-actions .button{flex:1}.account-visibility-row{padding:14px}}

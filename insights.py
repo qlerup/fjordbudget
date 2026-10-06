@@ -34,7 +34,7 @@ def _history_months(db, source, currency, today):
     months = [row[0] for row in db.execute(
         '''SELECT DISTINCT substr(t.booked_on,1,7)
            FROM transactions t JOIN accounts a ON a.id=t.account_id
-           WHERE a.source=? AND t.currency=? AND substr(t.booked_on,1,7)<=?
+           WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7)<=?
            ORDER BY 1 DESC LIMIT 7''',
         (source, currency, current))]
     completed = [month for month in months if month < current][:6]
@@ -57,7 +57,7 @@ def _profile(db, source, currency, today):
                    SUM(CASE WHEN t.amount>0 AND t.category!='Overførsler' THEN t.amount ELSE 0 END) income,
                    SUM(CASE WHEN t.amount<0 AND t.category!='Overførsler' THEN -t.amount ELSE 0 END) expenses
             FROM transactions t JOIN accounts a ON a.id=t.account_id
-            WHERE a.source=? AND t.currency=? AND substr(t.booked_on,1,7) IN ({placeholders})
+            WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7) IN ({placeholders})
             GROUP BY 1''',
         (source, currency, *months)):
         monthly[row['month']] = {'income': row['income'] or 0, 'expenses': row['expenses'] or 0}
@@ -67,7 +67,7 @@ def _profile(db, source, currency, today):
     for row in db.execute(
         f'''SELECT substr(t.booked_on,1,7) month,t.amount,t.category,t.merchant
             FROM transactions t JOIN accounts a ON a.id=t.account_id
-            WHERE a.source=? AND t.currency=? AND t.amount<0 AND t.category!='Overførsler'
+            WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND t.amount<0 AND t.category!='Overførsler'
               AND substr(t.booked_on,1,7) IN ({placeholders})''',
         (source, currency, *months)):
         spend = -row['amount']

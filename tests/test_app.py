@@ -47,6 +47,14 @@ class AppTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def select_pending_accounts(self, selected=True):
+        items=self.client.get('/api/accounts/manage?pending=1').json['items']
+        if items:
+            response=self.client.put('/api/accounts/manage',
+                json={'included':{item['id']:selected for item in items}},headers=self.headers)
+            self.assertEqual(response.status_code,200)
+        return items
+
     def test_demo_and_real_are_separate_and_transfers_do_not_inflate_totals(self):
         demo=self.client.get('/api/dashboard?source=demo').json
         live=self.client.get('/api/dashboard?source=live').json
@@ -151,6 +159,7 @@ class AppTests(unittest.TestCase):
         self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
         state=self.provider.calls[-1][2]['json']['state']
         self.client.get('/bank/callback?state='+state+'&code=abc')
+        self.select_pending_accounts()
         aid=self.client.get('/api/dashboard?source=live').json['accounts'][0]['id']
         url='/api/accounts/setup'
         self.assertEqual(self.client.put(url,json={'names':{aid:'Food'}}).status_code,403)
@@ -169,6 +178,7 @@ class AppTests(unittest.TestCase):
         self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
         state=self.provider.calls[-1][2]['json']['state']
         self.client.get('/bank/callback?state='+state+'&code=abc')
+        self.select_pending_accounts()
         aid=self.client.get('/api/dashboard?source=live').json['accounts'][0]['id']
         endpoint='/api/accounts/'+aid+'/name'
         self.assertEqual(self.client.put(endpoint,json={'name':'Food'},headers=self.headers).status_code,200)
@@ -218,6 +228,11 @@ class AppTests(unittest.TestCase):
         self.assertIn('invalid',response.location)
         response=self.client.get('/bank/callback?state='+state+'&code=abc')
         self.assertIn('connected',response.location)
+        pending=self.client.get('/api/accounts/manage?pending=1').json['items']
+        self.assertEqual(len(pending),1)
+        self.assertFalse(pending[0]['included'])
+        self.assertEqual(self.client.get('/api/dashboard?source=live').json['accounts'],[])
+        self.select_pending_accounts()
         self.assertIn('invalid',self.client.get('/bank/callback?state='+state+'&code=abc').location)
         with connect(self.db) as db:
             self.assertNotIn('secret-session-token',db.execute('SELECT session_token FROM connections').fetchone()[0])
@@ -234,6 +249,26 @@ class AppTests(unittest.TestCase):
         self.assertIn('invalid',self.client.get('/bank/callback?state='+state+'&code=abc').location)
         self.assertFalse(any(path=='/sessions' for _,path,_ in self.provider.calls))
 
+    def test_accounts_can_be_hidden_without_deleting_history(self):
+        self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
+        state=self.provider.calls[-1][2]['json']['state']
+        self.client.get('/bank/callback?state='+state+'&code=abc')
+        pending=self.client.get('/api/accounts/manage?pending=1').json['items']
+        self.assertEqual(len(pending),1)
+        aid=pending[0]['id']
+        self.client.put('/api/accounts/manage',json={'included':{aid:True}},headers=self.headers)
+        with connect(self.db) as db:
+            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                          VALUES (?,?,?,?,?,?,?)''',(aid,'visibility',self.month+'-01','Visible purchase',-12345,'DKK','Andet'))
+        self.assertEqual(len(self.client.get('/api/dashboard?source=live').json['accounts']),1)
+        self.assertEqual(self.client.get('/api/transactions?source=live').json['total'],1)
+        self.client.put('/api/accounts/manage',json={'included':{aid:False}},headers=self.headers)
+        self.assertEqual(self.client.get('/api/dashboard?source=live').json['accounts'],[])
+        self.assertEqual(self.client.get('/api/transactions?source=live').json['total'],0)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM transactions WHERE external_id='visibility'").fetchone()[0],1)
+        self.client.put('/api/accounts/manage',json={'included':{aid:True}},headers=self.headers)
+        self.assertEqual(self.client.get('/api/transactions?source=live').json['total'],1)
     def test_search_pagination_and_account_filters(self):
         result=self.client.get('/api/transactions?source=demo&q=netto').json
         self.assertTrue(all('netto' in t['description'].lower() for t in result['items']))

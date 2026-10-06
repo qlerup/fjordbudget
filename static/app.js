@@ -36,6 +36,7 @@ function switchSource(next) {
   document.querySelectorAll('[data-source]').forEach(b=>{b.classList.toggle('selected',b.dataset.source===source); b.setAttribute('aria-pressed',String(b.dataset.source===source));});
   $('demoNotice').hidden=source!=='demo';
   $('syncButton').hidden=source==='demo';
+  $('manageAccountsButton').hidden=source==='demo';
   $('syncMessage').textContent='';
   $('accountFilter').value=''; $('search').value=''; $('categoryFilter').value=''; page=1;
   return refresh();
@@ -43,7 +44,7 @@ function switchSource(next) {
 function renderAccounts() {
   const accounts=dashboard.accounts;
   $('accountCount').textContent=accounts.length; $('accountsLabel').textContent=accounts.length;
-  $('accounts').innerHTML=accounts.length?accounts.map(a=>`<div class="account-tile"><button class="account-card" data-account="${esc(a.id)}" data-currency="${esc(a.currency)}"><div class="account-top"><span class="account-bank-icon">${svg('bank')}</span><span class="account-name">${esc(a.name)}<small>${esc(a.bank)}${source==='demo'?' · Demokonto':''}</small></span>${svg('chevron','chevron')}</div><div class="account-bottom"><span class="account-balance">${a.balance===null?'Afventer saldo':esc(money(a.balance,a.currency,2))}</span><span class="account-number">${a.last4?'•• '+esc(a.last4):esc(a.currency)}</span></div></button><button class="text-button rename-account" data-rename="${esc(a.id)}" aria-label="Navngiv konto ${esc(a.name)}">Navngiv konto</button></div>`).join(''):`<div class="empty-state">${svg('bank')}<h3>Din første konto starter her</h3><p>Forbind din bank for at se dine egne konti og saldi.</p><button class="button primary" data-connect>Forbind bank</button></div>`;
+  $('accounts').innerHTML=accounts.length?accounts.map(a=>`<div class="account-tile"><button class="account-card" data-account="${esc(a.id)}" data-currency="${esc(a.currency)}"><div class="account-top"><span class="account-bank-icon">${svg('bank')}</span><span class="account-name">${esc(a.name)}<small>${esc(a.bank)}${source==='demo'?' · Demokonto':''}</small></span>${svg('chevron','chevron')}</div><div class="account-bottom"><span class="account-balance">${a.balance===null?'Afventer saldo':esc(money(a.balance,a.currency,2))}</span><span class="account-number">${a.last4?'•• '+esc(a.last4):esc(a.currency)}</span></div></button><button class="text-button rename-account" data-rename="${esc(a.id)}" aria-label="Navngiv konto ${esc(a.name)}">Navngiv konto</button></div>`).join(''):(source==='live' && dashboard.hidden_account_count?`<div class="empty-state">${svg('bank')}<h3>Ingen konti er valgt</h3><p>Dine bankkonti er gemt, men ingen er med i overblikket lige nu.</p><button class="button primary" id="emptyManageAccounts" type="button">Administrer konti</button></div>`:`<div class="empty-state">${svg('bank')}<h3>Din første konto starter her</h3><p>Forbind din bank for at se dine egne konti og saldi.</p><button class="button primary" data-connect>Forbind bank</button></div>`);
   const previous=$('accountFilter').value;
   $('accountFilter').innerHTML='<option value="">Alle konti</option>'+accounts.filter(a=>a.currency===$('currency').value).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
   if ([...$('accountFilter').options].some(o=>o.value===previous)) $('accountFilter').value=previous;
@@ -193,6 +194,25 @@ function openBudget() {
   $('budgetFields').innerHTML=dashboard.categories.map((c,i)=>`<label class="budget-field"><span class="budget-category"><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><input name="${esc(c.name)}" aria-label="Budget for ${esc(c.name)}" type="number" min="0" max="1000000000" step="0.01" required value="${c.budget/100}"></label>`).join('');
   showError('budgetError',''); $('budgetDialog').showModal();
 }
+let accountVisibilityAccounts=[];
+async function openAccountVisibility(pending=false){
+  const result=await api('/api/accounts/manage'+(pending?'?pending=1':''));
+  accountVisibilityAccounts=result.items;
+  if(pending && !accountVisibilityAccounts.length)return false;
+  $('accountVisibilityForm').dataset.pending=String(pending);
+  $('accountVisibilityTitle').textContent=pending?'Hvilke nye konti skal være med?':'Administrer konti';
+  $('accountVisibilityIntro').textContent=pending
+    ?'Vælg de konti, FjordBudget skal bruge. De fravalgte gemmes, men holdes ude af saldo, posteringer, analyse og mål.'
+    :'Slå konti til eller fra når som helst. Historikken slettes ikke, når en konto skjules.';
+  $('accountVisibilityFields').innerHTML=accountVisibilityAccounts.length?accountVisibilityAccounts.map((a,i)=>{
+    const checked=pending?true:!!a.included;
+    const status=a.connected?'Forbundet':'Kun gemt historik';
+    return `<label class="account-visibility-row" for="visibleAccount${i}"><input id="visibleAccount${i}" type="checkbox" data-account-visible="${esc(a.id)}" ${checked?'checked':''}><span><strong>${esc(a.name)}</strong><small>${esc(a.bank)} · ${a.last4?'•• '+esc(a.last4)+' · ':''}${esc(a.currency)} · ${status}</small></span><i class="visibility-switch" aria-hidden="true"></i></label>`;
+  }).join(''):'<p class="empty-state">Der er ingen konti at administrere endnu.</p>';
+  showError('accountVisibilityError','');
+  $('accountVisibilityDialog').showModal();
+  return true;
+}
 let accountSetupDismissed=false, dashboardSource=null;
 function openAccountSetup(){
   if(source!=='live' || dashboardSource!=='live' || syncPolling || accountSetupDismissed || document.querySelector('dialog[open]'))return;
@@ -240,6 +260,7 @@ document.addEventListener('click',async event=>{
     await refresh();$('accountFilter').value=account.dataset.account;setView('transactions');
     try{await loadTransactions();}catch(error){showError('loadError',error.message);}return;
   }
+  if(event.target.closest('#manageAccountsButton') || event.target.closest('#emptyManageAccounts')){await openAccountVisibility(false);return;}
   if(event.target.closest('.edit-budget')){openBudget();return;}
   const disconnect=event.target.closest('[data-disconnect]');
   if(disconnect && confirm('Afbryd bankens læseadgang? Allerede hentede posteringer bliver gemt lokalt.')){
@@ -302,8 +323,11 @@ async function init(){
     const status=await api('/api/sync');
     if(status.running)await pollSync();
     else if(bankResult==='connected'){
-      try{await api('/api/sync',{method:'POST',body:'{}'});await pollSync();}
-      catch(error){showError('loadError',error.message);openAccountSetup();}
+      const needsSelection=await openAccountVisibility(true);
+      if(!needsSelection){
+        try{await api('/api/sync',{method:'POST',body:'{}'});await pollSync();}
+        catch(error){showError('loadError',error.message);openAccountSetup();}
+      }
     }else openAccountSetup();
   }catch(error){$('loading').hidden=true;showError('loadError',error.message);}
 }
@@ -321,6 +345,26 @@ $('accountNameForm').addEventListener('submit',async event=>{
   finally{button.disabled=false;}
 });
 
+$('accountVisibilityForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget, button=event.submitter;
+  button.disabled=true;showError('accountVisibilityError','');
+  try{
+    const included={};
+    form.querySelectorAll('[data-account-visible]').forEach(input=>{included[input.dataset.accountVisible]=input.checked;});
+    if(!Object.keys(included).length){showError('accountVisibilityError','Der er ingen konti at gemme.');return;}
+    const result=await api('/api/accounts/manage',{method:'PUT',body:JSON.stringify({included})});
+    const wasPending=form.dataset.pending==='true';
+    $('accountVisibilityDialog').close();
+    await refresh();
+    toast(result.active?`${result.active} konti er med i FjordBudget`:'Alle konti er skjult');
+    if(wasPending && result.active){
+      try{await api('/api/sync',{method:'POST',body:'{}'});await pollSync();}
+      catch(error){showError('loadError',error.message);openAccountSetup();}
+    }else if(wasPending)openAccountSetup();
+  }catch(error){showError('accountVisibilityError',error.message);}
+  finally{button.disabled=false;}
+});
 $('accountSetupDialog').addEventListener('close',()=>{accountSetupDismissed=true;});
 $('accountSetupForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=$('saveAccountSetup');button.disabled=true;

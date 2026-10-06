@@ -160,8 +160,13 @@ def import_account(db_path, account_id, transactions, balances):
 
 def sync_all(db_path, provider, cipher, progress):
     with connect(db_path) as db:
-        accounts = [dict(r) for r in db.execute("SELECT a.*,c.valid_until FROM accounts a JOIN connections c ON c.id=a.connection_id WHERE a.source='live'")]
+        accounts = [dict(r) for r in db.execute("""SELECT a.*,c.valid_until FROM accounts a
+                                                    JOIN connections c ON c.id=a.connection_id
+                                                    WHERE a.source='live' AND a.included=1 AND a.selection_pending=0""")]
+        has_connections = db.execute('SELECT 1 FROM connections LIMIT 1').fetchone() is not None
     if not accounts:
+        if has_connections:
+            raise BankError('Vælg mindst én konto under Administrer konti, før du synkroniserer.')
         raise BankError('Forbind en bank, før du synkroniserer.')
     errors = []
     for i, account in enumerate(accounts):

@@ -145,6 +145,7 @@ class UITests(unittest.TestCase):
             route.fulfill(json={'ok':True})
         self.page.route('**/api/dashboard?*',dashboard)
         self.page.route('**/api/accounts/setup',save)
+        self.page.route('**/api/accounts/manage?pending=1',lambda route:route.fulfill(json={'items':[]}))
         calls=[]
         def sync(route):
             calls.append(route.request.method)
@@ -165,6 +166,30 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#appContent')).to_be_visible()
         expect(self.page.locator('#accountSetupDialog')).not_to_be_visible()
 
+    def test_account_manager_can_toggle_accounts_on_mobile(self):
+        accounts=[
+            {'id':'a1','name':'Lønkonto','custom_name':None,'bank':'Test Bank','last4':'1111','currency':'DKK','balance':10000,'synced_at':None,'included':1,'selection_pending':0,'connected':1},
+            {'id':'a2','name':'Ekstra konto','custom_name':None,'bank':'Test Bank','last4':'2222','currency':'DKK','balance':20000,'synced_at':None,'included':0,'selection_pending':0,'connected':1},
+        ]
+        saved=[]
+        def manage(route):
+            if route.request.method=='PUT':
+                saved.append(route.request.post_data_json)
+                route.fulfill(json={'ok':True,'active':1})
+            else:
+                route.fulfill(json={'items':accounts})
+        self.page.route('**/api/accounts/manage',manage)
+        self.page.set_viewport_size({'width':390,'height':844})
+        self.page.locator('[data-source="live"]').click()
+        self.page.locator('#manageAccountsButton').click()
+        expect(self.page.locator('#accountVisibilityDialog')).to_be_visible()
+        expect(self.page.locator('#accountVisibilityFields [data-account-visible]')).to_have_count(2)
+        self.page.locator('[data-account-visible="a1"]').uncheck()
+        self.page.locator('[data-account-visible="a2"]').check()
+        self.page.locator('#saveAccountVisibility').click()
+        expect(self.page.locator('#accountVisibilityDialog')).not_to_be_visible()
+        self.assertTrue(saved)
+        self.assertEqual(saved[-1]['included'],{'a1':False,'a2':True})
     def test_category_create_budget_delete_and_mobile(self):
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.locator('nav [data-view="categories"]').click()
