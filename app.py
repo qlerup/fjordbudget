@@ -181,12 +181,24 @@ def create_app(config=None):
                     raise ValueError('Kategorien findes allerede.')
                 db.execute('INSERT INTO categories(name,color,protected) VALUES (?,?,0)', (name,COLORS[len(categories)%len(COLORS)]))
             elif request.method == 'PATCH':
-                target = body.get('budget_category')
                 if not any(c['name']==name for c in categories):
                     raise ValueError('Kategorien findes ikke.')
-                if target is not None and target not in [c['name'] for c in budget_category_list(db)]:
-                    raise ValueError('Vælg en gyldig budgetkategori eller ingen.')
-                db.execute('UPDATE categories SET budget_category=? WHERE name=?',(target,name))
+                updates, values = [], []
+                if 'budget_category' in body:
+                    target = body.get('budget_category')
+                    if target is not None and target not in [c['name'] for c in budget_category_list(db)]:
+                        raise ValueError('Vælg en gyldig budgetkategori eller ingen.')
+                    updates.append('budget_category=?')
+                    values.append(target)
+                if 'requires_merchant' in body:
+                    requires_merchant = body.get('requires_merchant')
+                    if type(requires_merchant) is not bool:
+                        raise ValueError('Valget for forhandlerkrav er ugyldigt.')
+                    updates.append('requires_merchant=?')
+                    values.append(int(requires_merchant))
+                if not updates:
+                    raise ValueError('Der er ingen kategoriindstillinger at gemme.')
+                db.execute('UPDATE categories SET '+','.join(updates)+' WHERE name=?', (*values,name))
             else:
                 current = next((c for c in categories if c['name']==name),None)
                 if not current or current['protected']:
@@ -380,8 +392,11 @@ def create_app(config=None):
         with connect(db_path) as db:
             total = db.execute('SELECT count(*) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '+where, values).fetchone()[0]
             rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,t.category_manual,
-                                        t.merchant,t.merchant_manual,COALESCE(a.custom_name,a.name) account
-                                 FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '''+where+' ORDER BY t.booked_on DESC,t.id DESC LIMIT 30 OFFSET ?', [*values, (page-1)*30]).fetchall()
+                                        t.merchant,t.merchant_manual,COALESCE(c.requires_merchant,1) requires_merchant,
+                                        COALESCE(a.custom_name,a.name) account
+                                 FROM transactions t JOIN accounts a ON a.id=t.account_id
+                                 LEFT JOIN categories c ON c.name=t.category
+                                 WHERE '''+where+' ORDER BY t.booked_on DESC,t.id DESC LIMIT 30 OFFSET ?', [*values, (page-1)*30]).fetchall()
         return jsonify(items=[dict(r) for r in rows], total=total, page=page, pages=max(1, (total+29)//30))
 
     @app.get('/api/merchants')

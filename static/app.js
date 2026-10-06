@@ -13,6 +13,10 @@ function transactionState(t) {
   if (t.amount >= 0) return {className:'', title:''};
   const hasMerchant=!!String(t.merchant || '').trim();
   const hasCategory=!!String(t.category || '').trim();
+  const requiresMerchant=!(t.requires_merchant===0 || t.requires_merchant===false);
+  if (hasCategory && !requiresMerchant) {
+    return {className:'transaction-complete', title:'Kategorien kræver ikke forhandler'};
+  }
   const completed=(hasMerchant?1:0)+(hasCategory?1:0);
   return completed===2
     ? {className:'transaction-complete', title:'Forhandler og kategori er på plads'}
@@ -392,7 +396,7 @@ async function loadCategories(){
   const selected=$('categoryFilter').value;
   $('categoryFilter').innerHTML='<option value="">Alle kategorier</option>'+config.categories.map(c=>`<option>${esc(c)}</option>`).join('');
   if(config.categories.includes(selected))$('categoryFilter').value=selected;
-  $('categoryList').innerHTML=result.items.map(c=>`<div class="category-management-row"><span><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><label class="category-budget-link">Budgetkategori<select data-budget-link="${esc(c.name)}" aria-label="Budgetkategori for ${esc(c.name)}"><option value="">Ingen budgetkategori</option>${result.budget_categories.map(b=>`<option value="${esc(b.name)}" ${c.budget_category===b.name?'selected':''}>${esc(b.name)}</option>`).join('')}</select></label>${c.protected?'<small class="muted">Fast kategori</small>':`<button class="button quiet" data-delete-category="${esc(c.name)}" aria-label="Slet ${esc(c.name)}">Slet</button>`}</div>`).join('');
+  $('categoryList').innerHTML=result.items.map(c=>`<div class="category-management-row"><span><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><div class="category-settings"><label class="category-merchant-setting"><span>Kræver forhandler</span><input type="checkbox" data-merchant-required="${esc(c.name)}" ${c.requires_merchant?'checked':''} aria-label="Kræver forhandler for ${esc(c.name)}"><i class="setting-switch" aria-hidden="true"></i></label><label class="category-budget-link">Budgetkategori<select data-budget-link="${esc(c.name)}" aria-label="Budgetkategori for ${esc(c.name)}"><option value="">Ingen budgetkategori</option>${result.budget_categories.map(b=>`<option value="${esc(b.name)}" ${c.budget_category===b.name?'selected':''}>${esc(b.name)}</option>`).join('')}</select></label></div>${c.protected?'<small class="muted">Fast kategori</small>':`<button class="button quiet" data-delete-category="${esc(c.name)}" aria-label="Slet ${esc(c.name)}">Slet</button>`}</div>`).join('');
 }
 $('categoryCreateForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter;button.disabled=true;showError('categoryError','');
@@ -413,6 +417,17 @@ $('categoryDeleteForm').addEventListener('submit',async event=>{
 });
 
 $('categoryList').addEventListener('change',async event=>{
+  const merchantToggle=event.target.closest('[data-merchant-required]');
+  if(merchantToggle){
+    merchantToggle.disabled=true;showError('categoryError','');
+    try{
+      await api('/api/categories',{method:'PATCH',body:JSON.stringify({name:merchantToggle.dataset.merchantRequired,requires_merchant:merchantToggle.checked})});
+      await refresh();
+      toast(merchantToggle.checked?'Forhandler er nu påkrævet':'Forhandler er ikke længere påkrævet');
+    }catch(error){showError('categoryError',error.message);await loadCategories();}
+    finally{merchantToggle.disabled=false;}
+    return;
+  }
   const select=event.target.closest('[data-budget-link]');if(!select)return;
   select.disabled=true;showError('categoryError','');
   try{await api('/api/categories',{method:'PATCH',body:JSON.stringify({name:select.dataset.budgetLink,budget_category:select.value || null})});await refresh();toast('Budgettilknytning gemt');}

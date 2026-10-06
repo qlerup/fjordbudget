@@ -209,3 +209,14 @@
 .account-visibility-row>input:checked~.visibility-switch{background:var(--green)}.account-visibility-row>input:checked~.visibility-switch:after{transform:translateX(18px)}
 .account-visibility-row:has(input:focus-visible){outline:2px solid #91ab7d;outline-offset:2px}
 @media(max-width:760px){.account-heading-actions{width:100%;justify-content:stretch}.account-heading-actions .button{flex:1}.account-visibility-row{padding:14px}}
+
+/* Per-category merchant requirement. */
+.category-settings{display:flex;gap:14px;align-items:flex-end;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.category-merchant-setting{display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--muted)}
+.category-merchant-setting>input{position:absolute;opacity:0;pointer-events:none}
+.setting-switch{display:block;width:42px;height:24px;border-radius:999px;background:#d9ded5;position:relative;box-shadow:inset 0 0 0 1px #cbd2c5;transition:.15s}
+.setting-switch:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:white;box-shadow:0 1px 4px #17221925;transition:.15s}
+.category-merchant-setting>input:checked~.setting-switch{background:var(--green)}
+.category-merchant-setting>input:checked~.setting-switch:after{transform:translateX(18px)}
+.category-merchant-setting:has(input:focus-visible) .setting-switch{outline:2px solid #91ab7d;outline-offset:2px}
+@media(max-width:760px){.category-settings{width:100%;margin-left:0;justify-content:space-between;align-items:flex-end}.category-merchant-setting{min-width:120px}}

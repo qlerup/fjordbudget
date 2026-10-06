@@ -68,7 +68,8 @@ def initialize(path):
           title TEXT NOT NULL, merchant TEXT NOT NULL,
           PRIMARY KEY(source,title));
         CREATE TABLE IF NOT EXISTS categories (
-          name TEXT PRIMARY KEY, color TEXT NOT NULL, protected INTEGER NOT NULL DEFAULT 0);
+          name TEXT PRIMARY KEY, color TEXT NOT NULL, protected INTEGER NOT NULL DEFAULT 0,
+          requires_merchant INTEGER NOT NULL DEFAULT 1 CHECK(requires_merchant IN (0,1)));
         CREATE TABLE IF NOT EXISTS budget_categories (name TEXT PRIMARY KEY, color TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS savings_goals (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,9 +91,15 @@ def initialize(path):
         ''')
         db.execute('BEGIN IMMEDIATE')
         if not db.execute("SELECT 1 FROM app_migrations WHERE name='categories'").fetchone():
-            db.executemany('INSERT OR IGNORE INTO categories VALUES (?,?,?)',
+            db.executemany('INSERT OR IGNORE INTO categories(name,color,protected) VALUES (?,?,?)',
                 [(name,COLORS[i],int(name in ('Andet','Indkomst','Overførsler'))) for i,name in enumerate(CATEGORIES)])
             db.execute("INSERT INTO app_migrations VALUES ('categories')")
+        category_columns = {row[1] for row in db.execute('PRAGMA table_info(categories)')}
+        if 'requires_merchant' not in category_columns:
+            db.execute('ALTER TABLE categories ADD COLUMN requires_merchant INTEGER NOT NULL DEFAULT 1')
+        if not db.execute("SELECT 1 FROM app_migrations WHERE name='category-merchant-requirement'").fetchone():
+            db.execute("UPDATE categories SET requires_merchant=0 WHERE name IN ('Indkomst','Overførsler')")
+            db.execute("INSERT INTO app_migrations VALUES ('category-merchant-requirement')")
         account_columns = {row[1] for row in db.execute('PRAGMA table_info(accounts)')}
         if 'custom_name' not in account_columns:
             db.execute('ALTER TABLE accounts ADD COLUMN custom_name TEXT')
@@ -126,7 +133,7 @@ def initialize(path):
 
 
 def category_list(db):
-    return [dict(row) for row in db.execute('SELECT name,color,protected,budget_category FROM categories ORDER BY rowid')]
+    return [dict(row) for row in db.execute('SELECT name,color,protected,budget_category,requires_merchant FROM categories ORDER BY rowid')]
 
 
 def budget_category_list(db):

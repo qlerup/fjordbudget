@@ -299,6 +299,17 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM transactions WHERE description='Coffee'").fetchone()[0],3)
 
+    def test_transaction_exposes_category_merchant_requirement(self):
+        with connect(self.db) as db:
+            tid=db.execute("SELECT id FROM transactions WHERE account_id='demo-daily' AND category='Indkomst' LIMIT 1").fetchone()[0]
+            month=db.execute("SELECT substr(booked_on,1,7) FROM transactions WHERE id=?",(tid,)).fetchone()[0]
+        items=self.client.get('/api/transactions?source=demo&month='+month).json['items']
+        income=next(item for item in items if item['id']==tid)
+        self.assertEqual(income['requires_merchant'],0)
+        self.client.patch('/api/categories',json={'name':'Indkomst','requires_merchant':True},headers=self.headers)
+        items=self.client.get('/api/transactions?source=demo&month='+month).json['items']
+        self.assertEqual(next(item for item in items if item['id']==tid)['requires_merchant'],1)
+
     def test_category_rule_updates_history_and_future_imports_across_accounts(self):
         with connect(self.db) as db:
             db.execute("INSERT INTO accounts(id,source,name,bank,last4,currency) VALUES ('live-test','live','Account','Bank','1234','DKK')")
@@ -330,6 +341,13 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.client.post(url,json={'name':'Travel'}).status_code,403)
         self.assertEqual(self.client.post(url,json={'name':'Travel'},headers=self.headers).status_code,200)
         self.assertEqual(self.client.post(url,json={'name':' TRAVEL '},headers=self.headers).status_code,400)
+        categories=self.client.get(url).json['items']
+        self.assertFalse(next(c for c in categories if c['name']=='Indkomst')['requires_merchant'])
+        self.assertFalse(next(c for c in categories if c['name']=='Overførsler')['requires_merchant'])
+        self.assertTrue(next(c for c in categories if c['name']=='Travel')['requires_merchant'])
+        self.assertEqual(self.client.patch(url,json={'name':'Travel','requires_merchant':False},headers=self.headers).status_code,200)
+        self.assertFalse(next(c for c in self.client.get(url).json['items'] if c['name']=='Travel')['requires_merchant'])
+        self.assertEqual(self.client.patch(url,json={'name':'Travel','requires_merchant':'no'},headers=self.headers).status_code,400)
         self.assertIn('Travel',self.client.get('/api/config').json['categories'])
         self.assertNotIn('Travel',[c['name'] for c in self.client.get('/api/dashboard').json['categories']])
         with connect(self.db) as db:
@@ -387,6 +405,7 @@ class AppTests(unittest.TestCase):
             client=migrated.test_client()
             data=client.get('/api/categories').json
             self.assertEqual(data['items'][0]['budget_category'],'Legacy')
+            self.assertTrue(data['items'][0]['requires_merchant'])
             with connect(path) as db:
                 self.assertEqual(db.execute("SELECT amount FROM budgets WHERE category='Legacy'").fetchone()[0],12345)
             create_app({'TESTING':True,'DATA_DIR':directory,'PROVIDER':self.provider})
