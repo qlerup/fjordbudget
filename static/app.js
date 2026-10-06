@@ -82,7 +82,7 @@ async function loadTransactions() {
     const completed=(t.merchant?1:0)+(t.category_manual?1:0);
     const rowState=t.amount>=0?'':completed===2?'transaction-complete':completed===1?'transaction-partial':'transaction-incomplete';
     const rowTitle=t.amount>=0?'':completed===2?'Forhandler og kategori er på plads':completed===1?'Mangler enten forhandler eller bekræftet kategori':'Mangler både forhandler og bekræftet kategori';
-    return `<tr class="${rowState}" title="${esc(rowTitle)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span><button type="button" class="text-button merchant-edit" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}">${t.merchant?'Ret forhandler':'Angiv forhandler'}</button></span></div></td><td>${esc(t.account)}</td><td><select class="category-select" data-transaction="${t.id}" aria-label="Kategori for ${esc(t.description)}">${config.categories.map(c=>`<option ${c===t.category?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
+    return `<tr class="${rowState}" title="${esc(rowTitle)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span><button type="button" class="text-button merchant-edit" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}">${t.merchant?'Ret forhandler':'Angiv forhandler'}</button></span></div></td><td>${esc(t.account)}</td><td><button type="button" class="category-picker-button ${t.category_manual?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category)}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
   }).join('');
   $('emptyTransactions').hidden=!!data.items.length;
   $('transactionCount').textContent=data.total?`${(page-1)*30+1}–${Math.min(page*30,data.total)} af ${data.total} posteringer`:'0 posteringer';
@@ -270,12 +270,6 @@ $('bankCredentialsForm').addEventListener('submit', async event=>{
 $('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{page=1;loadTransactions().catch(e=>showError('loadError',e.message));},250);});
 $('previousPage').onclick=()=>{if(page>1){page--;loadTransactions().catch(e=>showError('loadError',e.message));}};
 $('nextPage').onclick=()=>{if(page<pages){page++;loadTransactions().catch(e=>showError('loadError',e.message));}};
-$('transactionRows').addEventListener('change',async event=>{
-  const select=event.target.closest('[data-transaction]');if(!select)return;
-  select.disabled=true;
-  try{const result=await api('/api/transactions/'+select.dataset.transaction,{method:'PATCH',body:JSON.stringify({category:select.value})});toast(`Kategori gemt · ${result.updated} posteringer opdateret. Huskes fremover.`);await refresh();}
-  catch(error){showError('loadError',error.message);select.disabled=false;}
-});
 $('budgetForm').addEventListener('submit',async event=>{
   event.preventDefault(); const button=event.submitter;button.disabled=true;
   try{await api('/api/budgets?'+query(),{method:'PUT',body:JSON.stringify({amounts:Object.fromEntries(new FormData(event.target))})});$('budgetDialog').close();toast('Dit budget er gemt');await refresh();}

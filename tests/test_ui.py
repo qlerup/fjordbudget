@@ -229,14 +229,29 @@ class UITests(unittest.TestCase):
             self.assertIn(' \u00b7 ',text)
             self.assertNotIn('?',text)
         expect(self.page.locator('#transactionRows')).not_to_contain_text('Spotify')
-        category=self.page.locator('#transactionRows .category-select').first
-        category.select_option('Fritid')
+        category=self.page.locator('#transactionRows .category-picker-button').first
+        category.click()
+        expect(self.page.locator('#categoryDialog')).to_be_visible()
+        self.page.locator('#categorySearch').fill('Fri')
+        expect(self.page.locator('#categoryOptions .choice-option')).to_have_count(1)
+        self.page.locator('#categoryOptions .choice-option').click()
+        expect(self.page.locator('#categorySearch')).to_have_value('Fritid')
+        self.page.locator('#savePickedCategory').click()
         expect(self.page.locator('#toast')).to_contain_text('Huskes fremover.')
+
+        self.page.locator('#transactionRows [data-edit-merchant]').first.click()
+        expect(self.page.locator('#merchantDialog')).to_be_visible()
+        self.page.locator('#merchantName').fill('Matas')
+        expect(self.page.locator('#merchantOptions .choice-option')).to_have_count(1)
+        self.page.locator('#merchantOptions .choice-option').click()
+        expect(self.page.locator('#merchantName')).to_have_value('Matas')
+        self.page.keyboard.press('Escape')
+
         self.page.reload()
         self.page.locator('#month').fill(month)
         self.page.locator('#month').dispatch_event('change')
         self.page.locator('#search').fill('Netto')
-        expect(self.page.locator('#transactionRows .category-select').first).to_have_value('Fritid')
+        expect(self.page.locator('#transactionRows .category-picker-button').first).to_contain_text('Fritid')
 
     def test_budget_saved_after_reload_and_live_data_empty(self):
         self.page.locator('.edit-budget').first.click()
