@@ -45,7 +45,21 @@ function renderMerchantChoices(){
 function renderCategoryChoices(){
   const selected=$('categoryPickerForm').dataset.category || '';
   const items=(config?.categories || []).map(name=>({name}));
-  renderChoiceList('categoryOptions','categoryPickerEmpty',items,$('categorySearch').value,selected,categoryActive,item=>item.name);
+  const search=$('categorySearch').value.trim();
+  const filtered=renderChoiceList('categoryOptions','categoryPickerEmpty',items,search,selected,categoryActive,item=>item.name);
+  const exact=items.some(item=>normalizedSearch(item.name)===normalizedSearch(search));
+  const canCreate=search.length>0 && search.length<=60 && !exact && !/[\u0000-\u001f\u007f]/.test(search);
+  if(canCreate){
+    const create=document.createElement('button');
+    create.type='button';
+    create.className='choice-create-option';
+    create.dataset.createCategory=search;
+    const plus=document.createElement('span');plus.className='choice-create-plus';plus.textContent='+';
+    const label=document.createElement('span');label.textContent=`Opret “${search}”`;
+    create.append(plus,label);
+    $('categoryOptions').append(create);
+  }
+  $('categoryPickerEmpty').hidden=filtered.length>0 || canCreate;
 }
 function moveActive(inputId, optionsId, direction, kind){
   const options=Array.from($(optionsId).querySelectorAll('.choice-option'));
@@ -130,7 +144,27 @@ $('clearMerchant').addEventListener('click',()=>{
 });
 
 $('categorySearch').addEventListener('input',()=>{categoryActive=-1;renderCategoryChoices();});
-$('categoryOptions').addEventListener('click',event=>{
+$('categoryOptions').addEventListener('click',async event=>{
+  const create=event.target.closest('[data-create-category]');
+  if(create){
+    const name=create.dataset.createCategory.trim();
+    create.disabled=true;showError('categoryPickerError','');
+    try{
+      const result=await api('/api/categories',{method:'POST',body:JSON.stringify({name})});
+      config.categories=result.items.map(item=>item.name);
+      config.colors=result.items.map(item=>item.color);
+      const selectedFilter=$('categoryFilter').value;
+      $('categoryFilter').innerHTML='<option value="">Alle kategorier</option>'+config.categories.map(category=>`<option>${esc(category)}</option>`).join('');
+      if(config.categories.includes(selectedFilter))$('categoryFilter').value=selectedFilter;
+      $('categoryPickerForm').dataset.category=name;
+      $('categorySearch').value=name;
+      categoryActive=-1;
+      renderCategoryChoices();
+      toast(`Kategorien “${name}” er oprettet og valgt`);
+    }catch(error){showError('categoryPickerError',error.message);}
+    finally{create.disabled=false;}
+    return;
+  }
   const option=event.target.closest('.choice-option');if(!option)return;
   $('categoryPickerForm').dataset.category=option.dataset.value;
   $('categorySearch').value=option.dataset.value;

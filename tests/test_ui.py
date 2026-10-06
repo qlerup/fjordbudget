@@ -320,6 +320,28 @@ class UITests(unittest.TestCase):
         expect(row.locator('.category-picker-button')).to_contain_text('Overførsler')
         expect(row.locator('.merchant-picker-button')).to_have_count(0)
 
+    def test_category_can_be_created_directly_from_transaction_picker(self):
+        month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]
+        self.page.locator('#month').fill(month)
+        self.page.locator('#month').dispatch_event('change')
+        self.page.locator('#search').fill('Netto')
+        row=self.page.locator('#transactionRows tr').first
+        row.locator('.category-picker-button').click()
+        expect(self.page.locator('#categoryDialog')).to_be_visible()
+        self.page.locator('#categorySearch').fill('Børn test')
+        create=self.page.locator('[data-create-category="Børn test"]')
+        expect(create).to_be_visible()
+        create.click()
+        expect(self.page.locator('#categorySearch')).to_have_value('Børn test')
+        expect(self.page.locator('#categoryOptions .choice-option.selected')).to_have_text('Børn test')
+        expect(self.page.locator('#categoryFilter option')).to_contain_text(['Børn test'])
+        self.page.locator('#savePickedCategory').click()
+        expect(self.page.locator('#categoryDialog')).not_to_be_visible()
+        expect(self.page.locator('#transactionRows .category-picker-button').first).to_contain_text('Børn test')
+        categories=self.app.test_client().get('/api/categories').json['items']
+        created=next(item for item in categories if item['name']=='Børn test')
+        self.assertEqual(created['requires_merchant'],1)
+
     def test_budget_saved_after_reload_and_live_data_empty(self):
         self.page.locator('.edit-budget').first.click()
         self.page.get_by_label('Budget for Mad & indkøb').fill('4567.89')

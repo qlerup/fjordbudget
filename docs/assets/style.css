@@ -249,3 +249,10 @@
     font-size:16px!important;
   }
 }
+
+/* Inline category creation in picker. */
+.choice-create-option{display:flex;align-items:center;gap:10px;width:100%;border:0;border-top:1px solid var(--line);background:#f7faf4;color:var(--green);padding:12px;font:inherit;font-size:13px;font-weight:650;text-align:left;cursor:pointer}
+.choice-create-option:hover,.choice-create-option:focus-visible{background:#edf4e8;outline:none}
+.choice-create-option:disabled{opacity:.55;cursor:wait}
+.choice-create-plus{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#e4efe0;font-size:17px;line-height:1}
+@media(max-width:760px){.choice-create-option{font-size:16px;padding:13px 12px}}
