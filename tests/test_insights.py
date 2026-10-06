@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import create_app
 from banking import import_account, normalize_transactions
-from db import connect
+from db import connect, transaction_rule_title
 
 
 class Provider:
@@ -140,6 +140,29 @@ class InsightTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM merchant_rules WHERE source='demo' AND merchant='Test Merchant'").fetchone()[0],0)
             self.assertEqual(db.execute("SELECT count(*) FROM transactions WHERE merchant='Test Merchant'").fetchone()[0],0)
+
+    def test_numeric_bank_text_variants_share_merchant_but_ambiguous_short_mcd_does_not(self):
+        self.assertEqual(transaction_rule_title('MCD 06151 MCDRONNEDE'),
+                         transaction_rule_title('MCD 06150 MCDRONNEDE'))
+        self.assertNotEqual(transaction_rule_title('MCD 06151'),
+                            transaction_rule_title('MCD 06150'))
+        self.assertNotEqual(transaction_rule_title('MCD 06151 MCDRONNEDE'),
+                            transaction_rule_title('MCD 06151 KORTKØB'))
+
+        with connect(self.db) as db:
+            db.execute("""INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                          VALUES ('demo-daily','mcd-a',?,'MCD 06151 MCDRONNEDE',-3200,'DKK','Mad & indkøb')""",
+                       (date.today().isoformat(),))
+            db.execute("""INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                          VALUES ('demo-daily','mcd-b',?,'MCD 06150 MCDRONNEDE',-12700,'DKK','Andet')""",
+                       (date.today().isoformat(),))
+            first=db.execute("SELECT id FROM transactions WHERE external_id='mcd-a'").fetchone()[0]
+        response=self.client.patch(f'/api/transactions/{first}/merchant',
+                                   json={'merchant':"McDonald's",'remember':True},headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json['updated'],2)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute("SELECT merchant FROM transactions WHERE external_id='mcd-b'").fetchone()[0],"McDonald's")
 
     def test_goal_analysis_flags_unrealistic_goal_and_tracks_featured_progress(self):
         body = {

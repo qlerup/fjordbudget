@@ -11,7 +11,7 @@ from urllib.parse import quote
 import jwt
 import requests
 
-from db import CURRENCIES, categorize, cents, connect, transaction_title, category_list
+from db import CURRENCIES, categorize, cents, connect, transaction_title, transaction_rule_title, category_list
 
 
 class BankError(Exception):
@@ -133,15 +133,34 @@ def import_account(db_path, account_id, transactions, balances):
     with connect(db_path) as db:
         db.execute('BEGIN IMMEDIATE')
         account = db.execute('SELECT * FROM accounts WHERE id=?', (account_id,)).fetchone()
-        rules = dict(db.execute('SELECT title,category FROM category_rules WHERE source=?', (account['source'],)).fetchall())
-        merchant_rules = dict(db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?', (account['source'],)).fetchall())
+        category_rule_rows = db.execute('SELECT title,category FROM category_rules WHERE source=?', (account['source'],)).fetchall()
+        merchant_rule_rows = db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?', (account['source'],)).fetchall()
+        rules = dict(category_rule_rows)
+        merchant_rules = dict(merchant_rule_rows)
+
+        def stable_rules(rows, value_key):
+            grouped, ambiguous = {}, set()
+            for rule_row in rows:
+                signature = transaction_rule_title(rule_row['title'])
+                value = rule_row[value_key]
+                if signature in grouped and grouped[signature] != value:
+                    ambiguous.add(signature)
+                else:
+                    grouped[signature] = value
+            for signature in ambiguous:
+                grouped.pop(signature, None)
+            return grouped
+
+        stable_category_rules = stable_rules(category_rule_rows, 'category')
+        stable_merchant_rules = stable_rules(merchant_rule_rows, 'merchant')
         eligible = [b for b in balances if b.get('balance_type') in ranking and b.get('balance_amount', {}).get('currency') == account['currency']]
         balance = min(eligible, key=lambda b: ranking[b['balance_type']]) if eligible else None
         categories = {c['name'] for c in category_list(db)}
         for row in rows:
             title = transaction_title(row[2])
-            rule = rules.get(title)
-            merchant_rule = merchant_rules.get(title)
+            signature = transaction_rule_title(row[2])
+            rule = rules.get(title) or stable_category_rules.get(signature)
+            merchant_rule = merchant_rules.get(title) or stable_merchant_rules.get(signature)
             row = (*row[:-1], rule or (row[-1] if row[-1] in categories else 'Andet'), int(rule is not None))
             db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual,merchant,merchant_manual)
               VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET

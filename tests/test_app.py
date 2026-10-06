@@ -336,6 +336,28 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute('SELECT category FROM transactions WHERE external_id=?',(imported_id,)).fetchone()[0],'Fritid')
 
+    def test_numeric_bank_text_variants_share_category_and_future_import(self):
+        with connect(self.db) as db:
+            for ref,title in [('numeric-cat-a','MCD 06151 MCDRONNEDE'),
+                              ('numeric-cat-b','MCD 06150 MCDRONNEDE')]:
+                db.execute("""INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                              VALUES ('demo-daily',?,?,?,-3200,'DKK','Andet')""",
+                           (ref,self.month+'-01',title))
+            tid=db.execute("SELECT id FROM transactions WHERE external_id='numeric-cat-a'").fetchone()[0]
+        response=self.client.patch('/api/transactions/'+str(tid),json={'category':'Mad & indkøb'},headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json['updated'],2)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute("SELECT category FROM transactions WHERE external_id='numeric-cat-b'").fetchone()[0],'Mad & indkøb')
+
+        raw={'status':'BOOK','booking_date':self.month+'-02','credit_debit_indicator':'DBIT',
+             'transaction_amount':{'amount':'45','currency':'DKK'},
+             'remittance_information':['MCD 06149 MCDRONNEDE'],'entry_reference':'numeric-cat-future'}
+        import_account(self.db,'demo-daily',[raw],[])
+        with connect(self.db) as db:
+            self.assertEqual(db.execute("SELECT category FROM transactions WHERE external_id='ref:numeric-cat-future'").fetchone()[0],
+                             'Mad & indkøb')
+
     def test_category_management_preserves_separate_budgets(self):
         url='/api/categories'
         self.assertEqual(self.client.post(url,json={'name':'Travel'}).status_code,403)

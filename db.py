@@ -24,11 +24,24 @@ def transaction_title(value):
     return ' '.join(unicodedata.normalize('NFKC', str(value or '')).casefold().split())
 
 
+def transaction_rule_title(value):
+    """Stable bank-text key that ignores changing standalone number blocks safely."""
+    normalized = transaction_title(value)
+    tokens = normalized.split()
+    text_tokens = [token for token in tokens if not token.isdigit()]
+    alpha_signal = sum(sum(char.isalpha() for char in token) for token in text_tokens)
+    # Do not generalize very short labels such as "MCD 06151"; they are too ambiguous.
+    if len(text_tokens) < 2 or alpha_signal < 6:
+        return normalized
+    return ' '.join(text_tokens)
+
+
 @contextmanager
 def connect(path):
     conn = sqlite3.connect(path, timeout=20)
     conn.row_factory = sqlite3.Row
     conn.create_function('transaction_title', 1, transaction_title, deterministic=True)
+    conn.create_function('transaction_rule_title', 1, transaction_rule_title, deterministic=True)
     conn.execute('PRAGMA foreign_keys=ON')
     try:
         with conn:

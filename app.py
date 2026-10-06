@@ -19,7 +19,7 @@ from flask import Flask, g, jsonify, redirect, render_template, request, session
 from werkzeug.exceptions import HTTPException
 
 from banking import BankError, EnableBanking, account_name, sync_all
-from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, category_list, budget_category_list
+from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, transaction_rule_title, category_list, budget_category_list
 from hub_auth import register_hub_auth
 from insights import build_insights
 
@@ -548,11 +548,13 @@ def create_app(config=None):
             if row is None:
                 return jsonify(error='Posteringen blev ikke fundet.'), 404
             title = transaction_title(row['description'])
+            signature = transaction_rule_title(row['description'])
             db.execute('''INSERT INTO category_rules(source,title,category) VALUES (?,?,?)
               ON CONFLICT(source,title) DO UPDATE SET category=excluded.category''', (row['source'], title, category))
             result = db.execute('''UPDATE transactions SET category=?,category_manual=1
-              WHERE transaction_title(description)=? AND account_id IN (SELECT id FROM accounts WHERE source=?)''',
-              (category, title, row['source']))
+              WHERE transaction_rule_title(description)=?
+                AND account_id IN (SELECT id FROM accounts WHERE source=?)''',
+              (category, signature, row['source']))
             updated = result.rowcount
         return jsonify(ok=True, updated=updated, rule_saved=True)
 
@@ -573,6 +575,7 @@ def create_app(config=None):
             if row is None:
                 return jsonify(error='Posteringen blev ikke fundet.'), 404
             title = transaction_title(row['description'])
+            signature = transaction_rule_title(row['description'])
             if merchant:
                 key = merchant_key(merchant)
                 canonical = next((item['name'] for item in merchant_items(db, row['source'])
@@ -586,9 +589,9 @@ def create_app(config=None):
                 else:
                     db.execute('DELETE FROM merchant_rules WHERE source=? AND title=?', (row['source'], title))
                 result = db.execute('''UPDATE transactions SET merchant=?,merchant_manual=1
-                                       WHERE transaction_title(description)=?
+                                       WHERE transaction_rule_title(description)=?
                                          AND account_id IN (SELECT id FROM accounts WHERE source=?)''',
-                                    (merchant, title, row['source']))
+                                    (merchant, signature, row['source']))
             else:
                 result = db.execute('UPDATE transactions SET merchant=?,merchant_manual=1 WHERE id=?',
                                     (merchant, transaction_id))
