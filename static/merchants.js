@@ -1,6 +1,20 @@
 'use strict';
 const merchantRows=$('transactionRows');
-merchantRows.addEventListener('click',event=>{
+let merchantSuggestionsSource='';
+async function loadMerchantSuggestions(){
+  const requested=source;
+  if(merchantSuggestionsSource===requested && $('merchantSuggestions').children.length)return;
+  const result=await api('/api/merchants?source='+encodeURIComponent(requested));
+  if(requested!==source)return;
+  $('merchantSuggestions').replaceChildren(...result.items.map(item=>{
+    const option=document.createElement('option');
+    option.value=item.name;
+    option.label=item.uses===1?'Brugt 1 gang':`Brugt ${item.uses} gange`;
+    return option;
+  }));
+  merchantSuggestionsSource=requested;
+}
+merchantRows.addEventListener('click',async event=>{
   const button=event.target.closest('[data-edit-merchant]');
   if(!button)return;
   $('merchantForm').dataset.transaction=button.dataset.editMerchant;
@@ -8,6 +22,7 @@ merchantRows.addEventListener('click',event=>{
   $('merchantName').value=button.dataset.merchant || '';
   $('merchantRemember').checked=true;
   showError('merchantError','');
+  try{await loadMerchantSuggestions();}catch(error){showError('merchantError','Kunne ikke hente eksisterende forhandlere. Du kan stadig skrive en ny.');}
   $('merchantDialog').showModal();
   $('merchantName').focus();
 });

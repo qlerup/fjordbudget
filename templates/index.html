@@ -110,7 +110,9 @@
   <p class="dialog-intro">Fortæl FjordBudget hvor købet er foretaget. Bankens originale tekst ændres aldrig.</p>
   <p class="small muted">Banktekst</p><code id="merchantBankText"></code>
   <form id="merchantForm">
-    <label for="merchantName">Forhandler</label><input id="merchantName" maxlength="100" autocomplete="off" placeholder="Fx McDonald's, Netto eller Wolt">
+    <label for="merchantName">Forhandler</label><input id="merchantName" list="merchantSuggestions" maxlength="100" autocomplete="off" placeholder="Skriv eller vælg en eksisterende forhandler">
+    <datalist id="merchantSuggestions"></datalist>
+    <p class="small muted merchant-autocomplete-hint">Begynd at skrive for at vælge en forhandler, du allerede har brugt. Du kan stadig oprette en ny.</p>
     <label class="checkbox-row"><input id="merchantRemember" type="checkbox" checked> <span>Husk forhandleren fremover ved præcis samme normaliserede banktekst</span></label>
     <div id="merchantError" class="error-box" role="alert" hidden></div>
     <div class="dialog-actions"><button id="clearMerchant" type="button" class="text-button">Fjern forhandler</button><button type="button" class="button quiet" data-close="merchantDialog">Annuller</button><button id="saveMerchant" type="submit" class="button primary">Gem forhandler</button></div>

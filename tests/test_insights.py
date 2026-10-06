@@ -73,6 +73,38 @@ class InsightTests(unittest.TestCase):
         self.assertGreater(search['total'], 0)
         self.assertTrue(all(item['merchant'] == "McDonald's" for item in search['items']))
 
+    def test_merchant_autocomplete_reuses_canonical_name_and_exposes_manual_completion(self):
+        with connect(self.db) as db:
+            rows = db.execute("""SELECT id,description FROM transactions
+                                 WHERE account_id='demo-daily' AND amount<0
+                                 ORDER BY id LIMIT 2""").fetchall()
+        first, second = rows
+        self.assertEqual(self.client.patch(
+            f"/api/transactions/{first['id']}/merchant",
+            json={'merchant': "McDonald's", 'remember': True},
+            headers=self.headers).status_code, 200)
+
+        merchants = self.client.get('/api/merchants?source=demo').json['items']
+        self.assertIn("McDonald's", [item['name'] for item in merchants])
+
+        response = self.client.patch(
+            f"/api/transactions/{second['id']}/merchant",
+            json={'merchant': 'mcdonalds', 'remember': False},
+            headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute('SELECT merchant FROM transactions WHERE id=?', (second['id'],)).fetchone()[0], "McDonald's")
+
+        item = next(item for item in self.client.get('/api/transactions?source=demo').json['items']
+                    if item['id'] == second['id'])
+        self.assertEqual(item['category_manual'], 0)
+        self.assertEqual(item['merchant'], "McDonald's")
+        self.client.patch(f"/api/transactions/{second['id']}",
+                          json={'category': item['category']}, headers=self.headers)
+        item = next(item for item in self.client.get('/api/transactions?source=demo').json['items']
+                    if item['id'] == second['id'])
+        self.assertEqual(item['category_manual'], 1)
+
     def test_goal_analysis_flags_unrealistic_goal_and_tracks_featured_progress(self):
         body = {
             'name': 'Stor drøm',

@@ -118,3 +118,17 @@
 .goal-numbers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;font-size:12px;color:var(--muted)}.goal-numbers b{display:block;color:var(--ink);font-size:14px;margin-top:3px}
 .goal-suggestions{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}.goal-suggestions h4{margin:0 0 7px;font-size:13px}.goal-suggestions li b{white-space:nowrap;color:var(--green)}.goal-suggestions p{font-size:11px;margin:10px 0 0}.savings-form .checkbox-row{margin-top:10px}
 @media(max-width:760px){.featured-goal-panel,.spending-breakdown{grid-template-columns:1fr}.savings-profile-summary{grid-template-columns:1fr}.goal-numbers{grid-template-columns:1fr}}
+
+/* Transaction completion status and merchant autocomplete. */
+.transactions-panel tbody tr.transaction-incomplete{background:#fff4f2}
+.transactions-panel tbody tr.transaction-partial{background:#fff9e8}
+.transactions-panel tbody tr.transaction-complete{background:#f0f8f0}
+.transactions-panel tbody tr.transaction-incomplete:hover{background:#ffefec}
+.transactions-panel tbody tr.transaction-partial:hover{background:#fff5d9}
+.transactions-panel tbody tr.transaction-complete:hover{background:#e9f5e9}
+.transactions-panel tbody tr.transaction-incomplete td:first-child,.transactions-panel tbody tr.transaction-partial td:first-child,.transactions-panel tbody tr.transaction-complete td:first-child{border-radius:8px 0 0 8px}
+.transactions-panel tbody tr.transaction-incomplete td:last-child,.transactions-panel tbody tr.transaction-partial td:last-child,.transactions-panel tbody tr.transaction-complete td:last-child{border-radius:0 8px 8px 0}
+.merchant-autocomplete-hint{margin:7px 0 0}
+@media(max-width:760px){
+  .transactions-panel tbody tr.transaction-incomplete,.transactions-panel tbody tr.transaction-partial,.transactions-panel tbody tr.transaction-complete{padding-left:10px;padding-right:10px;border-radius:10px;margin-bottom:4px}
+}

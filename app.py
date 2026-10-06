@@ -24,6 +24,10 @@ from hub_auth import register_hub_auth
 from insights import build_insights
 
 
+def merchant_key(value):
+    return re.sub(r"[\s'’`´.\-]+", '', transaction_title(value))
+
+
 def persistent_key(path, factory):
     if not path.exists():
         try:
@@ -136,6 +140,28 @@ def create_app(config=None):
     def stored_budget_categories():
         with connect(db_path) as db:
             return budget_category_list(db)
+
+    def merchant_items(db, source):
+        rows = db.execute('''SELECT merchant,COUNT(*) uses FROM (
+                               SELECT t.merchant merchant FROM transactions t
+                               JOIN accounts a ON a.id=t.account_id
+                               WHERE a.source=? AND t.merchant IS NOT NULL AND trim(t.merchant)!=''
+                               UNION ALL
+                               SELECT merchant FROM merchant_rules WHERE source=?
+                             ) GROUP BY merchant''', (source, source)).fetchall()
+        merged = {}
+        for row in rows:
+            key = merchant_key(row['merchant'])
+            uses = int(row['uses'])
+            current = merged.get(key)
+            if current is None:
+                merged[key] = {'name': row['merchant'], 'uses': uses, '_best': uses}
+            else:
+                current['uses'] += uses
+                if uses > current['_best']:
+                    current['name'], current['_best'] = row['merchant'], uses
+        items = [{'name': item['name'], 'uses': item['uses']} for item in merged.values()]
+        return sorted(items, key=lambda item: (-item['uses'], item['name'].casefold()))
 
     @app.route('/api/categories', methods=['GET', 'POST', 'PATCH', 'DELETE'])
     def manage_categories():
@@ -349,10 +375,19 @@ def create_app(config=None):
         where = ' AND '.join(conditions)
         with connect(db_path) as db:
             total = db.execute('SELECT count(*) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '+where, values).fetchone()[0]
-            rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,t.merchant,t.merchant_manual,
-                                        COALESCE(a.custom_name,a.name) account
+            rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,t.category_manual,
+                                        t.merchant,t.merchant_manual,COALESCE(a.custom_name,a.name) account
                                  FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '''+where+' ORDER BY t.booked_on DESC,t.id DESC LIMIT 30 OFFSET ?', [*values, (page-1)*30]).fetchall()
         return jsonify(items=[dict(r) for r in rows], total=total, page=page, pages=max(1, (total+29)//30))
+
+    @app.get('/api/merchants')
+    def merchants():
+        source = request.args.get('source', 'demo')
+        if source not in ('demo', 'live'):
+            raise ValueError('Ugyldig datakilde.')
+        with connect(db_path) as db:
+            items = merchant_items(db, source)
+        return jsonify(items=items)
 
     @app.patch('/api/transactions/<int:transaction_id>')
     def update_category(transaction_id):
@@ -390,6 +425,11 @@ def create_app(config=None):
             if row is None:
                 return jsonify(error='Posteringen blev ikke fundet.'), 404
             title = transaction_title(row['description'])
+            if merchant:
+                key = merchant_key(merchant)
+                canonical = next((item['name'] for item in merchant_items(db, row['source'])
+                                  if merchant_key(item['name']) == key), None)
+                merchant = canonical or merchant
             if remember:
                 if merchant:
                     db.execute('''INSERT INTO merchant_rules(source,title,merchant) VALUES (?,?,?)
