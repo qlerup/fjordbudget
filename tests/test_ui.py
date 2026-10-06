@@ -316,6 +316,10 @@ class UITests(unittest.TestCase):
         self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
         amount=self.page.locator('td.amount-cell').first.bounding_box()
         self.assertLessEqual(amount['x']+amount['width'],390)
+        colored=self.page.locator('#transactionRows tr.transaction-complete, #transactionRows tr.transaction-partial, #transactionRows tr.transaction-incomplete').first
+        expect(colored).to_be_visible()
+        self.assertNotEqual(colored.evaluate("el=>getComputedStyle(el).backgroundColor"),'rgba(0, 0, 0, 0)')
+        self.assertEqual(colored.locator('td').first.evaluate("el=>getComputedStyle(el).backgroundColor"),'rgba(0, 0, 0, 0)')
 
     def test_credentials_form_errors_save_and_mobile_layout(self):
         self.page.locator('[data-connect]').first.click()
