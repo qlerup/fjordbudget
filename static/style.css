@@ -12,9 +12,11 @@
   tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 9px;padding:13px 0;border-bottom:1px solid var(--line)}
   td{border:0;padding:0!important}
   td:first-child{grid-column:1;grid-row:1}
-  td:nth-child(2),td:nth-child(4){display:none}
+  td:nth-child(2),td:nth-child(5){display:none}
   td:nth-child(3){grid-column:1;grid-row:2;padding-left:41px!important}
-  td.amount-cell{grid-column:2;grid-row:1/3;align-self:center;font-size:12px;white-space:nowrap}
+  td:nth-child(4){grid-column:1;grid-row:3;padding-left:41px!important}
+  td:nth-child(4):empty{display:none}
+  td.amount-cell{grid-column:2;grid-row:1/4;align-self:start;font-size:12px;white-space:nowrap;padding-top:4px!important}
   .merchant{max-width:none;min-width:0}.merchant>span:last-child{min-width:0}
   .merchant-name{max-width:100%;font-size:12px}.merchant-kind{font-size:10px}
   .category-select{font-size:10px;max-width:145px;min-height:26px;padding:3px 5px}
@@ -169,6 +171,11 @@
   .transactions-panel tbody tr.transaction-complete td:nth-child(3){
     margin-top:9px;
   }
+  .transactions-panel tbody tr.transaction-incomplete td:nth-child(4),
+  .transactions-panel tbody tr.transaction-partial td:nth-child(4),
+  .transactions-panel tbody tr.transaction-complete td:nth-child(4){
+    margin-top:8px;
+  }
   .transactions-panel tbody tr.transaction-incomplete td.amount-cell,
   .transactions-panel tbody tr.transaction-partial td.amount-cell,
   .transactions-panel tbody tr.transaction-complete td.amount-cell{
@@ -182,7 +189,8 @@
 .category-picker-button:hover,.category-picker-button:focus-visible,.merchant-picker-button:hover,.merchant-picker-button:focus-visible{border-color:#cfd9c4;outline:none}
 .category-picker-button svg,.merchant-picker-button svg{width:13px;height:13px;flex:none;transform:rotate(90deg)}
 .category-picker-button.confirmed,.merchant-picker-button.confirmed{font-weight:600}
-.merchant-picker-button{margin-top:7px;max-width:220px;background:#f5f7ef}
+.merchant-picker-button{max-width:220px;background:#f5f7ef}
+.merchant-control-cell:empty{color:transparent}
 .choice-picker{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;margin:12px 0}
 .choice-search{display:flex;align-items:center;gap:9px;padding:0 12px;border-bottom:1px solid var(--line);background:#fafbf8}
 .choice-search svg{width:16px;height:16px;color:var(--muted);flex:none}.choice-search input{width:100%;min-width:0;border:0!important;outline:0;background:transparent!important;padding:13px 0!important;font:inherit!important;font-size:14px!important;color:var(--ink)!important}
@@ -191,7 +199,7 @@
 .choice-empty{padding:14px;margin:0;color:var(--muted);font-size:12px;line-height:1.5}.merchant-autocomplete-hint{margin-top:7px}
 @media(max-width:760px){
   .category-picker-button,.merchant-picker-button{width:100%;max-width:235px;min-height:38px;padding:8px 11px;font-size:12px;border-color:#d7dece;background:#f8faf5}
-  .merchant-picker-button{margin-top:8px}
+  .merchant-picker-button{margin-top:0}
   .choice-options{max-height:210px}
 }
 

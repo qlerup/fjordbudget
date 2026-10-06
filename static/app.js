@@ -92,11 +92,14 @@ async function loadTransactions() {
   if(generation!==transactionsGeneration)return;
   pages=data.pages;
   $('transactionRows').innerHTML=data.items.map(t=>{
-    const display=t.merchant || t.description;
-    const detail=t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler');
-    const subtitle=dateName(t.booked_on)+' · '+detail;
+    const requiresMerchant=!(t.requires_merchant===0 || t.requires_merchant===false);
+    const display=requiresMerchant && t.merchant ? t.merchant : t.description;
+    const detail=requiresMerchant ? (t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler')) : '';
+    const subtitle=detail ? dateName(t.booked_on)+' · '+detail : dateName(t.booked_on);
     const state=transactionState(t);
-    return `<tr class="${state.className}" title="${esc(state.title)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span><button type="button" class="merchant-picker-button ${t.merchant?'confirmed':''}" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}" aria-label="Forhandler for ${esc(t.description)}"><span>${esc(t.merchant || 'Vælg forhandler')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button></span></div></td><td>${esc(t.account)}</td><td><button type="button" class="category-picker-button ${t.category?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category || 'Vælg kategori')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button></td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
+    const categoryControl=`<button type="button" class="category-picker-button ${t.category?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category || 'Vælg kategori')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`;
+    const merchantControl=requiresMerchant?`<button type="button" class="merchant-picker-button ${t.merchant?'confirmed':''}" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}" aria-label="Forhandler for ${esc(t.description)}"><span>${esc(t.merchant || 'Vælg forhandler')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`:'';
+    return `<tr class="${state.className}" title="${esc(state.title)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span></span></div></td><td>${esc(t.account)}</td><td class="category-control-cell">${categoryControl}</td><td class="merchant-control-cell">${merchantControl}</td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
   }).join('');
   $('emptyTransactions').hidden=!!data.items.length;
   $('transactionCount').textContent=data.total?`${(page-1)*30+1}–${Math.min(page*30,data.total)} af ${data.total} posteringer`:'0 posteringer';

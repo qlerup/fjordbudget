@@ -291,6 +291,35 @@ class UITests(unittest.TestCase):
         self.page.locator('#search').fill('Netto')
         expect(self.page.locator('#transactionRows .category-picker-button').first).to_contain_text('Fritid')
 
+    def test_merchant_picker_follows_category_requirement_and_category_is_first(self):
+        month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]
+        self.page.locator('#month').fill(month)
+        self.page.locator('#month').dispatch_event('change')
+        self.page.locator('#search').fill('Til budgetkonto')
+        row=self.page.locator('#transactionRows tr').first
+        expect(row).to_be_visible()
+        expect(row.locator('.category-picker-button')).to_contain_text('Overførsler')
+        expect(row.locator('.merchant-picker-button')).to_have_count(0)
+        self.assertEqual(row.locator('td:nth-child(3)').evaluate("el=>el.cellIndex"),2)
+        self.assertEqual(row.locator('td:nth-child(4)').evaluate("el=>el.cellIndex"),3)
+
+        row.locator('.category-picker-button').click()
+        self.page.locator('#categorySearch').fill('Fritid')
+        self.page.locator('#categoryOptions .choice-option').click()
+        self.page.locator('#savePickedCategory').click()
+        expect(self.page.locator('#categoryDialog')).not_to_be_visible()
+        row=self.page.locator('#transactionRows tr').first
+        expect(row.locator('.category-picker-button')).to_contain_text('Fritid')
+        expect(row.locator('.merchant-picker-button')).to_be_visible()
+
+        row.locator('.category-picker-button').click()
+        self.page.locator('#categorySearch').fill('Overførsler')
+        self.page.locator('#categoryOptions .choice-option').click()
+        self.page.locator('#savePickedCategory').click()
+        row=self.page.locator('#transactionRows tr').first
+        expect(row.locator('.category-picker-button')).to_contain_text('Overførsler')
+        expect(row.locator('.merchant-picker-button')).to_have_count(0)
+
     def test_budget_saved_after_reload_and_live_data_empty(self):
         self.page.locator('.edit-budget').first.click()
         self.page.get_by_label('Budget for Mad & indkøb').fill('4567.89')
