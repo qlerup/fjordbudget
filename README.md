@@ -136,9 +136,11 @@ konto-linket fjernes. Ét mål markeres som aktivt og vises på overblikket. App
 pr. måned, sammenholder det med historisk råderum og markerer målet som realistisk,
 stramt, muligt med ændringer eller ikke realistisk med den nuværende økonomi.
 
-Besparelsesforslag tager udgangspunkt i faktisk forbrug. Lærte forhandlere vises
-først, så forslag kan være konkrete; resterende forbrug kan vises på kategoriniveau.
-Forslagene er konservative muligheder og ændrer aldrig budget eller posteringer
+Besparelsesforslag tager udgangspunkt i faktisk forbrug hos lærte forhandlere.
+Kategorier bruges ikke til opsparingsmålenes besparelsesforslag; de hører primært
+til budgetdelen. En forhandler kan markeres som fast udgift og bliver så helt udeladt
+fra forslagene. For justerbare forhandlere bruger analysen et konservativt potentiale
+på 10 % af det månedlige gennemsnit. Forslagene ændrer aldrig budget eller posteringer
 automatisk.
 
 ## Data og backup
