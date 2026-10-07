@@ -429,7 +429,9 @@ class UITests(unittest.TestCase):
         row=self.page.locator('#transactionRows tr').first
         row.locator('.merchant-picker-button').click()
         self.page.locator('#merchantName').fill('UI Merchant')
-        self.page.get_by_label('Fast udgift – beløbet kan ikke justeres og må ikke bruges i forslag til besparelser').check()
+        fixed_on_create=self.page.get_by_label('Opret som fast udgift – forhandleren må ikke bruges i forslag til besparelser')
+        expect(fixed_on_create).to_be_visible()
+        fixed_on_create.check()
         self.page.locator('#saveMerchant').click()
         expect(self.page.locator('#merchantDialog')).not_to_be_visible()
 
@@ -438,6 +440,12 @@ class UITests(unittest.TestCase):
         card=self.page.locator('[data-library-merchant="UI Merchant"]')
         expect(card).to_be_visible()
         expect(card).to_contain_text('Fast udgift')
+        fixed_toggle=card.locator('[data-merchant-fixed="UI Merchant"]')
+        expect(fixed_toggle).to_be_checked()
+        fixed_toggle.uncheck()
+        card=self.page.locator('[data-library-merchant="UI Merchant"]')
+        expect(card.locator('[data-merchant-fixed="UI Merchant"]')).not_to_be_checked()
+        expect(card).not_to_contain_text(' · Fast udgift')
         expect(card.locator('[data-delete-merchant-rule]')).to_have_count(1)
 
         card.locator('[data-delete-merchant-rule]').click()
