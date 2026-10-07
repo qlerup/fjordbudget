@@ -5,7 +5,11 @@ let merchantChoices=[], merchantChoicesSource='', merchantActive=-1, categoryAct
 
 function normalizedSearch(value){return String(value || '').toLocaleLowerCase('da').trim();}
 function merchantChoice(name){return merchantChoices.find(item=>normalizedSearch(item.name)===normalizedSearch(name));}
-function syncMerchantFixed(name){const item=merchantChoice(name);if(item)$('merchantFixed').checked=item.adjustable===false;}
+function syncMerchantFixedControl(name){
+  const value=String(name || '').trim(), existing=merchantChoice(value), creating=!!value && !existing;
+  $('merchantFixedRow').hidden=!creating;
+  if(!creating)$('merchantFixed').checked=false;
+}
 
 function renderChoiceList(containerId, emptyId, items, search, selected, activeIndex, formatter){
   const container=$(containerId), needle=normalizedSearch(search);
@@ -89,8 +93,9 @@ async function handleTransactionEdit(event){
     $('merchantName').value=merchantButton.dataset.merchant || '';
     $('merchantRemember').checked=true;
     $('merchantFixed').checked=false;
+    $('merchantFixedRow').hidden=true;
     showError('merchantError','');
-    try{await loadMerchantChoices();syncMerchantFixed($('merchantName').value);}catch(error){merchantChoices=[];showError('merchantError','Kunne ikke hente eksisterende forhandlere. Du kan stadig skrive en ny.');}
+    try{await loadMerchantChoices();syncMerchantFixedControl($('merchantName').value);}catch(error){merchantChoices=[];syncMerchantFixedControl($('merchantName').value);showError('merchantError','Kunne ikke hente eksisterende forhandlere. Du kan stadig skrive en ny.');}
     renderMerchantChoices();
     $('merchantDialog').showModal();
     $('merchantName').focus();
@@ -112,12 +117,12 @@ async function handleTransactionEdit(event){
 transactionRows.addEventListener('click',handleTransactionEdit);
 incompleteTransactionRows.addEventListener('click',handleTransactionEdit);
 
-$('merchantName').addEventListener('input',()=>{renderMerchantChoices();syncMerchantFixed($('merchantName').value);});
+$('merchantName').addEventListener('input',()=>{renderMerchantChoices();syncMerchantFixedControl($('merchantName').value);});
 $('merchantOptions').addEventListener('click',event=>{
   const option=event.target.closest('.choice-option');if(!option)return;
   $('merchantName').value=option.dataset.value;
   $('merchantForm').dataset.selected=option.dataset.value;
-  syncMerchantFixed(option.dataset.value);
+  syncMerchantFixedControl(option.dataset.value);
   renderMerchantChoices();
   $('merchantName').focus();
 });
@@ -133,9 +138,11 @@ $('merchantForm').addEventListener('submit',async event=>{
   try{
     const merchant=$('merchantName').value.trim();
     const remember=$('merchantRemember').checked;
-    const adjustable=!$('merchantFixed').checked;
+    const existing=merchantChoice(merchant);
+    const body={merchant,remember};
+    if(merchant && !existing)body.adjustable=!$('merchantFixed').checked;
     await api(`/api/transactions/${form.dataset.transaction}/merchant`,{
-      method:'PATCH',body:JSON.stringify({merchant,remember,adjustable}),
+      method:'PATCH',body:JSON.stringify(body),
     });
     $('merchantDialog').close();
     merchantChoicesSource='';
@@ -150,6 +157,7 @@ $('clearMerchant').addEventListener('click',()=>{
   $('merchantName').value='';
   $('merchantRemember').checked=true;
   $('merchantFixed').checked=false;
+  $('merchantFixedRow').hidden=true;
   $('merchantForm').requestSubmit($('saveMerchant'));
 });
 
@@ -215,10 +223,28 @@ async function loadMerchantLibrary(){
       const normalized=rule.bank_text===rule.title?'':`<small>Gemt mønster: ${esc(rule.title)}</small>`;
       return `<div class="merchant-rule-row"><div><strong>${esc(rule.bank_text)}</strong>${normalized}</div><button type="button" class="text-button merchant-rule-delete" data-delete-merchant-rule="${esc(rule.title)}" data-rule-merchant="${esc(item.name)}" aria-label="Slet banktekst ${esc(rule.bank_text)}">Slet banktekst</button></div>`;
     }).join(''):'<p class="small muted merchant-no-rules">Ingen gemte banktekster. Forhandleren findes kun på eksisterende posteringer.</p>';
-    return `<article class="merchant-library-card" data-library-merchant="${esc(item.name)}"><div class="merchant-library-head"><div><h3>${esc(item.name)}</h3><p>${item.transactions} ${item.transactions===1?'postering':'posteringer'} · ${item.rule_count} ${item.rule_count===1?'gemt banktekst':'gemte banktekster'}${item.adjustable===false?' · Fast udgift':''}</p></div><button type="button" class="button quiet merchant-delete-button" data-delete-library-merchant="${esc(item.name)}">Slet forhandler</button></div><div class="merchant-rules">${rules}</div></article>`;
+    return `<article class="merchant-library-card" data-library-merchant="${esc(item.name)}"><div class="merchant-library-head"><div><h3>${esc(item.name)}</h3><p>${item.transactions} ${item.transactions===1?'postering':'posteringer'} · ${item.rule_count} ${item.rule_count===1?'gemt banktekst':'gemte banktekster'}${item.adjustable===false?' · Fast udgift':''}</p></div><div class="merchant-library-actions"><label class="merchant-fixed-toggle"><input type="checkbox" data-merchant-fixed="${esc(item.name)}" ${item.adjustable===false?'checked':''}><span>Fast udgift</span></label><button type="button" class="button quiet merchant-delete-button" data-delete-library-merchant="${esc(item.name)}">Slet forhandler</button></div></div><div class="merchant-rules">${rules}</div></article>`;
   }).join(''):'<div class="empty-state"><svg><use href="#icon-store"/></svg><h3>Ingen forhandlere endnu</h3><p>Når du tilknytter forhandlere til posteringer, vises de her.</p></div>';
 }
 window.loadMerchantLibrary=loadMerchantLibrary;
+
+$('merchantLibrary').addEventListener('change',async event=>{
+  const toggle=event.target.closest('[data-merchant-fixed]');if(!toggle)return;
+  const checked=toggle.checked;
+  toggle.disabled=true;showError('merchantLibraryError','');
+  try{
+    await api('/api/merchant-library?source='+encodeURIComponent(source),{
+      method:'PATCH',
+      body:JSON.stringify({merchant:toggle.dataset.merchantFixed,adjustable:!checked}),
+    });
+    merchantChoicesSource='';
+    await loadMerchantLibrary();
+    toast(checked?'Forhandleren er markeret som fast udgift':'Forhandleren kan nu bruges i besparelsesforslag');
+  }catch(error){
+    toggle.checked=!checked;
+    showError('merchantLibraryError',error.message);
+  }finally{toggle.disabled=false;}
+});
 
 $('merchantLibrary').addEventListener('click',event=>{
   const rule=event.target.closest('[data-delete-merchant-rule]');
