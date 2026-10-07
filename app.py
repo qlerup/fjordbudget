@@ -217,7 +217,7 @@ def create_app(config=None):
             result.append(item)
         return sorted(result, key=lambda item: item['name'].casefold())
 
-    @app.route('/api/merchant-library', methods=['GET', 'DELETE'])
+    @app.route('/api/merchant-library', methods=['GET', 'PATCH', 'DELETE'])
     def merchant_library():
         source = request.args.get('source', 'demo')
         if source not in ('demo', 'live'):
@@ -229,6 +229,27 @@ def create_app(config=None):
         body = request.get_json(silent=True)
         merchant = body.get('merchant') if isinstance(body, dict) else None
         title = body.get('title') if isinstance(body, dict) else None
+
+        if request.method == 'PATCH':
+            adjustable = body.get('adjustable') if isinstance(body, dict) else None
+            if not isinstance(merchant, str) or not 1 <= len(merchant.strip()) <= 100:
+                raise ValueError('Ugyldig forhandler.')
+            if type(adjustable) is not bool:
+                raise ValueError('Ugyldigt valg for fast udgift.')
+            target = merchant_key(merchant.strip())
+            with connect(db_path) as db:
+                db.execute('BEGIN IMMEDIATE')
+                canonical = next((item['name'] for item in merchant_items(db, source)
+                                  if merchant_key(item['name']) == target), None)
+                if canonical is None:
+                    return jsonify(error='Forhandleren findes ikke længere.'), 404
+                db.execute('''INSERT INTO merchant_preferences(source,merchant_key,name,adjustable)
+                              VALUES (?,?,?,?)
+                              ON CONFLICT(source,merchant_key) DO UPDATE SET
+                                name=excluded.name,adjustable=excluded.adjustable''',
+                           (source, target, canonical, int(adjustable)))
+            return jsonify(ok=True, merchant=canonical, adjustable=adjustable)
+
         if bool(merchant) == bool(title):
             raise ValueError('Vælg enten en forhandler eller én gemt banktekst.')
 
@@ -653,8 +674,9 @@ def create_app(config=None):
                 key = merchant_key(merchant)
                 canonical = next((item['name'] for item in merchant_items(db, row['source'])
                                   if merchant_key(item['name']) == key), None)
+                is_new_merchant = canonical is None
                 merchant = canonical or merchant
-                if adjustable is not None:
+                if adjustable is not None and is_new_merchant:
                     db.execute('''INSERT INTO merchant_preferences(source,merchant_key,name,adjustable)
                                   VALUES (?,?,?,?)
                                   ON CONFLICT(source,merchant_key) DO UPDATE SET
