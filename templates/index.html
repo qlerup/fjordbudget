@@ -82,7 +82,7 @@
 <p class="small muted">Andet, Indkomst og Overførsler er faste kategorier, som bruges i overblikkets beregninger. Ved sletning flyttes posteringer og regler til den kategori, du vælger. Budgetkategorier og budgetbeløb bevares.</p>
 </section>
 <section class="panel merchant-library-panel" data-section="merchants" hidden>
-  <div class="section-heading"><div><h2>Dine forhandlere <span class="count" id="merchantLibraryCount">0</span></h2><p>Se hvilke banktekster FjordBudget har lært, og fjern regler eller hele forhandlere.</p></div></div>
+  <div class="section-heading"><div><h2>Dine forhandlere <span class="count" id="merchantLibraryCount">0</span></h2><p>Administrer forhandlere, banktekster og hvilke udgifter der må indgå i besparelsesforslag.</p></div></div>
   <div id="merchantLibraryError" class="error-box" role="alert" hidden></div>
   <div id="merchantLibrary" class="merchant-library"></div>
   <p class="small muted merchant-library-note">Sletter du kun en banktekst, beholdes forhandleren på historiske posteringer. Sletter du hele forhandleren, fjernes forhandlernavnet også fra eksisterende posteringer.</p>
@@ -153,7 +153,7 @@
     </div>
     <p class="small muted merchant-autocomplete-hint">Vælg en eksisterende forhandler fra listen, eller skriv et nyt navn og gem.</p>
     <label class="checkbox-row"><input id="merchantRemember" type="checkbox" checked> <span>Husk forhandleren ved samme banktekst. Skiftende rene tal ignoreres, når resten af teksten er tydelig</span></label>
-    <label class="checkbox-row"><input id="merchantFixed" type="checkbox"> <span>Fast udgift – beløbet kan ikke justeres og må ikke bruges i forslag til besparelser</span></label>
+    <label id="merchantFixedRow" class="checkbox-row" hidden><input id="merchantFixed" type="checkbox"> <span>Opret som fast udgift – forhandleren må ikke bruges i forslag til besparelser</span></label>
     <div id="merchantError" class="error-box" role="alert" hidden></div>
     <div class="dialog-actions"><button id="clearMerchant" type="button" class="text-button">Fjern forhandler</button><button type="button" class="button quiet" data-close="merchantDialog">Annuller</button><button id="saveMerchant" type="submit" class="button primary">Gem forhandler</button></div>
   </form>
