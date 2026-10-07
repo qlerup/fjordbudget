@@ -275,6 +275,35 @@ function openAccountSetup(){
     <input id="setupAccount${i}" name="${esc(a.id)}" maxlength="100" required placeholder="Fx Kostkonto eller Budgetkonto" autocomplete="off"></div>`).join('');
   showError('accountSetupError','');$('accountSetupDialog').showModal();
 }
+function historyAgeLabel(earliest){
+  if(!earliest)return '';
+  const start=new Date(earliest+'T12:00:00'), today=new Date();
+  let months=(today.getFullYear()-start.getFullYear())*12+(today.getMonth()-start.getMonth());
+  if(today.getDate()<start.getDate())months=Math.max(0,months-1);
+  if(months<1){
+    const days=Math.max(0,Math.floor((today-start)/86400000));
+    return days===1?'ca. 1 dag':`ca. ${days} dage`;
+  }
+  const years=Math.floor(months/12), rest=months%12, parts=[];
+  if(years)parts.push(years===1?'ca. 1 år':`ca. ${years} år`);
+  if(rest)parts.push(rest===1?'1 måned':`${rest} måneder`);
+  return parts.join(' og ');
+}
+function showHistoryImport(history){
+  if(!history)return false;
+  if(history.earliest_date){
+    const oldest=new Intl.DateTimeFormat('da-DK',{dateStyle:'long'}).format(new Date(history.earliest_date+'T12:00:00'));
+    $('historyImportText').textContent=`Banken gjorde det muligt at hente posteringer tilbage til ${oldest}.`;
+    const age=historyAgeLabel(history.earliest_date);
+    $('historyImportDetail').textContent=(age?`Det svarer til ${age} historik. `:'')+`${history.transactions} bogførte posteringer blev hentet fra ${history.accounts} ${history.accounts===1?'konto':'konti'}.`;
+  }else{
+    $('historyImportText').textContent='Banken returnerede ingen historiske posteringer i den første hentning.';
+    $('historyImportDetail').textContent='FjordBudget forsøgte at hente den længst mulige historik. Fremtidige synkroniseringer henter de seneste 90 dage.';
+  }
+  $('historyImportDialog').showModal();
+  return true;
+}
+
 async function pollSync() {
   if(syncPolling)return;
   syncPolling=true;
@@ -287,7 +316,7 @@ async function pollSync() {
       if(result.running){setTimeout(tick,1500);return;}
       syncPolling=false;
       if(result.message){toast(result.message);await refresh(); if(source==='live')$('syncMessage').textContent=result.message;}
-      openAccountSetup();
+      if(!showHistoryImport(result.history))openAccountSetup();
     }catch(error){syncPolling=false;$('syncButton').disabled=false;showError('loadError',error.message);}
   };
   await tick();
@@ -412,6 +441,7 @@ async function watchAutomaticSync(){
         $('syncMessage').textContent=status.message || 'Den automatiske banksynkronisering fejlede.';
       }else if(status.message){
         toast(status.message);
+        showHistoryImport(status.history);
       }
     }
   }catch{}
@@ -449,6 +479,7 @@ $('accountVisibilityForm').addEventListener('submit',async event=>{
   }catch(error){showError('accountVisibilityError',error.message);}
   finally{button.disabled=false;}
 });
+$('historyImportDialog').addEventListener('close',()=>openAccountSetup());
 $('accountSetupDialog').addEventListener('close',()=>{accountSetupDismissed=true;});
 $('accountSetupForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=$('saveAccountSetup');button.disabled=true;
