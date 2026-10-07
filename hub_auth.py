@@ -136,6 +136,7 @@ def register_hub_auth(app, db_path):
                 return render_template('login.html', error='Genindlæs siden og prøv igen.'), 403
             if request.headers.get('Origin') and request.headers['Origin'] != g.budget_origin:
                 return render_template('login.html', error='Ugyldig forespørgsel.'), 403
+            rate_key = request.remote_addr or 'unknown'
             with lock:
                 now = time.monotonic()
                 for key in list(attempts):
@@ -143,14 +144,17 @@ def register_hub_auth(app, db_path):
                         attempts[key].popleft()
                     if not attempts[key]:
                         del attempts[key]
-                bucket = attempts[request.remote_addr]
+                bucket = attempts[rate_key]
                 if len(bucket) >= 5 or len(attempts) > 2048:
-                    return render_template('login.html', error='For mange forsøg. Vent fem minutter.'), 429
-                bucket.append(now)
+                    return render_template('login.html', error='For mange mislykkede forsøg. Vent fem minutter.'), 429
             result = hub_api('/api/hub/apps/authenticate', {'username':request.form.get('username','')[:200],
                 'password':request.form.get('password','')[:1024]}, method='POST')
             if result.get('ok') and establish(result.get('user')):
+                with lock:
+                    attempts.pop(rate_key, None)
                 return redirect('/')
+            with lock:
+                attempts[rate_key].append(time.monotonic())
             error = 'Login afvist. Brug ejeren af dette budget med adgang i FjordHub. En påkrævet kodeændring skal gennemføres i FjordHub først.'
         return render_template('login.html', error=error)
 
