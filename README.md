@@ -78,11 +78,13 @@ DELETE bruges kun til at afbryde et læsesamtykke.
    gennem bankens returadresse.
 7. Tryk **Forbind bank**, vælg din danske bank, og godkend læseadgangen hos banken.
    MitID og banklogin foregår uden for FjordBudget; appen indsamler ikke disse oplysninger.
-8. Vælg **Mine bankdata → Opdater saldi** for den første hentning. Der hentes op til
-   de seneste 90 dages bogførte posteringer, afhængigt af bankens adgang og historik.
-   Tidligere hentede posteringer bevares lokalt. Derefter synkroniserer FjordBudget
-   automatisk aktive bankkonti, når deres seneste hentning er mindst 30 minutter gammel.
-   Knappen kan stadig bruges til en manuel opdatering når som helst.
+8. Ved den første synkronisering efter hver bankgodkendelse beder FjordBudget Enable Banking
+   om den **længst mulige historik** (`strategy=longest`). Banken bestemmer, hvor langt tilbage
+   der kan hentes. Når hentningen er færdig, viser appen en popup med datoen for den ældste
+   returnerede postering og hvor meget historik det svarer til. Derefter synkroniserer
+   FjordBudget aktive bankkonti med de seneste 90 dages bogførte posteringer, når deres
+   seneste hentning er mindst 30 minutter gammel. Tidligere hentede posteringer bevares lokalt,
+   og **Opdater saldi** kan stadig bruges manuelt når som helst.
 
 Når samtykket udløber, forbindes banken igen. Stabil kontohash genbruger kontoen
 og bevarer historik og manuelle kategorier. **Mine banker → Afbryd bankadgang**
