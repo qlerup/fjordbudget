@@ -80,6 +80,11 @@ def initialize(path):
           source TEXT NOT NULL CHECK(source IN ('demo','live')),
           title TEXT NOT NULL, merchant TEXT NOT NULL,
           PRIMARY KEY(source,title));
+        CREATE TABLE IF NOT EXISTS merchant_preferences (
+          source TEXT NOT NULL CHECK(source IN ('demo','live')),
+          merchant_key TEXT NOT NULL, name TEXT NOT NULL,
+          adjustable INTEGER NOT NULL DEFAULT 1 CHECK(adjustable IN (0,1)),
+          PRIMARY KEY(source,merchant_key));
         CREATE TABLE IF NOT EXISTS categories (
           name TEXT PRIMARY KEY, color TEXT NOT NULL, protected INTEGER NOT NULL DEFAULT 0,
           requires_merchant INTEGER NOT NULL DEFAULT 1 CHECK(requires_merchant IN (0,1)));
