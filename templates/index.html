@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js?v=budget-suggestion-20261007" defer></script>
   <script src="/static/savings.js?v=budget-suggestion-20261007" defer></script>
-  <script src="/static/merchants.js?v=budget-suggestion-20261007" defer></script>
+  <script src="/static/merchants.js?v=category-merchant-choice-20261007" defer></script>
 <link rel="apple-touch-icon" href="/static/logos/icon-180.png?v=brand-budget-green-20261005"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"></head>
 <body>
 <svg class="symbols" aria-hidden="true"><defs>
@@ -182,6 +182,14 @@
     </div>
     <div id="categoryPickerError" class="error-box" role="alert" hidden></div>
     <div class="dialog-actions"><button type="button" class="button quiet" data-close="categoryDialog">Annuller</button><button id="savePickedCategory" type="submit" class="button primary">Gem kategori</button></div>
+  </form>
+</dialog>
+<dialog id="categoryMerchantDialog" aria-labelledby="categoryMerchantTitle">
+  <h2 id="categoryMerchantTitle">Skal kategorien bruge forhandler?</h2>
+  <p id="categoryMerchantContext" class="dialog-intro"></p>
+  <form id="categoryMerchantForm">
+    <div id="categoryMerchantError" class="error-box" role="alert" hidden></div>
+    <div class="dialog-actions"><button type="submit" value="no" class="button quiet">Nej, uden forhandler</button><button type="submit" value="yes" class="button primary">Ja, brug forhandler</button></div>
   </form>
 </dialog>
 <dialog id="budgetCategoryDeleteDialog" aria-labelledby="budgetCategoryDeleteTitle"><h2 id="budgetCategoryDeleteTitle">Fjern budgetkategori</h2><p id="budgetCategoryDeleteText"></p><form id="budgetCategoryDeleteForm"><div id="budgetCategoryDeleteError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetCategoryDeleteDialog">Annuller</button><button type="submit" class="button primary">Fjern budgetkategori</button></div></form></dialog>

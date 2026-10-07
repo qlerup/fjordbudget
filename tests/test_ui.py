@@ -430,6 +430,10 @@ class UITests(unittest.TestCase):
         self.page.locator('#savePickedCategory').click()
         expect(self.page.locator('#categoryDialog')).not_to_be_visible()
         expect(self.page.locator('#toast')).to_contain_text('Kategori gemt')
+        expect(self.page.locator('#categoryMerchantDialog')).to_be_visible()
+        expect(self.page.locator('#categoryMerchantContext')).to_contain_text('Børn test')
+        self.page.locator('#categoryMerchantForm button[value="yes"]').click()
+        expect(self.page.locator('#categoryMerchantDialog')).not_to_be_visible()
         self.page.reload()
         expect(self.page.locator('#appContent')).to_be_visible()
         self.page.locator('#month').fill(month)
@@ -440,6 +444,30 @@ class UITests(unittest.TestCase):
         categories=self.app.test_client().get('/api/categories').json['items']
         created=next(item for item in categories if item['name']=='Børn test')
         self.assertEqual(created['requires_merchant'],1)
+
+    def test_new_category_can_be_saved_without_merchant(self):
+        self.page.locator('.nav-item[data-view="transactions"]').click()
+        category_button=self.page.locator('#transactionRows [data-edit-category]').first
+        expect(category_button).to_be_visible()
+        tid=category_button.get_attribute('data-edit-category')
+        category_button.click()
+        self.page.locator('#categorySearch').fill('Uden forhandler test')
+        self.page.locator('[data-create-category="Uden forhandler test"]').click()
+        expect(self.page.locator('#categoryOptions .choice-option.selected')).to_have_text('Uden forhandler test')
+        expect(self.page.locator('#categoryMerchantDialog')).not_to_be_visible()
+        self.page.locator('#savePickedCategory').click()
+        expect(self.page.locator('#categoryMerchantDialog')).to_be_visible()
+        self.page.locator('#categoryMerchantForm button[value="no"]').click()
+        expect(self.page.locator('#categoryMerchantDialog')).not_to_be_visible()
+        category=self.page.locator(f'#transactionRows [data-edit-category="{tid}"]')
+        expect(category).to_contain_text('Uden forhandler test')
+        expect(self.page.locator(f'#transactionRows [data-edit-merchant="{tid}"]')).to_have_count(0)
+        created=next(item for item in self.app.test_client().get('/api/categories').json['items'] if item['name']=='Uden forhandler test')
+        self.assertEqual(created['requires_merchant'],0)
+        category.click()
+        self.page.locator('#savePickedCategory').click()
+        expect(self.page.locator('#categoryDialog')).not_to_be_visible()
+        expect(self.page.locator('#categoryMerchantDialog')).not_to_be_visible()
 
     def test_merchant_library_lists_and_deletes_saved_bank_texts_and_merchants(self):
         month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]

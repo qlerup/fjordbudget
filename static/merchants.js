@@ -2,6 +2,7 @@
 const transactionRows=$('transactionRows');
 const incompleteTransactionRows=$('incompleteTransactionRows');
 let merchantChoices=[], merchantChoicesSource='', merchantActive=-1, categoryActive=-1;
+const categoriesAwaitingMerchantChoice=new Set();
 
 function normalizedSearch(value){return String(value || '').toLocaleLowerCase('da').trim();}
 function merchantChoice(name){return merchantChoices.find(item=>normalizedSearch(item.name)===normalizedSearch(name));}
@@ -169,6 +170,7 @@ $('categoryOptions').addEventListener('click',async event=>{
     create.disabled=true;showError('categoryPickerError','');
     try{
       const result=await api('/api/categories',{method:'POST',body:JSON.stringify({name})});
+      categoriesAwaitingMerchantChoice.add(name);
       config.categories=result.items.map(item=>item.name);
       config.colors=result.items.map(item=>item.color);
       const selectedFilter=$('categoryFilter').value;
@@ -209,8 +211,32 @@ $('categoryPickerForm').addEventListener('submit',async event=>{
     toast(`Kategori gemt · ${result.updated} posteringer opdateret. Huskes fremover.`);
     await refresh();
     if($('incompleteTransactionsDialog').open)await loadIncompleteTransactions();
+    if(categoriesAwaitingMerchantChoice.has(category)){
+      $('categoryMerchantForm').dataset.category=category;
+      $('categoryMerchantContext').textContent=`Skal du kunne vælge forhandler på posteringer i “${category}”? Valget gælder hele kategorien og kan ændres under Kategorier.`;
+      showError('categoryMerchantError','');
+      $('categoryMerchantDialog').showModal();
+    }
   }catch(error){showError('categoryPickerError',error.message);}
   finally{button.disabled=false;}
+});
+
+$('categoryMerchantForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget, name=form.dataset.category;
+  const requiresMerchant=event.submitter.value==='yes';
+  const buttons=Array.from(form.querySelectorAll('button'));
+  buttons.forEach(button=>button.disabled=true);
+  showError('categoryMerchantError','');
+  try{
+    await api('/api/categories',{method:'PATCH',body:JSON.stringify({name,requires_merchant:requiresMerchant})});
+    categoriesAwaitingMerchantChoice.delete(name);
+    $('categoryMerchantDialog').close();
+    await refresh();
+    if($('incompleteTransactionsDialog').open)await loadIncompleteTransactions();
+    toast(requiresMerchant?'Forhandler er slået til for kategorien':'Kategorien bruges uden forhandler');
+  }catch(error){showError('categoryMerchantError',error.message);}
+  finally{buttons.forEach(button=>button.disabled=false);}
 });
 
 
