@@ -2,7 +2,7 @@ import re
 import sys
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -163,6 +163,31 @@ class InsightTests(unittest.TestCase):
         self.assertEqual(response.json['updated'],2)
         with connect(self.db) as db:
             self.assertEqual(db.execute("SELECT merchant FROM transactions WHERE external_id='mcd-b'").fetchone()[0],"McDonald's")
+
+    def test_savings_analysis_defaults_to_last_month_and_accepts_custom_dates(self):
+        today = date.today()
+        first_this_month = today.replace(day=1)
+        previous_end = first_this_month - timedelta(days=1)
+        previous_start = previous_end.replace(day=1)
+
+        response = self.client.get('/api/savings-goals?source=demo')
+        self.assertEqual(response.status_code, 200)
+        profile = response.json['profile']
+        self.assertEqual(profile['period_start'], previous_start.isoformat())
+        self.assertEqual(profile['period_end'], previous_end.isoformat())
+
+        custom = self.client.get(
+            f'/api/savings-goals?source=demo&from={previous_start.isoformat()}&to={previous_start.isoformat()}'
+        )
+        self.assertEqual(custom.status_code, 200)
+        self.assertEqual(custom.json['profile']['period_start'], previous_start.isoformat())
+        self.assertEqual(custom.json['profile']['period_end'], previous_start.isoformat())
+        self.assertEqual(custom.json['profile']['period_days'], 1)
+
+        invalid = self.client.get(
+            f'/api/savings-goals?source=demo&from={previous_end.isoformat()}&to={previous_start.isoformat()}'
+        )
+        self.assertEqual(invalid.status_code, 400)
 
     def test_goal_analysis_flags_unrealistic_goal_and_tracks_featured_progress(self):
         body = {

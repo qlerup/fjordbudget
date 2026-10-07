@@ -345,7 +345,26 @@ def create_app(config=None):
     def savings_goals(goal_id=None):
         source, _, currency = parameters()
         if request.method == 'GET':
-            result = build_insights(db_path, source, currency)
+            raw_from = str(request.args.get('from') or '').strip()
+            raw_to = str(request.args.get('to') or '').strip()
+            if bool(raw_from) != bool(raw_to):
+                raise ValueError('Vælg både fra- og til-dato.')
+            if raw_from:
+                try:
+                    period_start = date.fromisoformat(raw_from)
+                    period_end = date.fromisoformat(raw_to)
+                except ValueError:
+                    raise ValueError('Vælg en gyldig fra- og til-dato.') from None
+                if period_start > period_end:
+                    raise ValueError('Fra-dato skal være før eller samme dag som til-dato.')
+            else:
+                first_this_month = date.today().replace(day=1)
+                period_end = first_this_month - timedelta(days=1)
+                period_start = period_end.replace(day=1)
+            result = build_insights(
+                db_path, source, currency,
+                period_start=period_start, period_end=period_end,
+            )
             with connect(db_path) as db:
                 accounts = [dict(row) for row in db.execute(
                     '''SELECT id,COALESCE(custom_name,name) name,bank,last4,currency,balance,synced_at,included

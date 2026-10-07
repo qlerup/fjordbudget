@@ -1,7 +1,29 @@
 'use strict';
-let savingsGoals=[], savingsAccounts=[], savingsGeneration=0, savingsLoadedScope='';
+let savingsGoals=[], savingsAccounts=[], savingsGeneration=0, savingsLoadedScope='', savingsPeriodInitialized=false;
 
-function savingsScope(){return new URLSearchParams({source,currency:$('currency').value}).toString();}
+function savingsIsoDate(value){
+  const year=value.getFullYear(), month=String(value.getMonth()+1).padStart(2,'0'), day=String(value.getDate()).padStart(2,'0');
+  return year+'-'+month+'-'+day;
+}
+function ensureSavingsPeriod(){
+  if(savingsPeriodInitialized && $('savingsPeriodFrom').value && $('savingsPeriodTo').value)return;
+  const now=new Date(), firstThisMonth=new Date(now.getFullYear(),now.getMonth(),1);
+  const end=new Date(firstThisMonth.getTime()-86400000);
+  const start=new Date(end.getFullYear(),end.getMonth(),1);
+  $('savingsPeriodFrom').value=savingsIsoDate(start);
+  $('savingsPeriodTo').value=savingsIsoDate(end);
+  savingsPeriodInitialized=true;
+}
+function savingsScope(){
+  ensureSavingsPeriod();
+  const from=$('savingsPeriodFrom').value, to=$('savingsPeriodTo').value;
+  if(!from || !to)throw new Error('Vælg både fra- og til-dato.');
+  if(from>to)throw new Error('Fra-dato skal være før eller samme dag som til-dato.');
+  return new URLSearchParams({source,currency:$('currency').value,from,to}).toString();
+}
+function savingsDateLabel(value){
+  return new Intl.DateTimeFormat('da-DK',{day:'numeric',month:'short',year:'numeric'}).format(new Date(value+'T12:00:00'));
+}
 function formatSavingsAmount(value){
   if(!/^[\d.]+(?:,\d{0,2})?$/.test(value))return value;
   const [whole, fraction]=value.replaceAll('.','').split(',');
@@ -45,21 +67,25 @@ function savingsSuggestion(item,currency){
 function renderSavingsProfile(profile){
   const categories=profile.categories.slice(0,5);
   const merchants=profile.merchants.slice(0,5);
+  const period=savingsDateLabel(profile.period_start)+' – '+savingsDateLabel(profile.period_end);
   $('savingsProfile').innerHTML=profile.months_analyzed?`
+    <p class="savings-period-caption">Viser <strong>${esc(period)}</strong></p>
     <div class="savings-profile-summary">
-      <article><span>Gns. indtægt</span><strong>${esc(money(profile.average_income,$('currency').value,0))}</strong></article>
-      <article><span>Gns. udgifter</span><strong>${esc(money(profile.average_expenses,$('currency').value,0))}</strong></article>
-      <article><span>Historisk råderum</span><strong class="${profile.average_available<0?'negative':''}">${esc(money(profile.average_available,$('currency').value,0))}/md.</strong></article>
+      <article><span>Indtægt i perioden</span><strong>${esc(money(profile.total_income,$('currency').value,0))}</strong></article>
+      <article><span>Udgifter i perioden</span><strong>${esc(money(profile.total_expenses,$('currency').value,0))}</strong></article>
+      <article><span>Råderum i perioden</span><strong class="${profile.total_available<0?'negative':''}">${esc(money(profile.total_available,$('currency').value,0))}</strong></article>
     </div>
     <div class="spending-breakdown">
-      <div><h3>Hvor pengene går hen</h3>${categories.length?`<ol>${categories.map(item=>`<li><span>${esc(item.name)}</span><b>${esc(money(item.monthly_average,$('currency').value,0))}/md.</b></li>`).join('')}</ol>`:'<p class="muted">Ingen udgifter at analysere endnu.</p>'}</div>
-      <div><h3>Forhandlere du har lært FjordBudget</h3>${merchants.length?`<ol>${merchants.map(item=>`<li><span>${esc(item.name)}<small>${esc(item.category)} · ${item.purchases} køb</small></span><b>${esc(money(item.monthly_average,$('currency').value,0))}/md.</b></li>`).join('')}</ol>`:'<p class="muted">Angiv forhandler på posteringer, så analysen kan blive mere konkret.</p>'}</div>
+      <div><h3>Hvor pengene går hen</h3>${categories.length?`<ol>${categories.map(item=>`<li><span>${esc(item.name)}</span><b>${esc(money(item.total,$('currency').value,0))}</b></li>`).join('')}</ol>`:'<p class="muted">Ingen udgifter at analysere endnu.</p>'}</div>
+      <div><h3>Forhandlere du har lært FjordBudget</h3>${merchants.length?`<ol>${merchants.map(item=>`<li><span>${esc(item.name)}<small>${esc(item.category)} · ${item.purchases} køb</small></span><b>${esc(money(item.total,$('currency').value,0))}</b></li>`).join('')}</ol>`:'<p class="muted">Angiv forhandler på posteringer, så analysen kan blive mere konkret.</p>'}</div>
     </div>
-    <p class="analysis-note">Baseret på ${profile.months_analyzed} ${profile.months_analyzed===1?'måned':'måneder'} med posteringer. Forslag er muligheder — ikke en vurdering af hvad du bør bruge penge på.</p>`:
-    '<div class="empty-state"><h3>Analysen vokser med dine data</h3><p>Når der er posteringer, kan FjordBudget sammenholde løn, udgifter, forhandlere og dine mål.</p></div>';
+    <p class="analysis-note">Kun posteringer fra den valgte periode er med. Målvurderingen omregner perioden til et månedligt niveau, så den kan sammenlignes med hvad målet kræver pr. måned.</p>`:
+    `<div class="empty-state"><h3>Ingen posteringer i perioden</h3><p>Der er ingen posteringer mellem ${esc(period)}. Vælg en anden periode for at analysere andre datoer.</p></div>`;
 }
 async function loadSavings(){
-  const generation=++savingsGeneration, scope=savingsScope();
+  const generation=++savingsGeneration;
+  let scope;
+  try{scope=savingsScope();}catch(error){showError('savingsError',error.message);return;}
   savingsLoadedScope='';savingsGoals=[];
   $('savingsList').innerHTML='<p class="muted">Henter opsparingsmål …</p>';
   showError('savingsError','');
@@ -125,6 +151,10 @@ function openSavings(goal=null){
   updateSavingsAccountMode();
   showError('savingsFormError','');$('savingsDialog').showModal();$('savingsName').focus();
 }
+$('savingsPeriodForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  await loadSavings();
+});
 $('savingsAccount').addEventListener('change',updateSavingsAccountMode);
 
 window.renderFeaturedGoal=function(goal){

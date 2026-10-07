@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from math import ceil
 
 from db import connect
@@ -142,6 +142,128 @@ def _profile(db, source, currency, today):
     }
 
 
+
+def _month_equivalent(start_date, end_date):
+    cursor = start_date.replace(day=1)
+    total = 0.0
+    while cursor <= end_date:
+        if cursor.month == 12:
+            next_month = cursor.replace(year=cursor.year + 1, month=1, day=1)
+        else:
+            next_month = cursor.replace(month=cursor.month + 1, day=1)
+        month_end = next_month - timedelta(days=1)
+        overlap_start = max(start_date, cursor)
+        overlap_end = min(end_date, month_end)
+        if overlap_start <= overlap_end:
+            overlap_days = (overlap_end - overlap_start).days + 1
+            month_days = (month_end - cursor).days + 1
+            total += overlap_days / month_days
+        cursor = next_month
+    return max(total, 1 / 31)
+
+
+def _period_profile(db, source, currency, start_date, end_date):
+    start_iso = start_date.isoformat()
+    end_iso = end_date.isoformat()
+    period_days = (end_date - start_date).days + 1
+    month_equivalent = _month_equivalent(start_date, end_date)
+
+    monthly_rows = list(db.execute(
+        '''SELECT substr(t.booked_on,1,7) month,
+                  SUM(CASE WHEN t.amount>0 AND t.category!='Overførsler' THEN t.amount ELSE 0 END) income,
+                  SUM(CASE WHEN t.amount<0 AND t.category!='Overførsler' THEN -t.amount ELSE 0 END) expenses
+           FROM transactions t JOIN accounts a ON a.id=t.account_id
+           WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=?
+             AND t.booked_on BETWEEN ? AND ?
+           GROUP BY 1 ORDER BY 1''',
+        (source, currency, start_iso, end_iso)))
+
+    total_income = sum(int(row['income'] or 0) for row in monthly_rows)
+    total_expenses = sum(int(row['expenses'] or 0) for row in monthly_rows)
+    total_available = total_income - total_expenses
+
+    category_spend = defaultdict(int)
+    merchant_spend = defaultdict(lambda: {'total': 0, 'count': 0, 'months': set(), 'categories': defaultdict(int)})
+    for row in db.execute(
+        '''SELECT substr(t.booked_on,1,7) month,t.amount,t.category,t.merchant
+           FROM transactions t JOIN accounts a ON a.id=t.account_id
+           WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=?
+             AND t.amount<0 AND t.category!='Overførsler'
+             AND t.booked_on BETWEEN ? AND ?''',
+        (source, currency, start_iso, end_iso)):
+        spend = -row['amount']
+        category_spend[row['category']] += spend
+        merchant = (row['merchant'] or '').strip()
+        if merchant:
+            item = merchant_spend[merchant]
+            item['total'] += spend
+            item['count'] += 1
+            item['months'].add(row['month'])
+            item['categories'][row['category']] += spend
+
+    categories = [{
+        'name': name,
+        'monthly_average': int(round(total / month_equivalent)),
+        'total': total,
+    } for name, total in category_spend.items()]
+    categories.sort(key=lambda item: item['total'], reverse=True)
+
+    merchants = []
+    merchant_by_category = defaultdict(int)
+    for name, item in merchant_spend.items():
+        category = max(item['categories'], key=item['categories'].get)
+        monthly_average = int(round(item['total'] / month_equivalent))
+        merchant_by_category[category] += monthly_average
+        merchants.append({
+            'name': name,
+            'category': category,
+            'monthly_average': monthly_average,
+            'total': item['total'],
+            'purchases': item['count'],
+            'active_months': len(item['months']),
+        })
+    merchants.sort(key=lambda item: item['total'], reverse=True)
+
+    opportunities = []
+    for merchant in merchants:
+        rate = FLEX_RATES.get(merchant['category'], 0)
+        saving = int(round(merchant['monthly_average'] * rate))
+        if saving >= 2500:
+            opportunities.append({
+                'type': 'merchant', 'name': merchant['name'], 'category': merchant['category'],
+                'monthly_average': merchant['monthly_average'], 'suggested_cut': saving,
+                'yearly_effect': saving * 12, 'purchases': merchant['purchases'],
+            })
+
+    for category in categories:
+        rate = FLEX_RATES.get(category['name'], 0)
+        unattributed = max(0, category['monthly_average'] - merchant_by_category[category['name']])
+        saving = int(round(unattributed * rate))
+        if saving >= 2500:
+            opportunities.append({
+                'type': 'category', 'name': f'Øvrigt i {category["name"]}', 'category': category['name'],
+                'monthly_average': unattributed, 'suggested_cut': saving,
+                'yearly_effect': saving * 12,
+            })
+    opportunities.sort(key=lambda item: item['suggested_cut'], reverse=True)
+
+    return {
+        'period_start': start_iso,
+        'period_end': end_iso,
+        'period_days': period_days,
+        'months': [row['month'] for row in monthly_rows],
+        'months_analyzed': len(monthly_rows),
+        'total_income': total_income,
+        'total_expenses': total_expenses,
+        'total_available': total_available,
+        'average_income': int(round(total_income / month_equivalent)),
+        'average_expenses': int(round(total_expenses / month_equivalent)),
+        'average_available': int(round(total_available / month_equivalent)),
+        'categories': categories,
+        'merchants': merchants,
+        'opportunities': opportunities[:10],
+    }
+
 def _goal_analysis(goal, profile, today):
     target = int(goal['target_amount'])
     saved = int(goal.get('saved_amount') or 0)
@@ -212,10 +334,12 @@ def _goal_analysis(goal, profile, today):
     }
 
 
-def build_insights(db_path, source, currency, today=None):
+def build_insights(db_path, source, currency, today=None, period_start=None, period_end=None):
     today = today or date.today()
     with connect(db_path) as db:
-        profile = _profile(db, source, currency, today)
+        profile = (_period_profile(db, source, currency, period_start, period_end)
+                   if period_start is not None and period_end is not None
+                   else _profile(db, source, currency, today))
         goals = [dict(row) for row in db.execute(
             '''SELECT g.id,g.name,g.target_amount,g.saved_amount,substr(g.deadline,1,7) deadline,
                       g.currency,g.featured,g.account_id,

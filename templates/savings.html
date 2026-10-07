@@ -1,6 +1,11 @@
 <section class="panel savings-panel" data-section="savings" hidden>
   <div class="section-heading"><div><h2>Dine mål og dit råderum</h2><p>Se hvad dine mål kræver, og hvor pengene faktisk går hen.</p></div><button type="button" class="button primary" id="newSavingsGoal"><svg><use href="#icon-plus"/></svg>Nyt mål</button></div>
-  <p class="small muted">FjordBudget sammenholder dine seneste måneders indtægter og udgifter med hvert mål. Overførsler mellem egne konti tæller ikke som forbrug. Besparelsesforslag er muligheder, ikke krav.</p>
+  <p class="small muted">Vælg selv perioden analysen skal bruge. Som udgangspunkt vises hele sidste måned. Overførsler mellem egne konti tæller ikke som forbrug.</p>
+  <form id="savingsPeriodForm" class="savings-period-form">
+    <label><span>Fra</span><input id="savingsPeriodFrom" type="date" required></label>
+    <label><span>Til</span><input id="savingsPeriodTo" type="date" required></label>
+    <button class="button quiet" type="submit">Vis periode</button>
+  </form>
   <div id="savingsProfile" class="savings-profile" aria-live="polite"></div>
   <div id="savingsError" class="error-box" role="alert" hidden></div>
   <div id="savingsList" class="savings-grid" aria-live="polite"></div>
