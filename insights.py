@@ -1,8 +1,9 @@
 from collections import defaultdict
 from datetime import date, timedelta
 from math import ceil
+import re
 
-from db import connect
+from db import connect, transaction_title
 
 
 FLEX_RATES = {
@@ -13,6 +14,10 @@ FLEX_RATES = {
     'Transport': 0.08,
     'Andet': 0.10,
 }
+
+
+def _merchant_key(value):
+    return re.sub(r"[\s'’`´.\-]+", '', transaction_title(value))
 
 
 def _month_number(value):
@@ -88,6 +93,10 @@ def _profile(db, source, currency, today):
     } for name, total in category_spend.items()]
     categories.sort(key=lambda item: item['monthly_average'], reverse=True)
 
+    merchant_preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
+        'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
+    merchant_preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
+        'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
     merchants = []
     merchant_by_category = defaultdict(int)
     for name, item in merchant_spend.items():
@@ -101,11 +110,14 @@ def _profile(db, source, currency, today):
             'total': item['total'],
             'purchases': item['count'],
             'active_months': len(item['months']),
+            'adjustable': merchant_preferences.get(_merchant_key(name), True),
         })
     merchants.sort(key=lambda item: item['monthly_average'], reverse=True)
 
     opportunities = []
     for merchant in merchants:
+        if not merchant['adjustable']:
+            continue
         rate = FLEX_RATES.get(merchant['category'], 0)
         saving = int(round(merchant['monthly_average'] * rate))
         if saving >= 2500:
@@ -221,11 +233,14 @@ def _period_profile(db, source, currency, start_date, end_date):
             'total': item['total'],
             'purchases': item['count'],
             'active_months': len(item['months']),
+            'adjustable': merchant_preferences.get(_merchant_key(name), True),
         })
     merchants.sort(key=lambda item: item['total'], reverse=True)
 
     opportunities = []
     for merchant in merchants:
+        if not merchant['adjustable']:
+            continue
         rate = FLEX_RATES.get(merchant['category'], 0)
         saving = int(round(merchant['monthly_average'] * rate))
         if saving >= 2500:
