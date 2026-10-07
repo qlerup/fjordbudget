@@ -156,6 +156,8 @@ def create_app(config=None):
                                UNION ALL
                                SELECT merchant FROM merchant_rules WHERE source=?
                              ) GROUP BY merchant''', (source, source)).fetchall()
+        preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
+            'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
         merged = {}
         for row in rows:
             key = merchant_key(row['merchant'])
@@ -167,7 +169,9 @@ def create_app(config=None):
                 current['uses'] += uses
                 if uses > current['_best']:
                     current['name'], current['_best'] = row['merchant'], uses
-        items = [{'name': item['name'], 'uses': item['uses']} for item in merged.values()]
+        items = [{'name': item['name'], 'uses': item['uses'],
+                  'adjustable': preferences.get(key, True)}
+                 for key, item in merged.items()]
         return sorted(items, key=lambda item: (-item['uses'], item['name'].casefold()))
 
     def merchant_library_items(db, source):
@@ -175,13 +179,16 @@ def create_app(config=None):
             '''SELECT transaction_title(t.description) title,MIN(t.description) display_text
                FROM transactions t JOIN accounts a ON a.id=t.account_id
                WHERE a.source=? GROUP BY transaction_title(t.description)''', (source,))}
+        preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
+            'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
         grouped = {}
 
         def ensure(name, weight=0):
             key = merchant_key(name)
             item = grouped.get(key)
             if item is None:
-                item = {'name': name, 'transactions': 0, 'rules': [], '_best': weight}
+                item = {'name': name, 'transactions': 0, 'rules': [], '_best': weight,
+                        'adjustable': preferences.get(key, True)}
                 grouped[key] = item
             elif weight > item['_best']:
                 item['name'], item['_best'] = name, weight
@@ -250,6 +257,7 @@ def create_app(config=None):
                 db.execute('DELETE FROM merchant_rules WHERE source=? AND title=?', (source, row['title']))
             for row in transactions:
                 db.execute('UPDATE transactions SET merchant=NULL,merchant_manual=0 WHERE id=?', (row['id'],))
+            db.execute('DELETE FROM merchant_preferences WHERE source=? AND merchant_key=?', (source, target))
         return jsonify(ok=True, deleted_rules=len(rules), cleared_transactions=len(transactions))
 
     @app.route('/api/categories', methods=['GET', 'POST', 'PATCH', 'DELETE'])
@@ -625,10 +633,13 @@ def create_app(config=None):
         body = request.get_json(silent=True)
         merchant = body.get('merchant') if isinstance(body, dict) else None
         remember = body.get('remember', True) if isinstance(body, dict) else True
+        adjustable = body.get('adjustable') if isinstance(body, dict) and 'adjustable' in body else None
         if not isinstance(merchant, str) or len(merchant.strip()) > 100 or any(ord(c) < 32 for c in merchant):
             raise ValueError('Forhandlernavnet skal være på højst 100 tegn uden linjeskift.')
         if type(remember) is not bool:
             raise ValueError('Ugyldigt valg for huskeregel.')
+        if adjustable is not None and type(adjustable) is not bool:
+            raise ValueError('Ugyldigt valg for fast udgift.')
         merchant = merchant.strip() or None
         with connect(db_path) as db:
             db.execute('BEGIN IMMEDIATE')
@@ -643,6 +654,12 @@ def create_app(config=None):
                 canonical = next((item['name'] for item in merchant_items(db, row['source'])
                                   if merchant_key(item['name']) == key), None)
                 merchant = canonical or merchant
+                if adjustable is not None:
+                    db.execute('''INSERT INTO merchant_preferences(source,merchant_key,name,adjustable)
+                                  VALUES (?,?,?,?)
+                                  ON CONFLICT(source,merchant_key) DO UPDATE SET
+                                    name=excluded.name,adjustable=excluded.adjustable''',
+                               (row['source'], key, merchant, int(adjustable)))
             if remember:
                 if merchant:
                     db.execute('''INSERT INTO merchant_rules(source,title,merchant) VALUES (?,?,?)
