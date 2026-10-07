@@ -76,8 +76,15 @@ class EnableBanking:
     def banks(self):
         return self.request('GET', '/aspsps', params={'country': 'DK'}).get('aspsps', [])
 
-    def transactions(self, uid, start, end):
-        params = {'date_from': start, 'date_to': end, 'transaction_status': 'BOOK'}
+    def transactions(self, uid, start=None, end=None, strategy='default'):
+        params = {'transaction_status': 'BOOK'}
+        if strategy == 'longest':
+            params['strategy'] = 'longest'
+        else:
+            if start:
+                params['date_from'] = start
+            if end:
+                params['date_to'] = end
         items, seen = [], set()
         for _ in range(200):
             page = self.request('GET', f'/accounts/{quote(uid, safe="")}/transactions', params=dict(params))
@@ -187,7 +194,12 @@ def sync_all(db_path, provider, cipher, progress):
         if has_connections:
             raise BankError('Vælg mindst én konto under Administrer konti, før du synkroniserer.')
         raise BankError('Forbind en bank, før du synkroniserer.')
+
     errors = []
+    history_dates = []
+    history_accounts = 0
+    history_transactions = 0
+
     for i, account in enumerate(accounts):
         progress(f'Henter konto {i+1} af {len(accounts)} …')
         try:
@@ -196,13 +208,49 @@ def sync_all(db_path, provider, cipher, progress):
             uid = cipher.decrypt(account['remote_id'].encode()).decode()
             balances = provider.request('GET', f'/accounts/{quote(uid, safe="")}/balances').get('balances', [])
             today = date.today()
-            items = provider.transactions(uid, (today-timedelta(days=90)).isoformat(), today.isoformat())
-            import_account(db_path, account['id'], items, balances)
+            fetch_longest = account.get('history_connection_id') != account.get('connection_id')
+
+            if fetch_longest:
+                progress(f'Henter længst mulige historik for konto {i+1} af {len(accounts)} …')
+                items = provider.transactions(uid, strategy='longest')
+            else:
+                items = provider.transactions(uid, (today-timedelta(days=90)).isoformat(), today.isoformat())
+
+            imported = import_account(db_path, account['id'], items, balances)
+
+            if fetch_longest:
+                history_accounts += 1
+                history_transactions += imported
+                for item in items:
+                    if item.get('status') != 'BOOK':
+                        continue
+                    value = item.get('booking_date') or item.get('value_date') or item.get('transaction_date')
+                    if value:
+                        history_dates.append(date.fromisoformat(value))
+
             details = provider.request('GET', f'/accounts/{quote(uid, safe="")}/details')
             with connect(db_path) as db:
-                db.execute('UPDATE accounts SET name=? WHERE id=?', (account_name(details), account['id']))
+                if fetch_longest:
+                    db.execute('UPDATE accounts SET name=?,history_connection_id=? WHERE id=?',
+                               (account_name(details), account['connection_id'], account['id']))
+                else:
+                    db.execute('UPDATE accounts SET name=? WHERE id=?', (account_name(details), account['id']))
         except (BankError, ValueError, KeyError) as error:
             errors.append(f'{account["name"]}: {str(error) if isinstance(error, BankError) else "Uventet dataformat fra banken."}')
+
     if errors:
         raise BankError(' '.join(errors))
-    return f'{len(accounts)} konti opdateret. Seneste 90 dages bogførte posteringer hentet.'
+
+    history = None
+    if history_accounts:
+        history = {
+            'accounts': history_accounts,
+            'transactions': history_transactions,
+            'earliest_date': min(history_dates).isoformat() if history_dates else None,
+            'latest_date': max(history_dates).isoformat() if history_dates else None,
+        }
+        message = f'{len(accounts)} konti opdateret. Længst tilgængelige historik er hentet.'
+    else:
+        message = f'{len(accounts)} konti opdateret. Seneste 90 dages bogførte posteringer hentet.'
+
+    return {'message': message, 'history': history}
