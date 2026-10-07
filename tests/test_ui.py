@@ -199,6 +199,14 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#appContent')).to_be_visible()
         expect(self.page.locator('#accountSetupDialog')).not_to_be_visible()
 
+    def test_longest_history_popup_shows_oldest_date_and_count(self):
+        self.page.evaluate("showHistoryImport({accounts:1,transactions:42,earliest_date:'2024-01-15',latest_date:'2026-10-07'})")
+        expect(self.page.locator('#historyImportDialog')).to_be_visible()
+        expect(self.page.locator('#historyImportText')).to_contain_text('15. januar 2024')
+        expect(self.page.locator('#historyImportDetail')).to_contain_text('42 bogførte posteringer')
+        self.page.get_by_role('button',name='Fortsæt',exact=True).click()
+        expect(self.page.locator('#historyImportDialog')).not_to_be_visible()
+
     def test_last_sync_timestamp_is_shown_below_refresh_button(self):
         data=self.app.test_client().get('/api/dashboard?source=demo').json
         data['has_bank_connections']=False
