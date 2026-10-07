@@ -6,14 +6,7 @@ import re
 from db import connect, transaction_title
 
 
-FLEX_RATES = {
-    'Fritid': 0.30,
-    'Shopping': 0.30,
-    'Abonnementer': 0.20,
-    'Mad & indkøb': 0.12,
-    'Transport': 0.08,
-    'Andet': 0.10,
-}
+MERCHANT_SAVINGS_RATE = 0.10
 
 
 def _merchant_key(value):
@@ -96,11 +89,9 @@ def _profile(db, source, currency, today):
     merchant_preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
         'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
     merchants = []
-    merchant_by_category = defaultdict(int)
     for name, item in merchant_spend.items():
         category = max(item['categories'], key=item['categories'].get)
         monthly_average = int(round(item['total'] / month_count))
-        merchant_by_category[category] += monthly_average
         merchants.append({
             'name': name,
             'category': category,
@@ -116,8 +107,7 @@ def _profile(db, source, currency, today):
     for merchant in merchants:
         if not merchant['adjustable']:
             continue
-        rate = FLEX_RATES.get(merchant['category'], 0)
-        saving = int(round(merchant['monthly_average'] * rate))
+        saving = int(round(merchant['monthly_average'] * MERCHANT_SAVINGS_RATE))
         if saving >= 2500:
             opportunities.append({
                 'type': 'merchant', 'name': merchant['name'], 'category': merchant['category'],
@@ -125,16 +115,6 @@ def _profile(db, source, currency, today):
                 'yearly_effect': saving * 12, 'purchases': merchant['purchases'],
             })
 
-    for category in categories:
-        rate = FLEX_RATES.get(category['name'], 0)
-        unattributed = max(0, category['monthly_average'] - merchant_by_category[category['name']])
-        saving = int(round(unattributed * rate))
-        if saving >= 2500:
-            opportunities.append({
-                'type': 'category', 'name': f'Øvrigt i {category["name"]}', 'category': category['name'],
-                'monthly_average': unattributed, 'suggested_cut': saving,
-                'yearly_effect': saving * 12,
-            })
     opportunities.sort(key=lambda item: item['suggested_cut'], reverse=True)
 
     incomes = [monthly[month]['income'] for month in months]
@@ -221,11 +201,9 @@ def _period_profile(db, source, currency, start_date, end_date):
     merchant_preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
         'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
     merchants = []
-    merchant_by_category = defaultdict(int)
     for name, item in merchant_spend.items():
         category = max(item['categories'], key=item['categories'].get)
         monthly_average = int(round(item['total'] / month_equivalent))
-        merchant_by_category[category] += monthly_average
         merchants.append({
             'name': name,
             'category': category,
@@ -241,8 +219,7 @@ def _period_profile(db, source, currency, start_date, end_date):
     for merchant in merchants:
         if not merchant['adjustable']:
             continue
-        rate = FLEX_RATES.get(merchant['category'], 0)
-        saving = int(round(merchant['monthly_average'] * rate))
+        saving = int(round(merchant['monthly_average'] * MERCHANT_SAVINGS_RATE))
         if saving >= 2500:
             opportunities.append({
                 'type': 'merchant', 'name': merchant['name'], 'category': merchant['category'],
@@ -250,16 +227,6 @@ def _period_profile(db, source, currency, start_date, end_date):
                 'yearly_effect': saving * 12, 'purchases': merchant['purchases'],
             })
 
-    for category in categories:
-        rate = FLEX_RATES.get(category['name'], 0)
-        unattributed = max(0, category['monthly_average'] - merchant_by_category[category['name']])
-        saving = int(round(unattributed * rate))
-        if saving >= 2500:
-            opportunities.append({
-                'type': 'category', 'name': f'Øvrigt i {category["name"]}', 'category': category['name'],
-                'monthly_average': unattributed, 'suggested_cut': saving,
-                'yearly_effect': saving * 12,
-            })
     opportunities.sort(key=lambda item: item['suggested_cut'], reverse=True)
 
     return {
