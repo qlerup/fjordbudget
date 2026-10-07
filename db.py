@@ -63,7 +63,8 @@ def initialize(path):
           name TEXT NOT NULL, bank TEXT NOT NULL, last4 TEXT NOT NULL,
           currency TEXT NOT NULL, balance INTEGER, balance_type TEXT, synced_at TEXT,
           included INTEGER NOT NULL DEFAULT 1 CHECK(included IN (0,1)),
-          selection_pending INTEGER NOT NULL DEFAULT 0 CHECK(selection_pending IN (0,1)));
+          selection_pending INTEGER NOT NULL DEFAULT 0 CHECK(selection_pending IN (0,1)),
+          history_connection_id TEXT);
         CREATE TABLE IF NOT EXISTS transactions (
           id INTEGER PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id),
           external_id TEXT NOT NULL, booked_on TEXT NOT NULL, description TEXT NOT NULL,
@@ -126,6 +127,8 @@ def initialize(path):
             db.execute('ALTER TABLE accounts ADD COLUMN included INTEGER NOT NULL DEFAULT 1')
         if 'selection_pending' not in account_columns:
             db.execute('ALTER TABLE accounts ADD COLUMN selection_pending INTEGER NOT NULL DEFAULT 0')
+        if 'history_connection_id' not in account_columns:
+            db.execute('ALTER TABLE accounts ADD COLUMN history_connection_id TEXT')
         transaction_columns = {row[1] for row in db.execute('PRAGMA table_info(transactions)')}
         if 'merchant' not in transaction_columns:
             db.execute('ALTER TABLE transactions ADD COLUMN merchant TEXT')
