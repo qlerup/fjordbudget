@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import create_app
+from db import connect
 from playwright.sync_api import sync_playwright, expect
 from werkzeug.serving import make_server
 
@@ -310,6 +311,7 @@ class UITests(unittest.TestCase):
         self.page.reload()
         self.page.locator('#month').fill(month)
         self.page.locator('#month').dispatch_event('change')
+        self.page.locator('.nav-item[data-view="transactions"]').click()
         self.page.locator('#search').fill('Netto')
         expect(self.page.locator('#transactionRows .category-picker-button').first).to_contain_text('Fritid')
 
@@ -317,6 +319,7 @@ class UITests(unittest.TestCase):
         month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]
         self.page.locator('#month').fill(month)
         self.page.locator('#month').dispatch_event('change')
+        self.page.locator('.nav-item[data-view="transactions"]').click()
         self.page.locator('#search').fill('Til budgetkonto')
         row=self.page.locator('#transactionRows tr').first
         expect(row).to_be_visible()
@@ -346,6 +349,7 @@ class UITests(unittest.TestCase):
         month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]
         self.page.locator('#month').fill(month)
         self.page.locator('#month').dispatch_event('change')
+        self.page.locator('.nav-item[data-view="transactions"]').click()
         self.page.locator('#search').fill('Netto')
         row=self.page.locator('#transactionRows tr').first
         row.locator('.category-picker-button').click()
@@ -364,6 +368,7 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#appContent')).to_be_visible()
         self.page.locator('#month').fill(month)
         self.page.locator('#month').dispatch_event('change')
+        self.page.locator('.nav-item[data-view="transactions"]').click()
         self.page.locator('#search').fill('Netto')
         expect(self.page.locator('#transactionRows .category-picker-button').first).to_contain_text('Børn test')
         categories=self.app.test_client().get('/api/categories').json['items']
@@ -374,6 +379,7 @@ class UITests(unittest.TestCase):
         month=self.app.test_client().get('/api/dashboard?source=demo').json['months'][1]
         self.page.locator('#month').fill(month)
         self.page.locator('#month').dispatch_event('change')
+        self.page.locator('.nav-item[data-view="transactions"]').click()
         self.page.locator('#search').fill('Netto')
         row=self.page.locator('#transactionRows tr').first
         row.locator('.merchant-picker-button').click()
@@ -458,7 +464,7 @@ class UITests(unittest.TestCase):
         self.assertLessEqual(self.page.locator('#budgetDialog').bounding_box()['width'],390)
         self.page.keyboard.press('Escape')
         self.page.locator('.nav-item[data-view="transactions"]').click()
-        expect(self.page.locator('.transactions-panel')).to_be_visible()
+        expect(self.page.locator('[data-section="transactions"]')).to_be_visible()
         self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
         self.assertEqual(self.page.locator('#search').evaluate("el=>getComputedStyle(el).fontSize"),'16px')
         self.assertEqual(self.page.locator('#accountFilter').evaluate("el=>getComputedStyle(el).fontSize"),'16px')
