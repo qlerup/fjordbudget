@@ -58,6 +58,13 @@
         <article class="summary-card"><div class="summary-top">Udgifter <span class="metric-icon expense">↗</span></div><div class="metric" id="expenses">—</div><div class="metric-footer">Bogførte udgifter denne måned</div></article>
         <article class="summary-card"><div class="summary-top">Tilbage i budgettet <span class="metric-icon budget-icon">◷</span></div><div class="metric" id="remaining">—</div><div class="metric-footer" id="remainingNote">Af dit månedsbudget</div></article>
       </section>
+      <section class="overview-task-row" data-section="attention">
+        <button id="incompleteTransactionsCard" class="incomplete-transactions-card" type="button" aria-haspopup="dialog" aria-controls="incompleteTransactionsDialog">
+          <span class="incomplete-card-icon" aria-hidden="true">!</span>
+          <span class="incomplete-card-copy"><small>IKKE UDFYLDTE POSTERINGER</small><strong id="incompleteTransactionsCount">0</strong><span id="incompleteTransactionsText">Alt er udfyldt denne måned</span></span>
+          <svg class="incomplete-card-chevron" aria-hidden="true"><use href="#icon-chevron"/></svg>
+        </button>
+      </section>
       <section id="featuredGoalPanel" class="panel featured-goal-panel" data-section="insights" hidden aria-live="polite"></section>
       <section class="accounts-section" data-section="accounts"><div class="section-heading"><div><h2>Mine konti <span class="count" id="accountsLabel">0</span></h2><p>Saldo lige nu, uanset valgt måned</p></div><div class="account-heading-actions"><button id="manageAccountsButton" class="button quiet" type="button"><svg><use href="#icon-grid"/></svg>Administrer konti</button><button id="syncButton" class="button quiet"><svg><use href="#icon-refresh"/></svg>Opdater saldi</button></div></div><div id="accounts" class="accounts-grid"></div><p id="syncMessage" class="sync-status" role="status"></p></section>
       <div class="insights" data-section="insights">
@@ -87,6 +94,17 @@
     <footer class="main-footer"><span>fjordbudget <span>·</span> Plads til det, der betyder noget.</span><span>Dine data gemmes lokalt</span></footer>
   </div>
 </main>
+<dialog id="incompleteTransactionsDialog" class="incomplete-transactions-dialog" aria-labelledby="incompleteTransactionsTitle">
+  <div class="dialog-header"><div><p class="eyebrow">MANGLER OPLYSNINGER</p><h2 id="incompleteTransactionsTitle">Posteringer der mangler</h2></div><button type="button" class="icon-button" data-close="incompleteTransactionsDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+  <p class="dialog-intro">Udfyld kategori og eventuelt forhandler. Når en postering er færdig, forsvinder den automatisk fra denne liste.</p>
+  <div id="incompleteTransactionsError" class="error-box" role="alert" hidden></div>
+  <div class="transactions-panel incomplete-dialog-transactions">
+    <div class="table-scroll"><table><thead><tr><th>Postering</th><th>Konto</th><th>Kategori</th><th>Forhandler</th><th>Dato</th><th class="amount-cell">Beløb</th></tr></thead><tbody id="incompleteTransactionRows"></tbody></table></div>
+    <div id="incompleteTransactionsEmpty" class="empty-state" hidden><svg><use href="#icon-grid"/></svg><h3>Alt er udfyldt</h3><p>Der er ingen posteringer, der mangler oplysninger i den valgte måned.</p></div>
+    <p id="incompleteTransactionsModalCount" class="small muted"></p>
+  </div>
+  <div class="dialog-actions"><button type="button" class="button quiet" data-close="incompleteTransactionsDialog">Luk</button><button id="viewAllTransactions" type="button" class="button primary">Se alle posteringer</button></div>
+</dialog>
 <dialog id="bankDialog" aria-labelledby="bankTitle"><div class="dialog-header"><div class="dialog-icon"><svg><use href="#icon-bank"/></svg></div><button class="icon-button" data-close="bankDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div><p class="eyebrow">DIT OVERBLIK STARTER HER</p><h2 id="bankTitle">Forbind din bank</h2><p class="dialog-intro">Se dine konti og posteringer ét sted. Du giver kun adgang til at læse dine bankdata.</p><div class="permission-box"><svg><use href="#icon-shield"/></svg><div><strong>Kun konti, saldi og posteringer</strong><span>FjordBudget kan ikke betale, overføre penge eller ændre noget i banken. Godkendelse foregår hos banken.</span></div></div><div id="bankSetup" hidden><h3>Bankforbindelsen skal sættes op én gang</h3><p>FjordBudget bruger Enable Banking til at hente bankdata. Du skal have et app-id og en privat API-nøgle fra tjenesten.</p><ol class="setup-steps"><li><strong>Opret en API-applikation</strong><span>Åbn <a href="https://enablebanking.com/cp/applications" target="_blank" rel="noreferrer">Enable Banking ↗</a>. Vælg Sandbox til test eller Production til dine egne konti.</span></li><li><strong>Registrer denne returadresse</strong><code id="callbackUrl"></code><span>Brug appens valgte adresse gennem hele bankgodkendelsen.</span></li><li><strong>Aktivér adgang til dine egne konti</strong><span>Ved Production skal egne konti først tilknyttes applikationen hos Enable Banking.</span></li></ol><p>Oplysninger om appen: <a href="/privacy" target="_blank" rel="noreferrer">Privatlivspolitik</a> · <a href="/terms" target="_blank" rel="noreferrer">Brugsvilkår</a>.</p><p>Privacy URL: <code id="privacyUrl"></code><br>Terms URL: <code id="termsUrl"></code></p><form id="bankCredentialsForm" autocomplete="off">
 <label for="bankAppId">App-id</label><input id="bankAppId" name="app_id" type="text" required maxlength="36" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false" autocapitalize="none">
 <label for="bankPrivateKey">Privat API-nøgle (secret / PEM)</label><textarea id="bankPrivateKey" name="private_key" required rows="5" maxlength="12000" spellcheck="false" autocapitalize="none" autocomplete="off" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>

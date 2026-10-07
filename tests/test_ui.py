@@ -5,6 +5,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -415,6 +416,36 @@ class UITests(unittest.TestCase):
         self.page.locator('[data-connect]').first.click()
         expect(self.page.locator('#bankSetup')).to_be_visible()
         expect(self.page.locator('.permission-box')).to_contain_text('kan ikke betale')
+
+    def test_overview_uses_incomplete_card_and_transactions_live_in_menu(self):
+        with connect(self.app.extensions['db_path']) as db:
+            db.execute("""INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                          VALUES ('demo-daily','overview-missing',?,'Overview missing test',-1234,'DKK','Andet')""",
+                       (date.today().isoformat(),))
+        self.page.reload()
+        expect(self.page.locator('#appContent')).to_be_visible()
+        expect(self.page.locator('[data-section="transactions"]')).not_to_be_visible()
+        card=self.page.locator('#incompleteTransactionsCard')
+        expect(card).to_be_visible()
+        before=int(self.page.locator('#incompleteTransactionsCount').inner_text())
+        self.assertGreaterEqual(before,1)
+
+        card.click()
+        expect(self.page.locator('#incompleteTransactionsDialog')).to_be_visible()
+        modal_row=self.page.locator('#incompleteTransactionRows tr').filter(has_text='Overview missing test')
+        expect(modal_row).to_be_visible()
+        modal_row.locator('.merchant-picker-button').click()
+        expect(self.page.locator('#merchantDialog')).to_be_visible()
+        self.page.locator('#merchantName').fill('Overview Merchant')
+        self.page.locator('#saveMerchant').click()
+        expect(self.page.locator('#merchantDialog')).not_to_be_visible()
+        expect(self.page.locator('#incompleteTransactionRows tr').filter(has_text='Overview missing test')).to_have_count(0)
+        expect(self.page.locator('#incompleteTransactionsCount')).to_have_text(str(before-1))
+
+        self.page.locator('#viewAllTransactions').click()
+        expect(self.page.locator('#incompleteTransactionsDialog')).not_to_be_visible()
+        expect(self.page.locator('[data-section="transactions"]')).to_be_visible()
+        expect(self.page.locator('#transactionRows')).to_contain_text('Overview missing test')
 
     def test_mobile_layout_dialog_and_navigation(self):
         self.page.set_viewport_size({'width':390,'height':844})

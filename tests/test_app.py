@@ -322,6 +322,27 @@ class AppTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM transactions WHERE description='Coffee'").fetchone()[0],3)
 
+    def test_incomplete_transaction_count_and_filter_follow_merchant_requirement(self):
+        with connect(self.db) as db:
+            db.execute("INSERT INTO accounts(id,source,name,bank,last4,currency,included,selection_pending) VALUES ('missing-live','live','Test','Bank','9999','DKK',1,0)")
+            rows=[
+                ('missing-one','Missing merchant',-1000,'DKK','Andet',None),
+                ('complete-one','Complete merchant',-2000,'DKK','Andet','Shop'),
+                ('transfer-one','Transfer',-3000,'DKK','Overførsler',None),
+                ('income-one','Income',4000,'DKK','Andet',None),
+            ]
+            for ref,description,amount,currency,category,merchant in rows:
+                db.execute("""INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,merchant)
+                              VALUES ('missing-live',?,?,?,?,?,?,?)""",
+                           (ref,self.month+'-01',description,amount,currency,category,merchant))
+        dashboard=self.client.get('/api/dashboard?source=live&month='+self.month).json
+        self.assertEqual(dashboard['incomplete_transactions'],1)
+        missing=self.client.get('/api/transactions?source=live&month='+self.month+'&missing=1&per_page=200').json
+        self.assertEqual(missing['total'],1)
+        self.assertEqual(missing['items'][0]['description'],'Missing merchant')
+        all_rows=self.client.get('/api/transactions?source=live&month='+self.month).json
+        self.assertEqual(all_rows['total'],4)
+
     def test_transaction_exposes_category_merchant_requirement(self):
         with connect(self.db) as db:
             tid=db.execute("SELECT id FROM transactions WHERE account_id='demo-daily' AND category='Indkomst' LIMIT 1").fetchone()[0]

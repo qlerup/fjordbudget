@@ -451,7 +451,8 @@ def create_app(config=None):
             accounts = [dict(r) for r in db.execute('''SELECT id,COALESCE(custom_name,name) name,custom_name,bank,last4,currency,balance,balance_type,synced_at
                                                         FROM accounts WHERE source=? AND included=1 AND selection_pending=0 ORDER BY rowid''', (source,))]
             hidden_account_count = db.execute('SELECT count(*) FROM accounts WHERE source=? AND (included=0 OR selection_pending=1)', (source,)).fetchone()[0]
-            rows = db.execute('''SELECT t.category,t.amount,c.budget_category FROM transactions t LEFT JOIN categories c ON c.name=t.category JOIN accounts a ON a.id=t.account_id
+            rows = db.execute('''SELECT t.category,t.amount,t.merchant,c.budget_category,COALESCE(c.requires_merchant,1) requires_merchant
+                                 FROM transactions t LEFT JOIN categories c ON c.name=t.category JOIN accounts a ON a.id=t.account_id
                                  WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7)=?''', (source, currency, month)).fetchall()
             budgets = {r['category']: r['amount'] for r in db.execute('SELECT category,amount FROM budgets WHERE source=? AND month=? AND currency=?', (source, month, currency))}
             months = [r[0] for r in db.execute('''SELECT DISTINCT substr(t.booked_on,1,7) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE a.source=? AND a.included=1 AND a.selection_pending=0 ORDER BY 1 DESC''', (source,))]
@@ -467,20 +468,29 @@ def create_app(config=None):
         categories = [{'name': cat['name'], 'color': cat['color'], 'spent': -sum(r['amount'] for r in rows if r['budget_category'] == cat['name'] and r['amount'] < 0 and r['category'] != 'Overførsler'),
                        'budget': budgets.get(cat['name'], 0)} for cat in stored_budget_categories()]
         selected = [a for a in accounts if a['currency'] == currency]
+        incomplete_transactions = sum(
+            1 for row in rows
+            if row['amount'] < 0 and (
+                not str(row['category'] or '').strip()
+                or (bool(row['requires_merchant']) and not str(row['merchant'] or '').strip())
+            )
+        )
         goal_insights = build_insights(db_path, source, currency)
         return jsonify(has_bank_connections=has_bank_connections, accounts=accounts, connections=connections, income=income, expenses=expenses,
                        balance=sum(a['balance'] for a in selected if a['balance'] is not None), missing_balances=sum(a['balance'] is None for a in selected),
                        budget=sum(budgets.values()), budget_spent=sum(c['spent'] for c in categories), categories=categories, months=months,
                        history=list(reversed(history)), month=month, featured_goal=goal_insights['featured_goal'],
-                       hidden_account_count=hidden_account_count)
+                       hidden_account_count=hidden_account_count, incomplete_transactions=incomplete_transactions)
 
     @app.get('/api/transactions')
     def transactions():
         source, month, currency = parameters()
         page = max(1, min(int(request.args.get('page', '1')), 100000))
+        per_page = max(1, min(int(request.args.get('per_page', '30')), 200))
         account = request.args.get('account', '')
         query = request.args.get('q', '').strip()[:200]
         category = request.args.get('category', '')
+        missing = request.args.get('missing') == '1'
         conditions = ['a.source=?', 'a.included=1', 'a.selection_pending=0', 't.currency=?', 'substr(t.booked_on,1,7)=?']
         values = [source, currency, month]
         if account:
@@ -494,16 +504,24 @@ def create_app(config=None):
                 raise ValueError('Ukendt kategori.')
             conditions.append('t.category=?')
             values.append(category)
+        if missing:
+            conditions.append("""t.amount<0 AND (
+                trim(COALESCE(t.category,''))=''
+                OR (COALESCE(c.requires_merchant,1)=1 AND trim(COALESCE(t.merchant,''))='')
+            )""")
         where = ' AND '.join(conditions)
         with connect(db_path) as db:
-            total = db.execute('SELECT count(*) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE '+where, values).fetchone()[0]
+            total = db.execute('''SELECT count(*) FROM transactions t
+                                  JOIN accounts a ON a.id=t.account_id
+                                  LEFT JOIN categories c ON c.name=t.category
+                                  WHERE '''+where, values).fetchone()[0]
             rows = db.execute('''SELECT t.id,t.booked_on,t.description,t.amount,t.currency,t.category,t.category_manual,
                                         t.merchant,t.merchant_manual,COALESCE(c.requires_merchant,1) requires_merchant,
                                         COALESCE(a.custom_name,a.name) account
                                  FROM transactions t JOIN accounts a ON a.id=t.account_id
                                  LEFT JOIN categories c ON c.name=t.category
-                                 WHERE '''+where+' ORDER BY t.booked_on DESC,t.id DESC LIMIT 30 OFFSET ?', [*values, (page-1)*30]).fetchall()
-        return jsonify(items=[dict(r) for r in rows], total=total, page=page, pages=max(1, (total+29)//30))
+                                 WHERE '''+where+' ORDER BY t.booked_on DESC,t.id DESC LIMIT ? OFFSET ?', [*values, per_page, (page-1)*per_page]).fetchall()
+        return jsonify(items=[dict(r) for r in rows], total=total, page=page, pages=max(1, (total+per_page-1)//per_page))
 
     @app.get('/api/merchants')
     def merchants():

@@ -43,7 +43,7 @@ function setView(next) {
   const titles={savings:['Dine drømme, dine mål.','Planlæg det, du vil spare op til.','Opsparingsmål'],merchants:['Dine forhandlere.','Se og administrer de forhandlere og banktekster, FjordBudget har lært.','Forhandlere'],categories:['Dine kategorier.','Tilpas kategorier til din økonomi.','Kategorier'],overview:['Din økonomi, samlet.','Alle dine konti. Ét enkelt overblik.','Overblik'], accounts:['Alle konti. Helt enkelt.','Se din saldo, og gå på opdagelse i dine posteringer.','Mine konti'], transactions:['De små tal fortæller.','Find og kategorisér dine bogførte posteringer.','Posteringer'], budget:['Plads til dine planer.','Sæt et budget, der passer til din hverdag.','Mit budget']};
   $('pageTitle').textContent=titles[next][0]; $('pageSubtitle').textContent=titles[next][1]; $('breadcrumb').textContent=titles[next][2];
   document.querySelectorAll('.nav-item[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===next); b.setAttribute('aria-current',b.dataset.view===next?'page':'false');});
-  document.querySelectorAll('[data-section]').forEach(el=>{ const section=el.dataset.section; el.hidden=next==='overview'? ['budget','categories','savings','merchants'].includes(section) : next==='budget'?!['summary','budget'].includes(section):section!==next; });
+  document.querySelectorAll('[data-section]').forEach(el=>{ const section=el.dataset.section; el.hidden=next==='overview'? ['budget','categories','savings','merchants','transactions'].includes(section) : next==='budget'?!['summary','budget'].includes(section):section!==next; });
 }
 function switchSource(next) {
   source=config?.has_bank_connections?'live':next; localStorage.setItem('fjordbudget-source',source);
@@ -77,6 +77,10 @@ function renderDashboard() {
   $('remaining').textContent=d.budget?money(d.budget-d.budget_spent):'Intet budget';
   $('remaining').classList.toggle('negative',!!d.budget && d.budget_spent>d.budget);
   $('remainingNote').textContent=d.budget?'Af '+money(d.budget)+' planlagt':'Sæt dit første månedsbudget';
+  const incomplete=d.incomplete_transactions || 0;
+  $('incompleteTransactionsCount').textContent=incomplete;
+  $('incompleteTransactionsText').textContent=incomplete===0?'Alt er udfyldt denne måned':incomplete===1?'1 postering mangler oplysninger':`${incomplete} posteringer mangler oplysninger`;
+  $('incompleteTransactionsCard').classList.toggle('complete',incomplete===0);
   $('budgetProgress').innerHTML=`<div class="budget-progress-label"><strong>${esc(money(d.budget_spent))} brugt</strong><span>${d.budget?esc(money(d.budget))+' i budget':'Intet budget endnu'}</span></div><div class="progress"><div class="progress-fill ${d.budget&&d.budget_spent>d.budget?'over':''}" style="width:${d.budget?Math.min(100,d.budget_spent/d.budget*100):0}%"></div></div>`;
   $('budgetPreview').innerHTML=budgetRows(d.categories.slice(0,3)); $('budgetFull').innerHTML=d.categories.length?budgetRows(d.categories,true):'<p class="empty-state">Tilføj din første budgetkategori ovenfor.</p>';
   const max=Math.max(1,...d.history.flatMap(h=>[h.income,h.expenses]));
@@ -86,26 +90,42 @@ function renderDashboard() {
   window.renderFeaturedGoal?.(d.featured_goal);
   renderAccounts();
 }
+function transactionRow(t) {
+  const requiresMerchant=!(t.requires_merchant===0 || t.requires_merchant===false);
+  const display=requiresMerchant && t.merchant ? t.merchant : t.description;
+  const detail=requiresMerchant ? (t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler')) : '';
+  const subtitle=detail ? dateName(t.booked_on)+' · '+detail : dateName(t.booked_on);
+  const state=transactionState(t);
+  const categoryControl=`<button type="button" class="category-picker-button ${t.category?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category || 'Vælg kategori')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`;
+  const merchantControl=requiresMerchant?`<button type="button" class="merchant-picker-button ${t.merchant?'confirmed':''}" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}" aria-label="Forhandler for ${esc(t.description)}"><span>${esc(t.merchant || 'Vælg forhandler')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`:'';
+  return `<tr class="${state.className}" title="${esc(state.title)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span></span></div></td><td>${esc(t.account)}</td><td class="category-control-cell">${categoryControl}</td><td class="merchant-control-cell">${merchantControl}</td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
+}
 async function loadTransactions() {
   const generation=++transactionsGeneration;
   const data=await api('/api/transactions?'+query({page,account:$('accountFilter').value,q:$('search').value,category:$('categoryFilter').value}));
   if(generation!==transactionsGeneration)return;
   pages=data.pages;
-  $('transactionRows').innerHTML=data.items.map(t=>{
-    const requiresMerchant=!(t.requires_merchant===0 || t.requires_merchant===false);
-    const display=requiresMerchant && t.merchant ? t.merchant : t.description;
-    const detail=requiresMerchant ? (t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler')) : '';
-    const subtitle=detail ? dateName(t.booked_on)+' · '+detail : dateName(t.booked_on);
-    const state=transactionState(t);
-    const categoryControl=`<button type="button" class="category-picker-button ${t.category?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category || 'Vælg kategori')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`;
-    const merchantControl=requiresMerchant?`<button type="button" class="merchant-picker-button ${t.merchant?'confirmed':''}" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}" aria-label="Forhandler for ${esc(t.description)}"><span>${esc(t.merchant || 'Vælg forhandler')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`:'';
-    return `<tr class="${state.className}" title="${esc(state.title)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span></span></div></td><td>${esc(t.account)}</td><td class="category-control-cell">${categoryControl}</td><td class="merchant-control-cell">${merchantControl}</td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
-  }).join('');
+  $('transactionRows').innerHTML=data.items.map(transactionRow).join('');
   $('emptyTransactions').hidden=!!data.items.length;
   $('transactionCount').textContent=data.total?`${(page-1)*30+1}–${Math.min(page*30,data.total)} af ${data.total} posteringer`:'0 posteringer';
   $('pageLabel').textContent=`${page} / ${pages}`;
   $('previousPage').disabled=page<=1; $('nextPage').disabled=page>=pages;
   $('transactionSubtitle').textContent=monthName($('month').value)+' · '+$('currency').value;
+}
+async function loadIncompleteTransactions() {
+  showError('incompleteTransactionsError','');
+  const data=await api('/api/transactions?'+query({missing:'1',per_page:'200'}));
+  $('incompleteTransactionRows').innerHTML=data.items.map(transactionRow).join('');
+  $('incompleteTransactionsEmpty').hidden=!!data.items.length;
+  $('incompleteTransactionsModalCount').textContent=data.total===0?'0 posteringer mangler oplysninger':
+    (data.total===1?'1 postering mangler oplysninger':`${data.total} posteringer mangler oplysninger`) +
+    (data.total>data.items.length?` · viser de første ${data.items.length}`:'');
+}
+async function openIncompleteTransactions() {
+  try{
+    await loadIncompleteTransactions();
+    $('incompleteTransactionsDialog').showModal();
+  }catch(error){showError('loadError',error.message);}
 }
 async function refresh() {
   const generation=++dashboardGeneration;
@@ -260,6 +280,14 @@ async function pollSync() {
   await tick();
 }
 document.addEventListener('click',async event=>{
+  if(event.target.closest('#incompleteTransactionsCard')){await openIncompleteTransactions();return;}
+  if(event.target.closest('#viewAllTransactions')){
+    $('incompleteTransactionsDialog').close();
+    setView('transactions');
+    await loadTransactions();
+    window.scrollTo({top:0,behavior:'smooth'});
+    return;
+  }
   const connect=event.target.closest('[data-connect]'); if(connect){await openBank();return;}
   const close=event.target.closest('[data-close]'); if(close){$(close.dataset.close).close();return;}
   const nav=event.target.closest('[data-view]'); if(nav){

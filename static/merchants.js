@@ -1,5 +1,6 @@
 'use strict';
 const transactionRows=$('transactionRows');
+const incompleteTransactionRows=$('incompleteTransactionRows');
 let merchantChoices=[], merchantChoicesSource='', merchantActive=-1, categoryActive=-1;
 
 function normalizedSearch(value){return String(value || '').toLocaleLowerCase('da').trim();}
@@ -77,7 +78,7 @@ function chooseActive(optionsId, kind){
   options[active]?.click();
 }
 
-transactionRows.addEventListener('click',async event=>{
+async function handleTransactionEdit(event){
   const merchantButton=event.target.closest('[data-edit-merchant]');
   if(merchantButton){
     $('merchantForm').dataset.transaction=merchantButton.dataset.editMerchant;
@@ -104,7 +105,9 @@ transactionRows.addEventListener('click',async event=>{
     $('categoryDialog').showModal();
     $('categorySearch').focus();
   }
-});
+}
+transactionRows.addEventListener('click',handleTransactionEdit);
+incompleteTransactionRows.addEventListener('click',handleTransactionEdit);
 
 $('merchantName').addEventListener('input',renderMerchantChoices);
 $('merchantOptions').addEventListener('click',event=>{
@@ -133,6 +136,7 @@ $('merchantForm').addEventListener('submit',async event=>{
     merchantChoicesSource='';
     toast(merchant?`Forhandler gemt: ${merchant}`:'Forhandler fjernet');
     await refresh();
+    if($('incompleteTransactionsDialog').open)await loadIncompleteTransactions();
     if(view==='savings')await loadSavings();
   }catch(error){showError('merchantError',error.message);}
   finally{button.disabled=false;}
@@ -190,6 +194,7 @@ $('categoryPickerForm').addEventListener('submit',async event=>{
     $('categoryDialog').close();
     toast(`Kategori gemt · ${result.updated} posteringer opdateret. Huskes fremover.`);
     await refresh();
+    if($('incompleteTransactionsDialog').open)await loadIncompleteTransactions();
   }catch(error){showError('categoryPickerError',error.message);}
   finally{button.disabled=false;}
 });
