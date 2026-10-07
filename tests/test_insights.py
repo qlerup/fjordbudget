@@ -193,11 +193,12 @@ class InsightTests(unittest.TestCase):
         ))
 
         response = self.client.patch(
-            f"/api/transactions/{row['id']}/merchant",
-            json={'merchant': 'Børnehave', 'remember': True, 'adjustable': True},
+            '/api/merchant-library?source=demo',
+            json={'merchant': 'Børnehave', 'adjustable': True},
             headers=self.headers,
         )
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json['adjustable'])
         profile = self.client.get('/api/savings-goals?source=demo').json['profile']
         self.assertTrue(any(
             item['type'] == 'merchant' and item['name'] == 'Børnehave'
