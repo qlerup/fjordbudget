@@ -91,7 +91,8 @@ def initialize(path):
           target_amount INTEGER NOT NULL CHECK(target_amount>0),
           saved_amount INTEGER NOT NULL DEFAULT 0 CHECK(saved_amount>=0),
           deadline TEXT NOT NULL,
-          featured INTEGER NOT NULL DEFAULT 0 CHECK(featured IN (0,1)));
+          featured INTEGER NOT NULL DEFAULT 0 CHECK(featured IN (0,1)),
+          account_id TEXT REFERENCES accounts(id));
         CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS budgets (
           source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,
@@ -130,6 +131,9 @@ def initialize(path):
             db.execute('ALTER TABLE savings_goals ADD COLUMN saved_amount INTEGER NOT NULL DEFAULT 0')
         if 'featured' not in goal_columns:
             db.execute('ALTER TABLE savings_goals ADD COLUMN featured INTEGER NOT NULL DEFAULT 0')
+        if 'account_id' not in goal_columns:
+            db.execute('ALTER TABLE savings_goals ADD COLUMN account_id TEXT REFERENCES accounts(id)')
+        db.execute('CREATE INDEX IF NOT EXISTS savings_goal_account ON savings_goals(account_id)')
         db.execute('CREATE INDEX IF NOT EXISTS tx_merchant ON transactions(merchant)')
         seed_demo(db)
         if not db.execute("SELECT 1 FROM app_migrations WHERE name='demo-merchants'").fetchone():

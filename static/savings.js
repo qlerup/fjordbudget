@@ -1,5 +1,5 @@
 'use strict';
-let savingsGoals=[], savingsGeneration=0, savingsLoadedScope='';
+let savingsGoals=[], savingsAccounts=[], savingsGeneration=0, savingsLoadedScope='';
 
 function savingsScope(){return new URLSearchParams({source,currency:$('currency').value}).toString();}
 function formatSavingsAmount(value){
@@ -66,17 +66,21 @@ async function loadSavings(){
   try{
     const result=await api('/api/savings-goals?'+scope);
     if(generation!==savingsGeneration || scope!==savingsScope())return;
-    savingsGoals=result.items;savingsLoadedScope=scope;
+    savingsGoals=result.items;savingsAccounts=result.accounts || [];savingsLoadedScope=scope;
     renderSavingsProfile(result.profile);
     $('savingsList').innerHTML=savingsGoals.length?savingsGoals.map(goal=>{
       const deadline=new Intl.DateTimeFormat('da-DK',{month:'long',year:'numeric'}).format(new Date(goal.deadline+'-01T12:00:00'));
-      const progress=goal.target_amount?Math.min(100,goal.saved_amount/goal.target_amount*100):0;
+      const progress=goal.target_amount?Math.max(0,Math.min(100,goal.saved_amount/goal.target_amount*100)):0;
       const [tone,label,text]=savingsStatus(goal);
+      const accountLine=goal.uses_live_balance
+        ? `<p class="savings-account-source">${svg('bank')}<span>Følger <strong>${esc(goal.account_name)}</strong> live${goal.account_balance_available?'':' · saldo afventer'}</span></p>`
+        : '';
       const suggestions=goal.analysis.suggestions || [];
       return `<article class="savings-card ${goal.featured?'featured':''}">
         <div class="savings-card-top"><span class="savings-icon">${svg('target')}</span>${goal.featured?'<span class="goal-featured">Vises på overblikket</span>':''}</div>
         <h3>${esc(goal.name)}</h3>
         <p class="savings-target">${esc(money(goal.saved_amount,goal.currency,2))} <small>af ${esc(money(goal.target_amount,goal.currency,2))}</small></p>
+        ${accountLine}
         <div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div>
         <p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>
         <div class="goal-status ${tone}"><strong>${esc(label)}</strong><span>${esc(text)}</span></div>
@@ -87,29 +91,51 @@ async function loadSavings(){
     }).join(''):'<div class="empty-state"><h3>Hvad drømmer du om?</h3><p>Opret dit første mål. FjordBudget beregner derefter, hvad det kræver pr. måned.</p></div>';
   }catch(error){if(generation===savingsGeneration){$('savingsList').innerHTML='';$('savingsProfile').innerHTML='';showError('savingsError',error.message);}}
 }
+function updateSavingsAccountMode(){
+  const account=savingsAccounts.find(item=>item.id===$('savingsAccount').value);
+  const linked=!!account;
+  $('savingsManualAmountFields').hidden=linked;
+  $('savingsAccountHint').hidden=!linked;
+  if(linked){
+    const accountLabel=account.last4?account.name+' · •• '+account.last4:account.name;
+    const balance=account.balance===null?'Saldo afventer bankens næste opdatering':'Aktuel saldo: '+money(account.balance,account.currency,2);
+    const hiddenNote=account.included?'':' · Kontoen er skjult fra det almindelige overblik';
+    $('savingsAccountHint').textContent=accountLabel+' · '+balance+hiddenNote+'. Målet følger saldoen automatisk.';
+  }
+}
 function openSavings(goal=null){
   $('savingsForm').reset();
   $('savingsForm').dataset.id=goal?.id || '';
   $('savingsForm').dataset.scope=savingsScope();
   $('savingsDialogTitle').textContent=goal?'Rediger opsparingsmål':'Nyt opsparingsmål';
   $('savingsContext').textContent=(source==='demo'?'Demodata':'Mine bankdata')+' · '+$('currency').value;
+  $('savingsAccount').innerHTML='<option value="">Ingen konto – brug manuelt beløb</option>'+savingsAccounts.map(account=>{
+    const suffix=account.last4?' · •• '+esc(account.last4):'';
+    const hidden=account.included?'':' · skjult i overblik';
+    return '<option value="'+esc(account.id)+'">'+esc(account.name)+suffix+hidden+'</option>';
+  }).join('');
   if(goal){
     $('savingsName').value=goal.name;
     $('savingsAmount').value=formatSavingsAmount((goal.target_amount/100).toFixed(2).replace('.',','));
-    $('savingsSavedAmount').value=formatSavingsAmount((goal.saved_amount/100).toFixed(2).replace('.',','));
+    $('savingsSavedAmount').value=formatSavingsAmount(((goal.manual_saved_amount ?? goal.saved_amount)/100).toFixed(2).replace('.',','));
+    $('savingsAccount').value=goal.account_id || '';
     $('savingsDeadline').value=goal.deadline;
     $('savingsFeatured').checked=!!goal.featured;
   }
+  updateSavingsAccountMode();
   showError('savingsFormError','');$('savingsDialog').showModal();$('savingsName').focus();
 }
+$('savingsAccount').addEventListener('change',updateSavingsAccountMode);
+
 window.renderFeaturedGoal=function(goal){
   const panel=$('featuredGoalPanel');
   if(!goal){panel.hidden=true;panel.innerHTML='';return;}
   panel.hidden=false;
-  const a=goal.analysis, progress=goal.target_amount?Math.min(100,goal.saved_amount/goal.target_amount*100):0;
+  const a=goal.analysis, progress=goal.target_amount?Math.max(0,Math.min(100,goal.saved_amount/goal.target_amount*100)):0;
   const [tone,label,text]=savingsStatus(goal);
+  const liveAccount=goal.uses_live_balance?`<small class="featured-goal-account">${svg('bank')} Følger ${esc(goal.account_name)} live</small>`:'';
   panel.innerHTML=`<div class="featured-goal-copy"><p class="eyebrow">DIT AKTIVE MÅL</p><h2>${esc(goal.name)}</h2><p>${esc(text)}</p><button type="button" class="text-button" data-view="savings">Se analyse og forslag <span>→</span></button></div>
-    <div class="featured-goal-numbers"><span>${esc(money(goal.saved_amount,goal.currency,0))} af ${esc(money(goal.target_amount,goal.currency,0))}</span><div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div><strong class="${tone}">${esc(label)}</strong>${a.months_analyzed?`<small>${esc(money(a.required_monthly,goal.currency,0))}/md. nødvendigt · ${esc(money(a.average_available,goal.currency,0))}/md. historisk råderum</small>`:''}</div>`;
+    <div class="featured-goal-numbers"><span>${esc(money(goal.saved_amount,goal.currency,0))} af ${esc(money(goal.target_amount,goal.currency,0))}</span>${liveAccount}<div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div><strong class="${tone}">${esc(label)}</strong>${a.months_analyzed?`<small>${esc(money(a.required_monthly,goal.currency,0))}/md. nødvendigt · ${esc(money(a.average_available,goal.currency,0))}/md. historisk råderum</small>`:''}</div>`;
 };
 $('newSavingsGoal').addEventListener('click',()=>openSavings());
 $('savingsList').addEventListener('click',event=>{
@@ -126,6 +152,7 @@ $('savingsForm').addEventListener('submit',async event=>{
     const values=Object.fromEntries(new FormData(form));
     values.target_amount=values.target_amount.replaceAll('.','').replace(',','.');
     values.saved_amount=(values.saved_amount || '0').replaceAll('.','').replace(',','.');
+    values.account_id=values.account_id || null;
     values.featured=$('savingsFeatured').checked;
     await api('/api/savings-goals'+(form.dataset.id?'/'+form.dataset.id:'')+'?'+form.dataset.scope,{method:form.dataset.id?'PUT':'POST',body:JSON.stringify(values)});
     $('savingsDialog').close();toast('Opsparingsmålet er gemt');await refresh();if(view==='savings')await loadSavings();

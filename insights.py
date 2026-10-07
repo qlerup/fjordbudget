@@ -217,10 +217,20 @@ def build_insights(db_path, source, currency, today=None):
     with connect(db_path) as db:
         profile = _profile(db, source, currency, today)
         goals = [dict(row) for row in db.execute(
-            '''SELECT id,name,target_amount,saved_amount,substr(deadline,1,7) deadline,currency,featured
-               FROM savings_goals WHERE source=? AND currency=? ORDER BY featured DESC,deadline,id''',
+            '''SELECT g.id,g.name,g.target_amount,g.saved_amount,substr(g.deadline,1,7) deadline,
+                      g.currency,g.featured,g.account_id,
+                      COALESCE(a.custom_name,a.name) account_name,a.bank account_bank,a.last4 account_last4,
+                      a.balance account_balance,a.synced_at account_synced_at
+               FROM savings_goals g
+               LEFT JOIN accounts a ON a.id=g.account_id AND a.source=g.source AND a.currency=g.currency
+               WHERE g.source=? AND g.currency=? ORDER BY g.featured DESC,g.deadline,g.id''',
             (source, currency))]
     for goal in goals:
+        goal['manual_saved_amount'] = int(goal['saved_amount'] or 0)
+        goal['uses_live_balance'] = bool(goal.get('account_id') and goal.get('account_name'))
+        goal['account_balance_available'] = bool(goal['uses_live_balance'] and goal.get('account_balance') is not None)
+        if goal['uses_live_balance']:
+            goal['saved_amount'] = int(goal['account_balance']) if goal['account_balance'] is not None else 0
         goal['analysis'] = _goal_analysis(goal, profile, today)
     featured = next((goal for goal in goals if goal['featured']), goals[0] if goals else None)
     return {

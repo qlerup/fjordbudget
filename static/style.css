@@ -92,7 +92,11 @@
 .savings-actions .text-button{font-size:14px;color:var(--muted)}
 .savings-form{display:grid;gap:10px;margin-top:20px}
 .savings-form label{font-size:14px;font-weight:600;margin-top:8px}
-.savings-form input{width:100%;min-width:0;max-width:100%;padding:12px;border:1px solid #ccd6cb;border-radius:8px;background:white;color:var(--ink);font-size:16px}
+.savings-form input,.savings-form select{width:100%;min-width:0;max-width:100%;padding:12px;border:1px solid #ccd6cb;border-radius:8px;background:white;color:var(--ink);font-size:16px}
+.savings-account-hint{margin:0;padding:12px 13px;border:1px solid #d9e5d3;border-radius:9px;background:#f3f7ef;color:#52684c!important;font-size:12px!important;line-height:1.55!important}
+#savingsManualAmountFields{display:grid;gap:10px}#savingsManualAmountFields[hidden]{display:none}
+.savings-account-source{display:flex;align-items:center;gap:7px;margin:-2px 0 12px;color:#617a59;font-size:12px;line-height:1.4}.savings-account-source svg{width:15px;height:15px}.savings-account-source strong{color:var(--ink)}
+.featured-goal-account{display:flex!important;align-items:center;gap:6px;color:#617a59!important}.featured-goal-account svg{width:14px;height:14px}
 .savings-form .dialog-actions{margin-top:16px;flex-wrap:wrap}
 @media(max-width:760px){.sidebar{flex-wrap:wrap;gap:8px}.sidebar nav{width:100%;justify-content:space-between}.savings-card{padding:20px}.savings-panel .section-heading{flex-wrap:wrap}}
 

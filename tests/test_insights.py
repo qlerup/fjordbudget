@@ -199,6 +199,43 @@ class InsightTests(unittest.TestCase):
         self.assertEqual([item['id'] for item in items if item['featured']], [second])
         self.assertEqual(self.client.get('/api/dashboard?source=demo').json['featured_goal']['id'], second)
 
+    def test_goal_can_follow_live_account_balance_and_restore_manual_amount(self):
+        body = {
+            'name': 'Konto-mål',
+            'target_amount': '100000',
+            'saved_amount': '500',
+            'account_id': 'demo-save',
+            'deadline': month_after(12),
+            'featured': True,
+        }
+        response=self.client.post('/api/savings-goals?source=demo',json=body,headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        goal_id=response.json['id']
+
+        result=self.client.get('/api/savings-goals?source=demo').json
+        self.assertIn('demo-save',[account['id'] for account in result['accounts']])
+        goal=next(item for item in result['items'] if item['id']==goal_id)
+        self.assertTrue(goal['uses_live_balance'])
+        self.assertEqual(goal['account_id'],'demo-save')
+        self.assertEqual(goal['account_name'],'Opsparing')
+        self.assertEqual(goal['manual_saved_amount'],50000)
+        self.assertEqual(goal['saved_amount'],6840000)
+
+        with connect(self.db) as db:
+            db.execute("UPDATE accounts SET balance=7000000 WHERE id='demo-save'")
+        goal=next(item for item in self.client.get('/api/savings-goals?source=demo').json['items']
+                  if item['id']==goal_id)
+        self.assertEqual(goal['saved_amount'],7000000)
+        self.assertEqual(self.client.get('/api/dashboard?source=demo').json['featured_goal']['saved_amount'],7000000)
+
+        body['account_id']=None
+        response=self.client.put(f'/api/savings-goals/{goal_id}?source=demo',json=body,headers=self.headers)
+        self.assertEqual(response.status_code,200)
+        goal=next(item for item in self.client.get('/api/savings-goals?source=demo').json['items']
+                  if item['id']==goal_id)
+        self.assertFalse(goal['uses_live_balance'])
+        self.assertEqual(goal['saved_amount'],50000)
+
     def test_goal_rejects_saved_amount_above_target(self):
         response = self.client.post('/api/savings-goals', json={
             'name': 'Fejl', 'target_amount': '1000', 'saved_amount': '1001',

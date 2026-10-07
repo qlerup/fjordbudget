@@ -346,7 +346,14 @@ def create_app(config=None):
         source, _, currency = parameters()
         if request.method == 'GET':
             result = build_insights(db_path, source, currency)
-            return jsonify(items=result['goals'], profile=result['profile'])
+            with connect(db_path) as db:
+                accounts = [dict(row) for row in db.execute(
+                    '''SELECT id,COALESCE(custom_name,name) name,bank,last4,currency,balance,synced_at,included
+                       FROM accounts
+                       WHERE source=? AND currency=? AND selection_pending=0
+                       ORDER BY included DESC,bank,COALESCE(custom_name,name),id''',
+                    (source, currency))]
+            return jsonify(items=result['goals'], profile=result['profile'], accounts=accounts)
         if request.method != 'DELETE':
             body = request.get_json(silent=True)
             name = body.get('name') if isinstance(body, dict) else None
@@ -354,6 +361,11 @@ def create_app(config=None):
                 raise ValueError('Navnet skal være på 1–80 tegn uden linjeskift.')
             amount = cents(body.get('target_amount'))
             saved_amount = cents(body.get('saved_amount', 0))
+            account_id = body.get('account_id')
+            if account_id in ('', None):
+                account_id = None
+            elif not isinstance(account_id, str) or not 1 <= len(account_id) <= 200 or any(ord(c)<32 for c in account_id):
+                raise ValueError('Den valgte konto er ugyldig.')
             if amount <= 0:
                 raise ValueError('Opsparingsmålet skal være større end 0.')
             if saved_amount < 0 or saved_amount > amount:
@@ -375,20 +387,27 @@ def create_app(config=None):
                 'SELECT 1 FROM savings_goals WHERE id=? AND source=? AND currency=?',
                 (goal_id, source, currency)).fetchone():
                 return jsonify(error='Opsparingsmålet findes ikke.'), 404
+            if request.method != 'DELETE' and account_id is not None:
+                linked_account = db.execute(
+                    '''SELECT 1 FROM accounts
+                       WHERE id=? AND source=? AND currency=? AND selection_pending=0''',
+                    (account_id, source, currency)).fetchone()
+                if linked_account is None:
+                    raise ValueError('Vælg en konto fra den aktuelle datakilde og valuta.')
             if request.method == 'POST':
                 existing = db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? LIMIT 1', (source, currency)).fetchone()
                 has_featured = db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? AND featured=1 LIMIT 1', (source, currency)).fetchone()
                 make_featured = bool(featured or not existing or not has_featured)
                 if make_featured:
                     db.execute('UPDATE savings_goals SET featured=0 WHERE source=? AND currency=?', (source, currency))
-                goal_id = db.execute('''INSERT INTO savings_goals(source,currency,name,target_amount,saved_amount,deadline,featured)
-                                    VALUES (?,?,?,?,?,?,?)''',
-                                    (source, currency, name.strip(), amount, saved_amount, deadline, int(make_featured))).lastrowid
+                goal_id = db.execute('''INSERT INTO savings_goals(source,currency,name,target_amount,saved_amount,deadline,featured,account_id)
+                                    VALUES (?,?,?,?,?,?,?,?)''',
+                                    (source, currency, name.strip(), amount, saved_amount, deadline, int(make_featured), account_id)).lastrowid
             elif request.method == 'PUT':
                 if featured:
                     db.execute('UPDATE savings_goals SET featured=0 WHERE source=? AND currency=?', (source, currency))
-                db.execute('UPDATE savings_goals SET name=?,target_amount=?,saved_amount=?,deadline=?,featured=? WHERE id=?',
-                           (name.strip(), amount, saved_amount, deadline, int(featured), goal_id))
+                db.execute('UPDATE savings_goals SET name=?,target_amount=?,saved_amount=?,deadline=?,featured=?,account_id=? WHERE id=?',
+                           (name.strip(), amount, saved_amount, deadline, int(featured), account_id, goal_id))
                 if not db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? AND featured=1 LIMIT 1', (source, currency)).fetchone():
                     fallback = db.execute('SELECT id FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id LIMIT 1', (source, currency)).fetchone()
                     if fallback:

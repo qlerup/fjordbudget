@@ -127,7 +127,12 @@
   <form id="savingsForm" class="savings-form">
     <label for="savingsName">Hvad sparer du op til?</label><input id="savingsName" name="name" maxlength="80" required placeholder="Fx sommerferie, bil eller bolig">
     <label for="savingsAmount">Hvor meget vil du spare op?</label><input id="savingsAmount" name="target_amount" type="text" maxlength="24" pattern="[0-9]{1,3}(\.[0-9]{3})*(,[0-9]{1,2})?" title="Skriv et beløb med komma som decimaltegn, fx 100.000,50" placeholder="Fx 100.000" required inputmode="decimal">
-    <label for="savingsSavedAmount">Hvor meget har du allerede sparet op?</label><input id="savingsSavedAmount" name="saved_amount" type="text" maxlength="24" pattern="[0-9]{1,3}(\.[0-9]{3})*(,[0-9]{1,2})?" title="Skriv et beløb med komma som decimaltegn" placeholder="0" value="0" inputmode="decimal">
+    <label for="savingsAccount">Følg en konto (valgfrit)</label>
+    <select id="savingsAccount" name="account_id"><option value="">Ingen konto – brug manuelt beløb</option></select>
+    <p id="savingsAccountHint" class="savings-account-hint" hidden></p>
+    <div id="savingsManualAmountFields">
+      <label for="savingsSavedAmount">Hvor meget har du allerede sparet op?</label><input id="savingsSavedAmount" name="saved_amount" type="text" maxlength="24" pattern="[0-9]{1,3}(\.[0-9]{3})*(,[0-9]{1,2})?" title="Skriv et beløb med komma som decimaltegn" placeholder="0" value="0" inputmode="decimal">
+    </div>
     <label for="savingsDeadline">Hvornår skal målet være nået?</label><input id="savingsDeadline" name="deadline" type="month" required>
     <label class="checkbox-row"><input id="savingsFeatured" name="featured" type="checkbox"> <span>Vis dette mål på overblikket som dit aktive mål</span></label>
     <div id="savingsFormError" class="error-box" role="alert" hidden></div>

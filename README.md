@@ -129,8 +129,10 @@ Reglen knyttes til den normaliserede, fulde banktekst. FjordBudget gætter ikke 
 forhandler ud fra enkelte forkortelser som korttype eller terminaltekst. Bankens
 originale posteringstekst bevares altid.
 
-Opsparingsmål kan indeholde målbeløb, allerede opsparet beløb og deadline. Ét mål
-markeres som aktivt og vises på overblikket. Appen beregner, hvor meget der kræves
+Opsparingsmål kan indeholde målbeløb, allerede opsparet beløb og deadline. Et mål
+kan valgfrit kobles til en konto; i så fald bruges kontoens senest synkroniserede saldo
+automatisk som målets opsparede beløb. Det manuelle beløb bevares og bruges igen, hvis
+konto-linket fjernes. Ét mål markeres som aktivt og vises på overblikket. Appen beregner, hvor meget der kræves
 pr. måned, sammenholder det med historisk råderum og markerer målet som realistisk,
 stramt, muligt med ændringer eller ikke realistisk med den nuværende økonomi.
 

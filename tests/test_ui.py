@@ -107,6 +107,37 @@ class UITests(unittest.TestCase):
         self.page.get_by_role('button',name='Mit budget',exact=True).click()
         expect(self.page.locator('#month')).to_be_visible()
 
+    def test_savings_goal_can_follow_account_balance_live(self):
+        self.page.set_viewport_size({'width':390,'height':844})
+        self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
+        self.page.locator('#newSavingsGoal').click()
+        self.page.locator('#savingsName').fill('Live konto mål')
+        self.page.locator('#savingsAmount').fill('100000')
+        self.page.locator('#savingsAccount').select_option('demo-save')
+        expect(self.page.locator('#savingsManualAmountFields')).to_be_hidden()
+        expect(self.page.locator('#savingsAccountHint')).to_contain_text('Aktuel saldo:')
+        expect(self.page.locator('#savingsAccountHint')).to_contain_text('Målet følger saldoen automatisk')
+        self.page.locator('#savingsDeadline').fill('2027-12')
+        self.page.locator('#savingsForm button[type=submit]').click()
+
+        card=self.page.locator('.savings-card').filter(has_text='Live konto mål')
+        expect(card).to_be_visible()
+        expect(card.locator('.savings-account-source')).to_contain_text('Følger Opsparing live')
+        expect(card.locator('.savings-target')).to_contain_text('68.400,00')
+
+        card.locator('[data-edit-savings]').click()
+        expect(self.page.locator('#savingsAccount')).to_have_value('demo-save')
+        self.page.locator('#savingsAccount').select_option('')
+        expect(self.page.locator('#savingsManualAmountFields')).to_be_visible()
+        expect(self.page.locator('#savingsSavedAmount')).to_have_value('0,00')
+        self.page.locator('#savingsForm button[type=submit]').click()
+
+        card=self.page.locator('.savings-card').filter(has_text='Live konto mål')
+        expect(card.locator('.savings-account-source')).to_have_count(0)
+        card.locator('[data-delete-savings]').click()
+        self.page.locator('#savingsDeleteForm button[type=submit]').click()
+        expect(self.page.locator('.savings-card').filter(has_text='Live konto mål')).to_have_count(0)
+
     def test_budget_category_create_delete_and_reload(self):
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.locator('[data-view="budget"]').first.click()
