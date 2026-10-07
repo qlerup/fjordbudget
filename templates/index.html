@@ -25,6 +25,9 @@
   <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
   <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
   <symbol id="icon-store" viewBox="0 0 24 24"><path d="M4 10v10h16V10M3 10l2-6h14l2 6"/><path d="M3 10c0 2 3 3 4.5 1.5C9 13 12 12 12 10c0 2 3 3 4.5 1.5C18 13 21 12 21 10M8 20v-5h4v5"/></symbol>
+  <symbol id="icon-income" viewBox="0 0 24 24"><path d="M5 5v14h14"/><path d="m6 18 11-11M10 7h7v7"/></symbol>
+  <symbol id="icon-expense" viewBox="0 0 24 24"><path d="M5 19V5h14"/><path d="m6 6 11 11M10 17h7v-7"/></symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></symbol>
 </defs></svg>
 <aside class="sidebar">
   <a class="brand" href="/" aria-label="FjordBudget start"><img src="/static/logos/wordmark.svg?v=brand-budget-green-20261005" width="182" height="46" alt="FjordBudget"></a>
@@ -54,9 +57,9 @@
     <div id="appContent" hidden>
       <section class="summary-grid" data-section="summary" aria-label="Økonomisk overblik">
         <article class="summary-card balance-card"><div class="summary-top">Samlet saldo <svg><use href="#icon-wallet"/></svg></div><div class="metric" id="balance">—</div><div class="metric-footer" id="balanceNote">På tværs af dine konti</div><span class="balance-decoration" aria-hidden="true"></span></article>
-        <article class="summary-card"><div class="summary-top">Indtægter <span class="metric-icon income">↙</span></div><div class="metric" id="income">—</div><div class="metric-footer">Denne måned · uden overførsler</div></article>
-        <article class="summary-card"><div class="summary-top">Udgifter <span class="metric-icon expense">↗</span></div><div class="metric" id="expenses">—</div><div class="metric-footer">Bogførte udgifter denne måned</div></article>
-        <article class="summary-card"><div class="summary-top">Tilbage i budgettet <span class="metric-icon budget-icon">◷</span></div><div class="metric" id="remaining">—</div><div class="metric-footer" id="remainingNote">Af dit månedsbudget</div></article>
+        <article class="summary-card"><div class="summary-top">Indtægter <span class="metric-icon income" aria-hidden="true"><svg><use href="#icon-income"/></svg></span></div><div class="metric" id="income">—</div><div class="metric-footer">Denne måned · uden overførsler</div></article>
+        <article class="summary-card"><div class="summary-top">Udgifter <span class="metric-icon expense" aria-hidden="true"><svg><use href="#icon-expense"/></svg></span></div><div class="metric" id="expenses">—</div><div class="metric-footer">Bogførte udgifter denne måned</div></article>
+        <article class="summary-card"><div class="summary-top">Tilbage i budgettet <span class="metric-icon budget-icon" aria-hidden="true"><svg><use href="#icon-clock"/></svg></span></div><div class="metric" id="remaining">—</div><div class="metric-footer" id="remainingNote">Af dit månedsbudget</div></article>
       </section>
       <section class="overview-task-row" data-section="attention">
         <button id="incompleteTransactionsCard" class="incomplete-transactions-card" type="button" aria-haspopup="dialog" aria-controls="incompleteTransactionsDialog">

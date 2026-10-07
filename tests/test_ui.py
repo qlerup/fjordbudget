@@ -457,6 +457,8 @@ class UITests(unittest.TestCase):
         self.page.set_viewport_size({'width':390,'height':844})
         expect(self.page.locator('#appContent')).to_be_visible()
         self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
+        expect(self.page.locator('.summary-card .metric-icon svg')).to_have_count(3)
+        self.assertEqual(self.page.locator('.summary-card .metric-icon').evaluate_all("els=>els.map(el=>el.textContent.trim())"),['','',''])
         self.page.locator('.nav-item[data-view="budget"]').click()
         expect(self.page.locator('.full-budget')).to_be_visible()
         self.page.locator('.full-budget .edit-budget').click()
