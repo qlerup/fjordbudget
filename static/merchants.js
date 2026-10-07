@@ -4,6 +4,8 @@ const incompleteTransactionRows=$('incompleteTransactionRows');
 let merchantChoices=[], merchantChoicesSource='', merchantActive=-1, categoryActive=-1;
 
 function normalizedSearch(value){return String(value || '').toLocaleLowerCase('da').trim();}
+function merchantChoice(name){return merchantChoices.find(item=>normalizedSearch(item.name)===normalizedSearch(name));}
+function syncMerchantFixed(name){const item=merchantChoice(name);if(item)$('merchantFixed').checked=item.adjustable===false;}
 
 function renderChoiceList(containerId, emptyId, items, search, selected, activeIndex, formatter){
   const container=$(containerId), needle=normalizedSearch(search);
@@ -39,7 +41,7 @@ function renderMerchantChoices(){
   const selected=$('merchantForm').dataset.selected || '';
   renderChoiceList('merchantOptions','merchantEmpty',merchantChoices,$('merchantName').value,selected,merchantActive,item=>{
     const name=document.createElement('span');name.textContent=item.name;
-    const meta=document.createElement('small');meta.textContent=item.uses===1?'Brugt 1 gang':`Brugt ${item.uses} gange`;
+    const meta=document.createElement('small');meta.textContent=(item.uses===1?'Brugt 1 gang':`Brugt ${item.uses} gange`)+(item.adjustable===false?' · Fast udgift':'');
     return [name,meta];
   });
 }
@@ -86,8 +88,9 @@ async function handleTransactionEdit(event){
     $('merchantBankText').textContent=merchantButton.dataset.description || '';
     $('merchantName').value=merchantButton.dataset.merchant || '';
     $('merchantRemember').checked=true;
+    $('merchantFixed').checked=false;
     showError('merchantError','');
-    try{await loadMerchantChoices();}catch(error){merchantChoices=[];showError('merchantError','Kunne ikke hente eksisterende forhandlere. Du kan stadig skrive en ny.');}
+    try{await loadMerchantChoices();syncMerchantFixed($('merchantName').value);}catch(error){merchantChoices=[];showError('merchantError','Kunne ikke hente eksisterende forhandlere. Du kan stadig skrive en ny.');}
     renderMerchantChoices();
     $('merchantDialog').showModal();
     $('merchantName').focus();
@@ -109,11 +112,12 @@ async function handleTransactionEdit(event){
 transactionRows.addEventListener('click',handleTransactionEdit);
 incompleteTransactionRows.addEventListener('click',handleTransactionEdit);
 
-$('merchantName').addEventListener('input',renderMerchantChoices);
+$('merchantName').addEventListener('input',()=>{renderMerchantChoices();syncMerchantFixed($('merchantName').value);});
 $('merchantOptions').addEventListener('click',event=>{
   const option=event.target.closest('.choice-option');if(!option)return;
   $('merchantName').value=option.dataset.value;
   $('merchantForm').dataset.selected=option.dataset.value;
+  syncMerchantFixed(option.dataset.value);
   renderMerchantChoices();
   $('merchantName').focus();
 });
@@ -129,8 +133,9 @@ $('merchantForm').addEventListener('submit',async event=>{
   try{
     const merchant=$('merchantName').value.trim();
     const remember=$('merchantRemember').checked;
+    const adjustable=!$('merchantFixed').checked;
     await api(`/api/transactions/${form.dataset.transaction}/merchant`,{
-      method:'PATCH',body:JSON.stringify({merchant,remember}),
+      method:'PATCH',body:JSON.stringify({merchant,remember,adjustable}),
     });
     $('merchantDialog').close();
     merchantChoicesSource='';
@@ -144,6 +149,7 @@ $('merchantForm').addEventListener('submit',async event=>{
 $('clearMerchant').addEventListener('click',()=>{
   $('merchantName').value='';
   $('merchantRemember').checked=true;
+  $('merchantFixed').checked=false;
   $('merchantForm').requestSubmit($('saveMerchant'));
 });
 
@@ -209,7 +215,7 @@ async function loadMerchantLibrary(){
       const normalized=rule.bank_text===rule.title?'':`<small>Gemt mønster: ${esc(rule.title)}</small>`;
       return `<div class="merchant-rule-row"><div><strong>${esc(rule.bank_text)}</strong>${normalized}</div><button type="button" class="text-button merchant-rule-delete" data-delete-merchant-rule="${esc(rule.title)}" data-rule-merchant="${esc(item.name)}" aria-label="Slet banktekst ${esc(rule.bank_text)}">Slet banktekst</button></div>`;
     }).join(''):'<p class="small muted merchant-no-rules">Ingen gemte banktekster. Forhandleren findes kun på eksisterende posteringer.</p>';
-    return `<article class="merchant-library-card" data-library-merchant="${esc(item.name)}"><div class="merchant-library-head"><div><h3>${esc(item.name)}</h3><p>${item.transactions} ${item.transactions===1?'postering':'posteringer'} · ${item.rule_count} ${item.rule_count===1?'gemt banktekst':'gemte banktekster'}</p></div><button type="button" class="button quiet merchant-delete-button" data-delete-library-merchant="${esc(item.name)}">Slet forhandler</button></div><div class="merchant-rules">${rules}</div></article>`;
+    return `<article class="merchant-library-card" data-library-merchant="${esc(item.name)}"><div class="merchant-library-head"><div><h3>${esc(item.name)}</h3><p>${item.transactions} ${item.transactions===1?'postering':'posteringer'} · ${item.rule_count} ${item.rule_count===1?'gemt banktekst':'gemte banktekster'}${item.adjustable===false?' · Fast udgift':''}</p></div><button type="button" class="button quiet merchant-delete-button" data-delete-library-merchant="${esc(item.name)}">Slet forhandler</button></div><div class="merchant-rules">${rules}</div></article>`;
   }).join(''):'<div class="empty-state"><svg><use href="#icon-store"/></svg><h3>Ingen forhandlere endnu</h3><p>Når du tilknytter forhandlere til posteringer, vises de her.</p></div>';
 }
 window.loadMerchantLibrary=loadMerchantLibrary;
