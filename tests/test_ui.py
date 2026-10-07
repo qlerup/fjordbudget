@@ -138,6 +138,19 @@ class UITests(unittest.TestCase):
         self.page.locator('#savingsDeleteForm button[type=submit]').click()
         expect(self.page.locator('.savings-card').filter(has_text='Live konto mål')).to_have_count(0)
 
+    def test_budget_suggestion_dialog_uses_transaction_history(self):
+        self.page.get_by_role('button',name='Mit budget',exact=True).click()
+        expect(self.page.locator('#suggestBudget')).to_be_visible()
+        self.page.locator('#suggestBudget').click()
+        expect(self.page.locator('#budgetSuggestionDialog')).to_be_visible()
+        expect(self.page.locator('#budgetSuggestionIntro')).to_contain_text('måneder')
+        expect(self.page.locator('#budgetSuggestionFields input')).to_have_count(8)
+        expect(self.page.get_by_text('5 % buffer',exact=False)).to_be_visible()
+        first=self.page.locator('#budgetSuggestionFields input').first
+        expect(first).to_be_editable()
+        self.page.locator('[data-close="budgetSuggestionDialog"]').first.click()
+        expect(self.page.locator('#budgetSuggestionDialog')).not_to_be_visible()
+
     def test_budget_category_create_delete_and_reload(self):
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.locator('[data-view="budget"]').first.click()

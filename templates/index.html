@@ -6,9 +6,9 @@
   <title>FjordBudget · Din økonomi, samlet</title>
   <link rel="icon" href="/static/icon.svg?v=brand-budget-green-20261005" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/app.js" defer></script>
-  <script src="/static/savings.js" defer></script>
-  <script src="/static/merchants.js" defer></script>
+  <script src="/static/app.js?v=budget-suggestion-20261007" defer></script>
+  <script src="/static/savings.js?v=budget-suggestion-20261007" defer></script>
+  <script src="/static/merchants.js?v=budget-suggestion-20261007" defer></script>
 <link rel="apple-touch-icon" href="/static/logos/icon-180.png?v=brand-budget-green-20261005"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"></head>
 <body>
 <svg class="symbols" aria-hidden="true"><defs>
@@ -88,7 +88,7 @@
   <p class="small muted merchant-library-note">Sletter du kun en banktekst, beholdes forhandleren på historiske posteringer. Sletter du hele forhandleren, fjernes forhandlernavnet også fra eksisterende posteringer.</p>
 </section>
 {% include 'savings.html' %}
-<section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><button class="button primary edit-budget">Rediger budget</button></div><form id="budgetCategoryCreateForm" class="budget-category-create"><label for="newBudgetCategoryName">Ny budgetkategori</label><div><input id="newBudgetCategoryName" maxlength="60" required placeholder="Fx Ferie eller Bil"><button class="button quiet" type="submit">Tilføj budgetkategori</button></div></form><p class="small muted">Tilknyt posteringernes kategorier til dit budget under <button type="button" class="text-button" data-view="categories">Kategorier</button>.</p><div id="budgetCategoryError" class="error-box" role="alert" hidden></div><div id="budgetFull"></div></section>
+<section class="panel full-budget" data-section="budget" hidden><div class="section-heading"><div><h2>Budget pr. kategori</h2><p>Planlagt og brugt i den valgte måned</p></div><div class="account-heading-actions"><button id="suggestBudget" class="button quiet" type="button">Lav budgetforslag</button><button class="button primary edit-budget">Rediger budget</button></div></div><form id="budgetCategoryCreateForm" class="budget-category-create"><label for="newBudgetCategoryName">Ny budgetkategori</label><div><input id="newBudgetCategoryName" maxlength="60" required placeholder="Fx Ferie eller Bil"><button class="button quiet" type="submit">Tilføj budgetkategori</button></div></form><p class="small muted">Tilknyt posteringernes kategorier til dit budget under <button type="button" class="text-button" data-view="categories">Kategorier</button>.</p><div id="budgetCategoryError" class="error-box" role="alert" hidden></div><div id="budgetFull"></div></section>
       <section class="panel transactions-panel" data-section="transactions"><div class="section-heading"><div><h2>Posteringer</h2><p id="transactionSubtitle">Dine bogførte ind- og udbetalinger</p></div><span class="subtle-tag">Kun bogførte</span></div>
         <p class="small muted">Kategorier huskes på samme banktekst. Du kan også angive den rigtige forhandler på et køb og vælge at huske den fremover. FjordBudget gætter ikke forhandler ud fra løse forkortelser.</p>
         <div class="transaction-filters"><label class="search-field"><svg><use href="#icon-search"/></svg><input id="search" type="search" placeholder="Søg i posteringer …" aria-label="Søg i posteringer"></label><label class="sr-only" for="accountFilter">Konto</label><select id="accountFilter"><option value="">Alle konti</option></select><label class="sr-only" for="categoryFilter">Kategori</label><select id="categoryFilter"><option value="">Alle kategorier</option></select></div>
@@ -185,6 +185,12 @@
   </form>
 </dialog>
 <dialog id="budgetCategoryDeleteDialog" aria-labelledby="budgetCategoryDeleteTitle"><h2 id="budgetCategoryDeleteTitle">Fjern budgetkategori</h2><p id="budgetCategoryDeleteText"></p><form id="budgetCategoryDeleteForm"><div id="budgetCategoryDeleteError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetCategoryDeleteDialog">Annuller</button><button type="submit" class="button primary">Fjern budgetkategori</button></div></form></dialog>
+<dialog id="budgetSuggestionDialog" aria-labelledby="budgetSuggestionTitle">
+<div class="dialog-header"><div><p class="eyebrow">FORSLAG FRA DIN HISTORIK</p><h2 id="budgetSuggestionTitle">Forslag til et fuldt budget</h2></div><button type="button" class="icon-button" data-close="budgetSuggestionDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+<p class="dialog-intro" id="budgetSuggestionIntro"></p>
+<p class="small muted">Forslaget bruger dit gennemsnitlige månedsforbrug, lægger 5 % buffer til og runder op til nærmeste 50 kr. Du kan rette beløbene, før du gemmer.</p>
+<form id="budgetSuggestionForm"><div id="budgetSuggestionFields" class="budget-fields"></div><p id="budgetSuggestionUnmapped" class="small muted" hidden></p><div id="budgetSuggestionError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetSuggestionDialog">Annuller</button><button type="submit" class="button primary">Brug budgetforslag</button></div></form>
+</dialog>
 <dialog id="budgetDialog" aria-labelledby="budgetTitle"><div class="dialog-header"><p class="eyebrow">PLANLÆG DIN MÅNED</p><button class="icon-button" data-close="budgetDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div><h2 id="budgetTitle">Dit månedsbudget</h2><p class="dialog-intro" id="budgetDialogSubtitle"></p><form id="budgetForm"><div id="budgetFields" class="budget-fields"></div><div id="budgetError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="budgetDialog">Annuller</button><button type="submit" class="button primary">Gem budget</button></div></form></dialog>
 <dialog id="accountNameDialog" aria-labelledby="accountNameTitle">
 <div class="dialog-header"><h2 id="accountNameTitle">Navngiv konto</h2><button class="icon-button" data-close="accountNameDialog" aria-label="Luk">×</button></div>

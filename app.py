@@ -716,6 +716,85 @@ def create_app(config=None):
                 db.execute('INSERT INTO budgets VALUES (?,?,?,?,?) ON CONFLICT(source,month,currency,category) DO UPDATE SET amount=excluded.amount', (source, month, currency, cat, value))
         return jsonify(ok=True)
 
+    @app.get('/api/budgets/suggestion')
+    def budget_suggestion():
+        source, month, currency = parameters()
+        selected_first = date.fromisoformat(month+'-01')
+        period_end = selected_first - timedelta(days=1)
+        end_ordinal = period_end.year * 12 + period_end.month - 1
+        start_ordinal = end_ordinal - 11
+        start_year, start_month0 = divmod(start_ordinal, 12)
+        period_start = date(start_year, start_month0 + 1, 1)
+
+        with connect(db_path) as db:
+            budget_categories = budget_category_list(db)
+            months = [row[0] for row in db.execute(
+                '''SELECT DISTINCT substr(t.booked_on,1,7)
+                   FROM transactions t JOIN accounts a ON a.id=t.account_id
+                   WHERE a.source=? AND a.included=1 AND a.selection_pending=0
+                     AND t.currency=? AND t.booked_on BETWEEN ? AND ?
+                   ORDER BY 1''',
+                (source, currency, period_start.isoformat(), period_end.isoformat()))]
+            months_analyzed = len(months)
+
+            totals = {row['budget_category']: int(row['spent'] or 0) for row in db.execute(
+                '''SELECT c.budget_category,SUM(-t.amount) spent
+                   FROM transactions t JOIN accounts a ON a.id=t.account_id
+                   LEFT JOIN categories c ON c.name=t.category
+                   WHERE a.source=? AND a.included=1 AND a.selection_pending=0
+                     AND t.currency=? AND t.amount<0 AND t.category!='Overførsler'
+                     AND t.booked_on BETWEEN ? AND ? AND c.budget_category IS NOT NULL
+                   GROUP BY c.budget_category''',
+                (source, currency, period_start.isoformat(), period_end.isoformat()))}
+            unmapped_total = int(db.execute(
+                '''SELECT COALESCE(SUM(-t.amount),0)
+                   FROM transactions t JOIN accounts a ON a.id=t.account_id
+                   LEFT JOIN categories c ON c.name=t.category
+                   WHERE a.source=? AND a.included=1 AND a.selection_pending=0
+                     AND t.currency=? AND t.amount<0 AND t.category!='Overførsler'
+                     AND t.booked_on BETWEEN ? AND ?
+                     AND c.budget_category IS NULL''',
+                (source, currency, period_start.isoformat(), period_end.isoformat())).fetchone()[0] or 0)
+            current = {row['category']: int(row['amount']) for row in db.execute(
+                'SELECT category,amount FROM budgets WHERE source=? AND month=? AND currency=?',
+                (source, month, currency))}
+
+        items = []
+        for category in budget_categories:
+            total = totals.get(category['name'], 0)
+            monthly_average = ((total + months_analyzed // 2) // months_analyzed) if months_analyzed else 0
+            if monthly_average:
+                buffered = (monthly_average * 105 + 99) // 100
+                suggested = ((buffered + 4999) // 5000) * 5000
+            else:
+                suggested = 0
+            items.append({
+                'name': category['name'],
+                'color': category['color'],
+                'year_total': total,
+                'monthly_average': monthly_average,
+                'suggested': suggested,
+                'current_budget': current.get(category['name'], 0),
+            })
+
+        unmapped_monthly_average = (
+            (unmapped_total + months_analyzed // 2) // months_analyzed if months_analyzed else 0
+        )
+        return jsonify(
+            month=month,
+            currency=currency,
+            period_start=period_start.isoformat(),
+            period_end=period_end.isoformat(),
+            months=months,
+            months_analyzed=months_analyzed,
+            target_months=12,
+            items=items,
+            total_suggested=sum(item['suggested'] for item in items),
+            unmapped_total=unmapped_total,
+            unmapped_monthly_average=unmapped_monthly_average,
+            method='monthly_average_plus_5_percent_rounded_up_50',
+        )
+
     @app.get('/api/banks')
     def banks():
         if not provider.configured:

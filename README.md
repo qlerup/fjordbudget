@@ -109,6 +109,11 @@ Officielle kilder:
 - Saldo er den senest hentede bankbalance; det er ikke en beregnet saldo ved
   slutningen af den valgte måned. Bogført saldo foretrækkes frem for disponibel.
 - Månedsbudget er udgiftslofter pr. kategori, ikke en prognose for kontosaldo.
+- Under **Mit budget → Lav budgetforslag** kan FjordBudget bruge op til de 12 hele måneder
+  før den valgte budgetmåned til at foreslå et komplet månedsbudget. Forslaget bruger
+  gennemsnitligt forbrug pr. budgetkategori, lægger 5 % buffer til og runder op til nærmeste
+  50 kr. Beløbene vises til gennemsyn og kan rettes, før de gemmes. Udgifter i kategorier
+  uden en budgettilknytning vises særskilt og lægges ikke automatisk ind i forslaget.
 - Kategorien **Overførsler** udelades fra indtægter/udgifter. Genkendelsen er enkel:
   kontrollér kategorierne, især overførsler mellem egne konti.
 - Gentagen import bruger bankens `entry_reference` pr. konto. Hvor banken ikke

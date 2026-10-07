@@ -136,6 +136,47 @@ class AppTests(unittest.TestCase):
             with self.subTest(value=invalid),self.assertRaises(ValueError):
                 cents(invalid)
 
+    def test_budget_suggestion_uses_previous_twelve_complete_months(self):
+        with connect(self.db) as db:
+            db.execute("""INSERT INTO accounts(id,source,name,bank,last4,currency,included,selection_pending)
+                          VALUES ('budget-suggest-live','live','Budget test','Bank','1111','DKK',1,0)""")
+            db.execute("""INSERT OR IGNORE INTO categories(name,color,protected,requires_merchant,budget_category)
+                          VALUES ('Ikke budgetteret','#999999',0,1,NULL)""")
+            start_ordinal = 2025 * 12 + 10 - 1
+            for i in range(12):
+                year, month0 = divmod(start_ordinal + i, 12)
+                booked = f'{year:04d}-{month0+1:02d}-15'
+                for suffix, category, amount in [
+                    ('food','Mad & indkøb',-100000),
+                    ('home','Bolig',-200000),
+                    ('unmapped','Ikke budgetteret',-30000),
+                    ('transfer','Overførsler',-900000),
+                ]:
+                    db.execute("""INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                                  VALUES ('budget-suggest-live',?,?,?,?, 'DKK',?)""",
+                               (f'{suffix}-{i}',booked,suffix,amount,category))
+            db.execute("""INSERT INTO budgets(source,month,currency,category,amount)
+                          VALUES ('live','2026-10','DKK','Mad & indkøb',500000)""")
+
+        response=self.client.get('/api/budgets/suggestion?source=live&month=2026-10&currency=DKK')
+        self.assertEqual(response.status_code,200)
+        result=response.json
+        self.assertEqual(result['period_start'],'2025-10-01')
+        self.assertEqual(result['period_end'],'2026-09-30')
+        self.assertEqual(result['months_analyzed'],12)
+        self.assertEqual(len(result['months']),12)
+        food=next(item for item in result['items'] if item['name']=='Mad & indkøb')
+        home=next(item for item in result['items'] if item['name']=='Bolig')
+        self.assertEqual(food['year_total'],1200000)
+        self.assertEqual(food['monthly_average'],100000)
+        self.assertEqual(food['suggested'],105000)
+        self.assertEqual(food['current_budget'],500000)
+        self.assertEqual(home['monthly_average'],200000)
+        self.assertEqual(home['suggested'],210000)
+        self.assertEqual(result['unmapped_total'],360000)
+        self.assertEqual(result['unmapped_monthly_average'],30000)
+        self.assertFalse(any(item['name']=='Overførsler' for item in result['items']))
+
     def test_budget_is_persistent_and_scoped_to_month_currency_and_mode(self):
         values={cat:'123.45' for cat in CATEGORIES[:8]}
         response=self.client.put('/api/budgets?source=live',json={'amounts':values},headers=self.headers)

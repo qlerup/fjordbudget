@@ -244,6 +244,37 @@ function openBudget() {
   $('budgetFields').innerHTML=dashboard.categories.map((c,i)=>`<label class="budget-field"><span class="budget-category"><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}</span><input name="${esc(c.name)}" aria-label="Budget for ${esc(c.name)}" type="number" min="0" max="1000000000" step="0.01" required value="${c.budget/100}"></label>`).join('');
   showError('budgetError',''); $('budgetDialog').showModal();
 }
+async function openBudgetSuggestion(){
+  const button=$('suggestBudget');
+  button.disabled=true;showError('budgetCategoryError','');
+  try{
+    const scope=query().toString();
+    const result=await api('/api/budgets/suggestion?'+scope);
+    if(!result.months_analyzed){
+      showError('budgetCategoryError','Der er ingen historiske posteringer at lave et budgetforslag ud fra.');
+      return;
+    }
+    $('budgetSuggestionForm').dataset.scope=scope;
+    const start=new Intl.DateTimeFormat('da-DK',{dateStyle:'long'}).format(new Date(result.period_start+'T12:00:00'));
+    const end=new Intl.DateTimeFormat('da-DK',{dateStyle:'long'}).format(new Date(result.period_end+'T12:00:00'));
+    const coverage=result.months_analyzed===12?'12 hele måneder':`${result.months_analyzed} måneder med data`;
+    $('budgetSuggestionIntro').textContent=`Baseret på ${coverage} fra ${start} til ${end}. Forslaget gælder ${monthName(result.month)}.`;
+    $('budgetSuggestionFields').innerHTML=result.items.map(item=>{
+      const previous=item.current_budget?` · nu ${money(item.current_budget,result.currency,0)}`:'';
+      return `<label class="budget-field"><span><span class="budget-category"><i class="category-dot" style="background:${item.color}"></i>${esc(item.name)}</span><small class="muted">Gns. ${esc(money(item.monthly_average,result.currency,0))}/md.${esc(previous)}</small></span><input name="${esc(item.name)}" aria-label="Budgetforslag for ${esc(item.name)}" type="number" min="0" max="1000000000" step="0.01" required value="${item.suggested/100}"></label>`;
+    }).join('');
+    if(result.unmapped_monthly_average){
+      $('budgetSuggestionUnmapped').textContent=`Der ligger desuden ca. ${money(result.unmapped_monthly_average,result.currency,0)}/md. i kategorier, som ikke er tilknyttet en budgetkategori. Det beløb er ikke med i forslaget.`;
+      $('budgetSuggestionUnmapped').hidden=false;
+    }else{
+      $('budgetSuggestionUnmapped').textContent='';
+      $('budgetSuggestionUnmapped').hidden=true;
+    }
+    showError('budgetSuggestionError','');
+    $('budgetSuggestionDialog').showModal();
+  }catch(error){showError('budgetCategoryError',error.message);}
+  finally{button.disabled=false;}
+}
 let accountVisibilityAccounts=[];
 async function openAccountVisibility(pending=false){
   const result=await api('/api/accounts/manage'+(pending?'?pending=1':''));
@@ -389,6 +420,19 @@ $('budgetForm').addEventListener('submit',async event=>{
   event.preventDefault(); const button=event.submitter;button.disabled=true;
   try{await api('/api/budgets?'+query(),{method:'PUT',body:JSON.stringify({amounts:Object.fromEntries(new FormData(event.target))})});$('budgetDialog').close();toast('Dit budget er gemt');await refresh();}
   catch(error){showError('budgetError',error.message);}finally{button.disabled=false;}
+});
+$('suggestBudget').addEventListener('click',openBudgetSuggestion);
+$('budgetSuggestionForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget, button=event.submitter;
+  button.disabled=true;showError('budgetSuggestionError','');
+  try{
+    await api('/api/budgets?'+form.dataset.scope,{method:'PUT',body:JSON.stringify({amounts:Object.fromEntries(new FormData(form))})});
+    $('budgetSuggestionDialog').close();
+    toast('Budgetforslaget er gemt');
+    await refresh();
+  }catch(error){showError('budgetSuggestionError',error.message);}
+  finally{button.disabled=false;}
 });
 $('connectBank').onclick=async()=>{
   $('connectBank').disabled=true;showError('bankError','');
