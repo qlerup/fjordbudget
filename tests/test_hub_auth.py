@@ -59,7 +59,10 @@ class HubAuthTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/dashboard').status_code,401)
         self.client.get('/login')
         with self.client.session_transaction() as s: token=s['csrf']
-        for _ in range(5): response=self.client.post('/login',data={'username':'owner','password':'wrong','csrf':token})
+        for _ in range(5):
+            response=self.client.post('/login',data={'username':'owner','password':'wrong','csrf':token})
+            self.assertEqual(response.status_code,200)
+        response=self.client.post('/login',data={'username':'owner','password':'correct','csrf':token})
         self.assertEqual(response.status_code,429)
 
     def test_public_domain_cookie_and_callback_follow_hub(self):
