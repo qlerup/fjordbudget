@@ -22,6 +22,10 @@ class Provider:
     def banks(self):
         return [{'name':'Test Bank','country':'DK','psu_types':['personal']}]
 
+    def transactions(self, uid, start, end):
+        self.calls.append(('TRANSACTIONS', uid, {'start':start, 'end':end}))
+        return []
+
     def request(self, method, path, **kwargs):
         self.calls.append((method,path,kwargs))
         if path == '/auth':
@@ -173,6 +177,25 @@ class AppTests(unittest.TestCase):
         self.assertEqual(account_name({'name':'Holder','details':' Holiday ','product':'Savings'}),'Holiday')
         self.assertEqual(account_name({'name':'Holder','details':' ','product':'Savings'}),'Savings')
         self.assertEqual(account_name({'name':'Holder'}),'Bankkonto')
+
+    def test_manual_sync_reports_completion_and_default_auto_interval(self):
+        self.assertEqual(self.app.extensions['auto_sync_interval_seconds'], 1800)
+        self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
+        state=self.provider.calls[-1][2]['json']['state']
+        self.client.get('/bank/callback?state='+state+'&code=abc')
+        self.select_pending_accounts()
+        self.assertEqual(self.client.post('/api/sync',json={},headers=self.headers).status_code,202)
+        deadline=time.time()+2
+        while time.time()<deadline:
+            status=self.client.get('/api/sync').json
+            if not status['running']:
+                break
+            time.sleep(0.01)
+        self.assertFalse(status['running'])
+        self.assertFalse(status['error'])
+        self.assertFalse(status['automatic'])
+        self.assertIsNotNone(status['completed_at'])
+        datetime.fromisoformat(status['completed_at'])
 
     def test_sync_refreshes_existing_account_name(self):
         self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)

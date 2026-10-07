@@ -47,6 +47,7 @@ def create_app(config=None):
                       FJORDHUB_API_KEY=os.environ.get('FJORDHUB_API_KEY', ''),
                       SESSION_COOKIE_NAME='fjordbudget_session', PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
                       APP_URL=os.environ.get('APP_URL', 'http://localhost:8060').rstrip('/'),
+                      AUTO_SYNC_INTERVAL_SECONDS=os.environ.get('AUTO_SYNC_INTERVAL_SECONDS', '1800'),
                       SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
                       MAX_CONTENT_LENGTH=16384, TRUSTED_HOSTS=['localhost', '127.0.0.1'])
     if config:
@@ -61,8 +62,13 @@ def create_app(config=None):
     provider = app.config.get('PROVIDER') or EnableBanking(os.environ.get('ENABLE_BANKING_APP_ID', ''), os.environ.get('ENABLE_BANKING_KEY_FILE', '/run/secrets/enablebanking.pem'), credential_store, cipher)
     app.extensions.update(db_path=db_path, bank_provider=provider, cipher=cipher)
     public_url = register_hub_auth(app, db_path)
-    job = {'running': False, 'message': '', 'error': False}
+    job = {'running': False, 'message': '', 'error': False, 'automatic': False, 'completed_at': None}
     job_lock = threading.Lock()
+    try:
+        auto_sync_interval = max(0, int(app.config['AUTO_SYNC_INTERVAL_SECONDS']))
+    except (TypeError, ValueError):
+        auto_sync_interval = 1800
+    app.extensions['auto_sync_interval_seconds'] = auto_sync_interval
 
     @app.before_request
     def protect_local_app():
@@ -722,17 +728,11 @@ def create_app(config=None):
                 return jsonify(error='Kontoen findes ikke.'), 404
         return jsonify(ok=True)
 
-    @app.get('/api/sync')
-    def sync_status():
-        with job_lock:
-            return jsonify(dict(job))
-
-    @app.post('/api/sync')
-    def sync():
+    def start_sync(automatic=False):
         with job_lock:
             if job['running']:
-                return jsonify(error='En synkronisering kører allerede.'), 409
-            job.update(running=True, message='Kontakter banken …', error=False)
+                return False
+            job.update(running=True, message='Kontakter banken …', error=False, automatic=automatic)
 
         def update(message):
             with job_lock:
@@ -752,8 +752,54 @@ def create_app(config=None):
                     job.update(message='Synkroniseringen fejlede. Eksisterende posteringer er bevaret.', error=True)
             finally:
                 with job_lock:
-                    job['running'] = False
-        threading.Thread(target=run, daemon=True).start()
+                    job.update(running=False, completed_at=datetime.now(timezone.utc).isoformat())
+
+        threading.Thread(target=run, daemon=True, name='fjordbudget-bank-sync').start()
+        return True
+
+    def auto_sync_due():
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=auto_sync_interval)
+        with connect(db_path) as db:
+            rows = db.execute("""SELECT a.synced_at FROM accounts a
+                                 JOIN connections c ON c.id=a.connection_id
+                                 WHERE a.source='live' AND a.included=1 AND a.selection_pending=0""").fetchall()
+        if not rows:
+            return False
+        for row in rows:
+            if not row['synced_at']:
+                return True
+            try:
+                synced_at = datetime.fromisoformat(row['synced_at'].replace('Z', '+00:00'))
+                if synced_at.tzinfo is None:
+                    synced_at = synced_at.replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                return True
+            if synced_at <= cutoff:
+                return True
+        return False
+
+    def auto_sync_loop():
+        last_attempt = time.monotonic() - auto_sync_interval
+        check_every = min(60, auto_sync_interval)
+        while True:
+            if time.monotonic() - last_attempt >= auto_sync_interval:
+                try:
+                    if auto_sync_due() and start_sync(automatic=True):
+                        last_attempt = time.monotonic()
+                except Exception as error:
+                    app.logger.error('Automatic sync check failed: %s', type(error).__name__)
+                    last_attempt = time.monotonic()
+            time.sleep(check_every)
+
+    @app.get('/api/sync')
+    def sync_status():
+        with job_lock:
+            return jsonify(dict(job))
+
+    @app.post('/api/sync')
+    def sync():
+        if not start_sync():
+            return jsonify(error='En synkronisering kører allerede.'), 409
         return jsonify(ok=True), 202
 
     @app.delete('/api/connections/<connection_id>')
@@ -771,5 +817,8 @@ def create_app(config=None):
             db.execute('UPDATE accounts SET connection_id=NULL,remote_id=NULL WHERE connection_id=?', (connection_id,))
             db.execute('DELETE FROM connections WHERE id=?', (connection_id,))
         return jsonify(ok=True)
+
+    if not app.testing and auto_sync_interval > 0:
+        threading.Thread(target=auto_sync_loop, daemon=True, name='fjordbudget-auto-sync').start()
 
     return app
