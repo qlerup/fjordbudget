@@ -164,6 +164,46 @@ class InsightTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute("SELECT merchant FROM transactions WHERE external_id='mcd-b'").fetchone()[0],"McDonald's")
 
+    def test_fixed_merchant_is_excluded_from_savings_opportunities(self):
+        with connect(self.db) as db:
+            row = db.execute(
+                "SELECT id FROM transactions WHERE account_id='demo-daily' AND description='ARKET' ORDER BY booked_on DESC LIMIT 1"
+            ).fetchone()
+            self.assertIsNotNone(row)
+
+        response = self.client.patch(
+            f"/api/transactions/{row['id']}/merchant",
+            json={'merchant': 'Børnehave', 'remember': True, 'adjustable': False},
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        merchants = self.client.get('/api/merchants?source=demo').json['items']
+        merchant = next(item for item in merchants if item['name'] == 'Børnehave')
+        self.assertFalse(merchant['adjustable'])
+
+        library = self.client.get('/api/merchant-library?source=demo').json['items']
+        merchant = next(item for item in library if item['name'] == 'Børnehave')
+        self.assertFalse(merchant['adjustable'])
+
+        profile = self.client.get('/api/savings-goals?source=demo').json['profile']
+        self.assertFalse(any(
+            item['type'] == 'merchant' and item['name'] == 'Børnehave'
+            for item in profile['opportunities']
+        ))
+
+        response = self.client.patch(
+            f"/api/transactions/{row['id']}/merchant",
+            json={'merchant': 'Børnehave', 'remember': True, 'adjustable': True},
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        profile = self.client.get('/api/savings-goals?source=demo').json['profile']
+        self.assertTrue(any(
+            item['type'] == 'merchant' and item['name'] == 'Børnehave'
+            for item in profile['opportunities']
+        ))
+
     def test_savings_analysis_defaults_to_last_month_and_accepts_custom_dates(self):
         today = date.today()
         first_this_month = today.replace(day=1)
