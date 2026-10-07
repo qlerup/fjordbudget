@@ -52,6 +52,7 @@ function switchSource(next) {
   $('demoNotice').hidden=source!=='demo';
   $('syncButton').hidden=source==='demo';
   $('manageAccountsButton').hidden=source==='demo';
+  $('lastSyncText').hidden=source==='demo';
   $('syncMessage').textContent='';
   $('accountFilter').value=''; $('search').value=''; $('categoryFilter').value=''; page=1;
   return refresh();
@@ -64,7 +65,18 @@ function renderAccounts() {
   $('accountFilter').innerHTML='<option value="">Alle konti</option>'+accounts.filter(a=>a.currency===$('currency').value).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
   if ([...$('accountFilter').options].some(o=>o.value===previous)) $('accountFilter').value=previous;
   const dates=accounts.map(a=>a.synced_at).filter(Boolean).sort();
-  if(source==='live' && dates.length) $('syncMessage').textContent='Senest hentet: '+new Intl.DateTimeFormat('da-DK',{dateStyle:'short',timeStyle:'short'}).format(new Date(dates[dates.length-1]));
+  if(source==='live'){
+    if(dates.length){
+      const synced=new Date(dates[dates.length-1]);
+      const syncDate=new Intl.DateTimeFormat('da-DK',{day:'numeric',month:'short',year:'numeric'}).format(synced);
+      const syncTime=new Intl.DateTimeFormat('da-DK',{hour:'2-digit',minute:'2-digit'}).format(synced);
+      $('lastSyncText').textContent=`Senest opdateret: ${syncDate} kl. ${syncTime}`;
+      $('lastSyncText').hidden=false;
+    }else{
+      $('lastSyncText').textContent='Ikke opdateret endnu';
+      $('lastSyncText').hidden=false;
+    }
+  }
 }
 function budgetRows(categories, editable=false) {
   return categories.map(c=>`<div class="budget-row"><span class="budget-category"><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}${editable?`<button type="button" class="text-button" data-delete-budget-category="${esc(c.name)}" aria-label="Fjern budgetkategori ${esc(c.name)}">Fjern</button>`:''}</span><span class="budget-value"><b>${esc(money(c.spent))}</b> / ${c.budget?esc(money(c.budget)):'Intet budget'}</span><div class="progress"><div class="progress-fill ${c.budget&&c.spent>c.budget?'over':''}" style="width:${c.budget?Math.min(100,c.spent/c.budget*100):0}%"></div></div></div>`).join('');

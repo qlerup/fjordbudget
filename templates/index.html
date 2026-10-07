@@ -28,6 +28,7 @@
   <symbol id="icon-income" viewBox="0 0 24 24"><path d="M5 5v14h14"/><path d="m6 18 11-11M10 7h7v7"/></symbol>
   <symbol id="icon-expense" viewBox="0 0 24 24"><path d="M5 19V5h14"/><path d="m6 6 11 11M10 17h7v-7"/></symbol>
   <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M4 5v6.5L12.5 20 20 12.5 11.5 4H5a1 1 0 0 0-1 1Z"/><circle cx="8" cy="8" r="1.4"/></symbol>
 </defs></svg>
 <aside class="sidebar">
   <a class="brand" href="/" aria-label="FjordBudget start"><img src="/static/logos/wordmark.svg?v=brand-budget-green-20261005" width="182" height="46" alt="FjordBudget"></a>
@@ -39,7 +40,7 @@
     <button class="nav-item" data-view="transactions"><svg><use href="#icon-arrows"/></svg>Posteringer</button>
     <button class="nav-item" data-view="budget"><svg><use href="#icon-chart"/></svg>Mit budget</button>
     <button class="nav-item" data-view="savings" aria-label="Opsparingsmål"><svg><use href="#icon-target"/></svg>Opsparingsmål</button>
-  <button class="nav-item" data-view="categories" aria-label="Kategorier"><svg><use href="#icon-grid"/></svg>Kategorier</button>
+  <button class="nav-item" data-view="categories" aria-label="Kategorier"><svg><use href="#icon-tag"/></svg>Kategorier</button>
   <button class="nav-item" data-view="merchants" aria-label="Forhandlere"><svg><use href="#icon-store"/></svg>Forhandlere</button></nav>
   <p class="nav-label second-label">FORBINDELSER</p>
   <button class="nav-item" data-connect><svg><use href="#icon-bank"/></svg>Mine banker</button>
@@ -69,7 +70,7 @@
         </button>
       </section>
       <section id="featuredGoalPanel" class="panel featured-goal-panel" data-section="insights" hidden aria-live="polite"></section>
-      <section class="accounts-section" data-section="accounts"><div class="section-heading"><div><h2>Mine konti <span class="count" id="accountsLabel">0</span></h2><p>Saldo lige nu, uanset valgt måned</p></div><div class="account-heading-actions"><button id="manageAccountsButton" class="button quiet" type="button"><svg><use href="#icon-grid"/></svg>Administrer konti</button><button id="syncButton" class="button quiet"><svg><use href="#icon-refresh"/></svg>Opdater saldi</button></div></div><div id="accounts" class="accounts-grid"></div><p id="syncMessage" class="sync-status" role="status"></p></section>
+      <section class="accounts-section" data-section="accounts"><div class="section-heading"><div><h2>Mine konti <span class="count" id="accountsLabel">0</span></h2><p>Saldo lige nu, uanset valgt måned</p></div><div class="account-heading-actions"><button id="manageAccountsButton" class="button quiet" type="button"><svg><use href="#icon-grid"/></svg>Administrer konti</button><div class="sync-action"><button id="syncButton" class="button quiet"><svg><use href="#icon-refresh"/></svg>Opdater saldi</button><span id="lastSyncText" class="last-sync-text" hidden></span></div></div></div><div id="accounts" class="accounts-grid"></div><p id="syncMessage" class="sync-status" role="status"></p></section>
       <div class="insights" data-section="insights">
         <section class="panel cashflow"><div class="section-heading"><div><h2>Ind og ud</h2><p>Din økonomi måned for måned</p></div><div class="legend"><span><i class="income-dot"></i>Indtægter</span><span><i class="expense-dot"></i>Udgifter</span></div></div><div id="cashflowChart" class="cashflow-chart"></div><div class="chart-footer"><span>Overførsler mellem konti er ikke medregnet</span><strong id="netCashflow"></strong></div></section>
         <section class="panel budget-panel"><div class="section-heading"><div><h2>Dit månedsbudget</h2><p>Giv dine penge en retning</p></div><button class="text-button edit-budget">Rediger <span>↗</span></button></div><div id="budgetProgress"></div><div id="budgetPreview"></div><button class="budget-detail text-button" data-view="budget">Se hele budgettet <span>→</span></button></section>

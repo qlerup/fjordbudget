@@ -168,6 +168,17 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#appContent')).to_be_visible()
         expect(self.page.locator('#accountSetupDialog')).not_to_be_visible()
 
+    def test_last_sync_timestamp_is_shown_below_refresh_button(self):
+        data=self.app.test_client().get('/api/dashboard?source=demo').json
+        data['has_bank_connections']=False
+        data['accounts'][0]['synced_at']='2026-10-07T13:22:00+00:00'
+        self.page.route('**/api/dashboard?source=live*',lambda route:route.fulfill(json=data))
+        self.page.locator('[data-source="live"]').click()
+        expect(self.page.locator('#lastSyncText')).to_be_visible()
+        expect(self.page.locator('#lastSyncText')).to_contain_text('Senest opdateret:')
+        expect(self.page.locator('#lastSyncText')).to_contain_text('7. okt. 2026')
+        expect(self.page.locator('#lastSyncText')).to_contain_text('kl.')
+
     def test_account_manager_can_toggle_accounts_on_mobile(self):
         accounts=[
             {'id':'a1','name':'Lønkonto','custom_name':None,'bank':'Test Bank','last4':'1111','currency':'DKK','balance':10000,'synced_at':None,'included':1,'selection_pending':0,'connected':1},
@@ -459,6 +470,8 @@ class UITests(unittest.TestCase):
         self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
         expect(self.page.locator('.summary-card .metric-icon svg')).to_have_count(3)
         self.assertEqual(self.page.locator('.summary-card .metric-icon').evaluate_all("els=>els.map(el=>el.textContent.trim())"),['','',''])
+        self.assertEqual(self.page.locator('.nav-item[data-view="overview"] use').get_attribute('href'),'#icon-grid')
+        self.assertEqual(self.page.locator('.nav-item[data-view="categories"] use').get_attribute('href'),'#icon-tag')
         self.page.locator('.nav-item[data-view="budget"]').click()
         expect(self.page.locator('.full-budget')).to_be_visible()
         self.page.locator('.full-budget .edit-budget').click()
