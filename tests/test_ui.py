@@ -429,6 +429,7 @@ class UITests(unittest.TestCase):
         row=self.page.locator('#transactionRows tr').first
         row.locator('.merchant-picker-button').click()
         self.page.locator('#merchantName').fill('UI Merchant')
+        self.page.get_by_label('Fast udgift – beløbet kan ikke justeres og må ikke bruges i forslag til besparelser').check()
         self.page.locator('#saveMerchant').click()
         expect(self.page.locator('#merchantDialog')).not_to_be_visible()
 
@@ -436,6 +437,7 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('[data-section="merchants"]')).to_be_visible()
         card=self.page.locator('[data-library-merchant="UI Merchant"]')
         expect(card).to_be_visible()
+        expect(card).to_contain_text('Fast udgift')
         expect(card.locator('[data-delete-merchant-rule]')).to_have_count(1)
 
         card.locator('[data-delete-merchant-rule]').click()
