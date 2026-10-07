@@ -61,11 +61,9 @@ function savingsStatus(goal){
   return ['danger','Målet er ikke realistisk endnu',`Du mangler ca. ${money(a.monthly_shortfall,goal.currency,0)} om måneden, og de fundne besparelser dækker ikke hele forskellen.`];
 }
 function savingsSuggestion(item,currency){
-  const type=item.type==='merchant'?'Forhandler':'Kategori';
-  return `<li><div><strong>${esc(item.name)}</strong><span>${type} · ${esc(item.category)} · normalt ca. ${esc(money(item.monthly_average,currency,0))}/md.</span></div><b>+${esc(money(item.recommended_cut,currency,0))}/md.</b></li>`;
+  return `<li><div><strong>${esc(item.name)}</strong><span>Forhandler · normalt ca. ${esc(money(item.monthly_average,currency,0))}/md.</span></div><b>+${esc(money(item.recommended_cut,currency,0))}/md.</b></li>`;
 }
 function renderSavingsProfile(profile){
-  const categories=profile.categories.slice(0,5);
   const merchants=profile.merchants.slice(0,5);
   const period=savingsDateLabel(profile.period_start)+' – '+savingsDateLabel(profile.period_end);
   $('savingsProfile').innerHTML=profile.months_analyzed?`
@@ -76,8 +74,8 @@ function renderSavingsProfile(profile){
       <article><span>Råderum i perioden</span><strong class="${profile.total_available<0?'negative':''}">${esc(money(profile.total_available,$('currency').value,0))}</strong></article>
     </div>
     <div class="spending-breakdown">
-      <div><h3>Hvor pengene går hen</h3>${categories.length?`<ol>${categories.map(item=>`<li><span>${esc(item.name)}</span><b>${esc(money(item.total,$('currency').value,0))}</b></li>`).join('')}</ol>`:'<p class="muted">Ingen udgifter at analysere endnu.</p>'}</div>
-      <div><h3>Forhandlere du har lært FjordBudget</h3>${merchants.length?`<ol>${merchants.map(item=>`<li><span>${esc(item.name)}<small>${esc(item.category)} · ${item.purchases} køb</small></span><b>${esc(money(item.total,$('currency').value,0))}</b></li>`).join('')}</ol>`:'<p class="muted">Angiv forhandler på posteringer, så analysen kan blive mere konkret.</p>'}</div>
+      <div><h3>Forhandlere i perioden</h3>${merchants.length?`<ol>${merchants.map(item=>`<li><span>${esc(item.name)}<small>${item.purchases} køb${item.adjustable===false?' · fast udgift':''}</small></span><b>${esc(money(item.total,$('currency').value,0))}</b></li>`).join('')}</ol>`:'<p class="muted">Angiv forhandler på posteringer, så analysen kan blive mere konkret.</p>'}</div>
+      <div><h3>Sådan findes besparelser</h3><p class="muted">Kun forhandlere bruges til forslag ved opsparingsmål. Kategorier hører til budgetdelen og påvirker ikke besparelsesforslagene. Forhandlere markeret som fast udgift bliver altid udeladt.</p></div>
     </div>
     <p class="analysis-note">Kun posteringer fra den valgte periode er med. Målvurderingen omregner perioden til et månedligt niveau, så den kan sammenlignes med hvad målet kræver pr. måned.</p>`:
     `<div class="empty-state"><h3>Ingen posteringer i perioden</h3><p>Der er ingen posteringer mellem ${esc(period)}. Vælg en anden periode for at analysere andre datoer.</p></div>`;
