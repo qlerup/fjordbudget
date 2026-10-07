@@ -18,13 +18,14 @@ class Provider:
     configured = True
     def __init__(self):
         self.calls = []
+        self.history_items = []
 
     def banks(self):
         return [{'name':'Test Bank','country':'DK','psu_types':['personal']}]
 
-    def transactions(self, uid, start, end):
-        self.calls.append(('TRANSACTIONS', uid, {'start':start, 'end':end}))
-        return []
+    def transactions(self, uid, start=None, end=None, strategy='default'):
+        self.calls.append(('TRANSACTIONS', uid, {'start':start, 'end':end, 'strategy':strategy}))
+        return list(self.history_items) if strategy == 'longest' else []
 
     def request(self, method, path, **kwargs):
         self.calls.append((method,path,kwargs))
@@ -184,6 +185,11 @@ class AppTests(unittest.TestCase):
         state=self.provider.calls[-1][2]['json']['state']
         self.client.get('/bank/callback?state='+state+'&code=abc')
         self.select_pending_accounts()
+        self.provider.history_items=[{
+            'status':'BOOK','booking_date':'2024-01-15','credit_debit_indicator':'DBIT',
+            'transaction_amount':{'amount':'10.00','currency':'DKK'},
+            'remittance_information':['Historisk køb'],'entry_reference':'historic',
+        }]
         self.assertEqual(self.client.post('/api/sync',json={},headers=self.headers).status_code,202)
         deadline=time.time()+2
         while time.time()<deadline:
@@ -196,6 +202,24 @@ class AppTests(unittest.TestCase):
         self.assertFalse(status['automatic'])
         self.assertIsNotNone(status['completed_at'])
         datetime.fromisoformat(status['completed_at'])
+        self.assertEqual(status['history']['earliest_date'],'2024-01-15')
+        self.assertEqual(status['history']['transactions'],1)
+        longest_calls=[call for call in self.provider.calls
+                       if call[0]=='TRANSACTIONS' and call[2]['strategy']=='longest']
+        self.assertEqual(len(longest_calls),1)
+
+        self.assertEqual(self.client.post('/api/sync',json={},headers=self.headers).status_code,202)
+        deadline=time.time()+2
+        while time.time()<deadline:
+            status=self.client.get('/api/sync').json
+            if not status['running']:
+                break
+            time.sleep(0.01)
+        self.assertFalse(status['error'])
+        self.assertIsNone(status['history'])
+        recent_calls=[call for call in self.provider.calls
+                      if call[0]=='TRANSACTIONS' and call[2]['strategy']=='default']
+        self.assertTrue(recent_calls)
 
     def test_sync_refreshes_existing_account_name(self):
         self.client.post('/api/bank/connect',json={'bank':'Test Bank'},headers=self.headers)
@@ -504,7 +528,11 @@ class AppTests(unittest.TestCase):
         with patch.object(provider,'request',side_effect=[{'transactions':[],'continuation_key':'next'}, {'transactions':[{'entry_reference':'a'}]}]) as req:
             self.assertEqual(provider.transactions('id','2026-01-01','2026-01-31'),[{'entry_reference':'a'}])
             first,second=[call.kwargs['params'] for call in req.call_args_list]
+            self.assertEqual(first,{'transaction_status':'BOOK','date_from':'2026-01-01','date_to':'2026-01-31'})
             self.assertEqual(second,{**first,'continuation_key':'next'})
+        with patch.object(provider,'request',return_value={'transactions':[]}) as req:
+            self.assertEqual(provider.transactions('id',strategy='longest'),[])
+            self.assertEqual(req.call_args.kwargs['params'],{'transaction_status':'BOOK','strategy':'longest'})
         with patch.object(provider,'request',return_value={'transactions':[],'continuation_key':'again'}),self.assertRaises(BankError):
             provider.transactions('id','2026-01-01','2026-01-31')
 
