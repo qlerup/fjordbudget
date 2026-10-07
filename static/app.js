@@ -44,6 +44,7 @@ function setView(next) {
   $('pageTitle').textContent=titles[next][0]; $('pageSubtitle').textContent=titles[next][1]; $('breadcrumb').textContent=titles[next][2];
   document.querySelectorAll('.nav-item[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===next); b.setAttribute('aria-current',b.dataset.view===next?'page':'false');});
   document.querySelectorAll('[data-section]').forEach(el=>{ const section=el.dataset.section; el.hidden=next==='overview'? ['budget','categories','savings','merchants','transactions'].includes(section) : next==='budget'?!['summary','budget'].includes(section):section!==next; });
+  $('manageAccountsButton').hidden=source==='demo' || next!=='accounts';
 }
 function switchSource(next) {
   source=config?.has_bank_connections?'live':next; localStorage.setItem('fjordbudget-source',source);
@@ -51,7 +52,7 @@ function switchSource(next) {
   document.querySelectorAll('[data-source]').forEach(b=>{b.classList.toggle('selected',b.dataset.source===source); b.setAttribute('aria-pressed',String(b.dataset.source===source));});
   $('demoNotice').hidden=source!=='demo';
   $('syncButton').hidden=source==='demo';
-  $('manageAccountsButton').hidden=source==='demo';
+  $('manageAccountsButton').hidden=source==='demo' || view!=='accounts';
   $('lastSyncText').hidden=source==='demo';
   $('syncMessage').textContent='';
   $('accountFilter').value=''; $('search').value=''; $('categoryFilter').value=''; page=1;
