@@ -62,7 +62,7 @@ def create_app(config=None):
     provider = app.config.get('PROVIDER') or EnableBanking(os.environ.get('ENABLE_BANKING_APP_ID', ''), os.environ.get('ENABLE_BANKING_KEY_FILE', '/run/secrets/enablebanking.pem'), credential_store, cipher)
     app.extensions.update(db_path=db_path, bank_provider=provider, cipher=cipher)
     public_url = register_hub_auth(app, db_path)
-    job = {'running': False, 'message': '', 'error': False, 'automatic': False, 'completed_at': None}
+    job = {'running': False, 'message': '', 'error': False, 'automatic': False, 'completed_at': None, 'history': None}
     job_lock = threading.Lock()
     try:
         auto_sync_interval = max(0, int(app.config['AUTO_SYNC_INTERVAL_SECONDS']))
@@ -827,7 +827,7 @@ def create_app(config=None):
         with job_lock:
             if job['running']:
                 return False
-            job.update(running=True, message='Kontakter banken …', error=False, automatic=automatic)
+            job.update(running=True, message='Kontakter banken …', error=False, automatic=automatic, history=None)
 
         def update(message):
             with job_lock:
@@ -835,9 +835,14 @@ def create_app(config=None):
 
         def run():
             try:
-                message = sync_all(db_path, provider, cipher, update)
+                result = sync_all(db_path, provider, cipher, update)
+                if isinstance(result, dict):
+                    message = result.get('message', '')
+                    history = result.get('history')
+                else:
+                    message, history = result, None
                 with job_lock:
-                    job.update(message=message, error=False)
+                    job.update(message=message, history=history, error=False)
             except BankError as error:
                 with job_lock:
                     job.update(message=str(error), error=True)
