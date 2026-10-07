@@ -204,6 +204,12 @@ class InsightTests(unittest.TestCase):
             for item in profile['opportunities']
         ))
 
+    def test_savings_opportunities_are_merchant_only(self):
+        profile = self.client.get('/api/savings-goals?source=demo').json['profile']
+        self.assertTrue(profile['opportunities'])
+        self.assertTrue(all(item['type'] == 'merchant' for item in profile['opportunities']))
+        self.assertFalse(any(item['name'].startswith('Øvrigt i ') for item in profile['opportunities']))
+
     def test_savings_analysis_defaults_to_last_month_and_accepts_custom_dates(self):
         today = date.today()
         first_this_month = today.replace(day=1)
