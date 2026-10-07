@@ -4,7 +4,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
 const svg = (name, cls='') => `<svg class="${cls}" aria-hidden="true"><use href="#icon-${name}"/></svg>`;
 const csrf = document.querySelector('meta[name="csrf-token"]').content;
 let config, dashboard, page=1, pages=1, view='overview', source=localStorage.getItem('fjordbudget-source') || 'demo';
-let dashboardGeneration=0, transactionsGeneration=0, toastTimer, searchTimer, syncPolling=false;
+let dashboardGeneration=0, transactionsGeneration=0, toastTimer, searchTimer, syncPolling=false, lastSyncCompletion=null;
 if (!['demo','live'].includes(source)) source='demo';
 const money = (value, currency=$('currency').value || 'DKK', decimals=0) => new Intl.NumberFormat('da-DK', {style:'currency', currency, minimumFractionDigits:decimals, maximumFractionDigits:decimals}).format(value / 100);
 const monthName = month => new Intl.DateTimeFormat('da-DK', {month:'long', year:'numeric'}).format(new Date(month+'-15T12:00:00'));
@@ -248,6 +248,7 @@ async function pollSync() {
   const tick=async()=>{
     try {
       const result=await api('/api/sync');
+      if(result.completed_at)lastSyncCompletion=result.completed_at;
       $('syncButton').disabled=result.running;
       if(source==='live') $('syncMessage').textContent=result.message;
       if(result.running){setTimeout(tick,1500);return;}
@@ -344,6 +345,7 @@ async function init(){
     }
     await switchSource(source);
     const status=await api('/api/sync');
+    lastSyncCompletion=status.completed_at || null;
     if(status.running)await pollSync();
     else if(bankResult==='connected'){
       const needsSelection=await openAccountVisibility(true);
@@ -356,6 +358,24 @@ async function init(){
 }
 if($('logoutButton'))$('logoutButton').onclick=async()=>{await api('/logout',{method:'POST',body:'{}'});window.location.assign('/login');};
 init();
+
+async function watchAutomaticSync(){
+  if(!config || syncPolling || source!=='live')return;
+  try{
+    const status=await api('/api/sync');
+    if(status.running){await pollSync();return;}
+    if(status.completed_at && status.completed_at!==lastSyncCompletion){
+      lastSyncCompletion=status.completed_at;
+      await refresh();
+      if(status.error){
+        $('syncMessage').textContent=status.message || 'Den automatiske banksynkronisering fejlede.';
+      }else if(status.message){
+        toast(status.message);
+      }
+    }
+  }catch{}
+}
+setInterval(watchAutomaticSync,30000);
 
 $('accountNameForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=$('saveAccountName');button.disabled=true;
