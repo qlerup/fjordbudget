@@ -95,8 +95,6 @@ def _profile(db, source, currency, today):
 
     merchant_preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
         'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
-    merchant_preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
-        'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
     merchants = []
     merchant_by_category = defaultdict(int)
     for name, item in merchant_spend.items():
@@ -220,6 +218,8 @@ def _period_profile(db, source, currency, start_date, end_date):
     } for name, total in category_spend.items()]
     categories.sort(key=lambda item: item['total'], reverse=True)
 
+    merchant_preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
+        'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
     merchants = []
     merchant_by_category = defaultdict(int)
     for name, item in merchant_spend.items():
