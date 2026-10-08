@@ -122,6 +122,14 @@ def register_hub_auth(app, db_path):
             user = next((u for u in result.get('items',[]) if u.get('id')==uid and not u.get('must_change_password')), None)
             if user:
                 return None
+            session.clear()
+            session['hub_access_revoked'] = True
+            if not request.path.startswith('/api/'):
+                return redirect('/login?access_removed=1')
+            return jsonify(error_code='access_revoked', authenticated=False,
+                           error='Din adgang er blevet fjernet. Du bliver automatisk logget ud.'), 401
+        if request.endpoint == 'api_hub_access':
+            return jsonify(authenticated=False, error_code='access_revoked' if session.get('hub_access_revoked') else None), (401 if session.get('hub_access_revoked') else 200)
         session.clear()
         if request.path.startswith('/api/'):
             return jsonify(error='Log ind via FjordHub for at fortsætte.'), 401
@@ -172,5 +180,11 @@ def register_hub_auth(app, db_path):
     def logout():
         session.clear()
         return jsonify(ok=True)
+
+    @app.get('/api/auth/access')
+    def api_hub_access():
+        response = jsonify(ok=True, authenticated=bool(session.get('hub_user_id')))
+        response.headers['Cache-Control'] = 'private, no-store'
+        return response
 
     return public_url

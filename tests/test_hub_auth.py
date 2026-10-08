@@ -39,8 +39,12 @@ class HubAuthTests(unittest.TestCase):
     def test_sso_owner_revocation_and_second_owner_denied(self):
         self.assertEqual(self.login().location,'/')
         self.assertEqual(self.client.get('/api/dashboard').status_code,200)
+        self.assertTrue(self.client.get('/api/auth/access').json['authenticated'])
         self.users=[{'id':8,'username':'other','role':'admin'}]
-        self.assertEqual(self.client.get('/api/dashboard').status_code,401)
+        revoked = self.client.get('/api/dashboard')
+        self.assertEqual(revoked.status_code,401)
+        self.assertEqual(revoked.json['error_code'],'access_revoked')
+        self.assertEqual(self.client.get('/api/auth/access').json['error_code'],'access_revoked')
         self.assertEqual(self.login().location,'/login')
         self.assertEqual(self.client.get('/api/dashboard').status_code,401)
 
