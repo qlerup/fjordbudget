@@ -8,7 +8,7 @@
 <p>Log ind med din FjordHub-konto. Åbner du appen fra FjordHub, bliver du logget ind automatisk.</p>
 {% if error %}<div class="error-box" role="alert">{{ error }}</div>{% endif %}
 <form method="post" action="/login" class="login-form">
-{% if email_required %}<div class="auth-field"><label for="first-login-email">Email til din FjordHub-konto</label><input id="first-login-email" name="first_login_email" type="email" autocomplete="email" required autofocus value="{{ request.form.get('first_login_email', '') }}"></div>{% endif %}
+{% if email_required %}<div class="auth-field"><label for="first-login-email">Email til din FjordHub-konto</label><input id="first-login-email" name="first_login_email" type="email" autocomplete="email" required autofocus value="{{ request.form.get('first_login_email', '') }}"></div>{% endif %}{% if password_required %}<div class="auth-field"><label for="first-login-password">Ny personlig adgangskode</label><input id="first-login-password" name="first_login_password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required></div><div class="auth-field"><label for="first-login-password-confirm">Gentag ny adgangskode</label><input id="first-login-password-confirm" name="first_login_password_confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" required></div>{% endif %}
 
 <input type="hidden" name="csrf" value="{{ session.get('csrf','') }}">
 <label for="username">FjordHub-brugernavn</label><input id="username" name="username" autocomplete="username" required maxlength="200" autofocus>
