@@ -155,8 +155,10 @@ def register_hub_auth(app, db_path):
                 bucket = attempts[rate_key]
                 if len(bucket) >= 5 or len(attempts) > 2048:
                     return render_template('login.html', error='For mange mislykkede forsøg. Vent fem minutter.'), 429
-            result = hub_api('/api/hub/apps/authenticate', {'username':request.form.get('username','')[:200],
+            result = hub_api('/api/hub/apps/authenticate', {'first_login_email':request.form.get('first_login_email',''),'username':request.form.get('username','')[:200],
                 'password':request.form.get('password','')[:1024]}, method='POST')
+            if result.get('ok') and result.get('user',{}).get('email_required'):
+                return render_template('login.html', managed=True, email_required=True, error=result['user'].get('email_error') or 'Indtast din email ved første login og bekræft dit login.')
             if result.get('ok') and establish(result.get('user')):
                 with lock:
                     attempts.pop(rate_key, None)

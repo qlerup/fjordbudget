@@ -8,6 +8,8 @@
 <p>Log ind med din FjordHub-konto. Åbner du appen fra FjordHub, bliver du logget ind automatisk.</p>
 {% if error %}<div class="error-box" role="alert">{{ error }}</div>{% endif %}
 <form method="post" action="/login" class="login-form">
+{% if email_required %}<div class="auth-field"><label for="first-login-email">Email til din FjordHub-konto</label><input id="first-login-email" name="first_login_email" type="email" autocomplete="email" required autofocus value="{{ request.form.get('first_login_email', '') }}"></div>{% endif %}
+
 <input type="hidden" name="csrf" value="{{ session.get('csrf','') }}">
 <label for="username">FjordHub-brugernavn</label><input id="username" name="username" autocomplete="username" required maxlength="200" autofocus>
 <label for="password">Adgangskode</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="1024">
