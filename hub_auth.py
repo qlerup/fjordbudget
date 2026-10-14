@@ -121,6 +121,10 @@ def register_hub_auth(app, db_path):
                 raise HubUnavailable()
             user = next((u for u in result.get('items',[]) if u.get('id')==uid and not u.get('must_change_password')), None)
             if user:
+                g.hub_email_member = user
+                if user.get('email_required') and request.endpoint != 'hub_email_update':
+                    from hub_email import required_response
+                    return required_response()
                 return None
             session.clear()
             session['hub_access_revoked'] = True
@@ -188,5 +192,10 @@ def register_hub_auth(app, db_path):
         response = jsonify(ok=True, authenticated=bool(session.get('hub_user_id')))
         response.headers['Cache-Control'] = 'private, no-store'
         return response
+
+    @app.post('/api/auth/email')
+    def hub_email_update():
+        from hub_email import submit_email
+        return submit_email(g.hub_email_member, hub_api)
 
     return public_url

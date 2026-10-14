@@ -7,6 +7,28 @@ from app import create_app
 
 
 class HubAuthTests(unittest.TestCase):
+    def test_required_email_blocks_existing_owner_and_restores_same_session(self):
+        self.assertEqual(self.login().status_code,302)
+        self.assertEqual(self.client.get('/api/dashboard').status_code,200)
+        self.users[0]['email_required']=True
+        result=self.client.get('/api/auth/access')
+        self.assertEqual(result.status_code,403)
+        self.assertEqual(result.json['error_code'],'email_update_required')
+        self.assertEqual(self.client.get('/api/dashboard').status_code,403)
+        headers={'X-CSRF-Token':result.json['csrf_token']}
+        from unittest.mock import Mock
+        def update(method,url,**kwargs):
+            if url.endswith('/email'):
+                self.assertTrue(url.endswith('/users/7/email'))
+                self.assertEqual(kwargs['json']['email'],'new@example.test')
+                self.users[0]['email_required']=False
+                return Mock(status_code=200,ok=True,json=lambda:{'ok':True,'accepted':True,'user':self.users[0]})
+            return self.hub(method,url,**kwargs)
+        with patch('hub_auth.requests.request',side_effect=update):
+            self.assertTrue(self.client.post('/api/auth/email',json={'email':'new@example.test','id':999},headers=headers).json['accepted'])
+        self.assertEqual(self.client.get('/api/dashboard').status_code,200)
+        with self.client.session_transaction() as s:self.assertEqual(s['hub_user_id'],7)
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.app=create_app({'TESTING':True,'DATA_DIR':self.temp.name,'AUTH_MODE':'fjordhub',
