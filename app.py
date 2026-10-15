@@ -414,6 +414,15 @@ def create_app(config=None):
                 account_id = None
             elif not isinstance(account_id, str) or not 1 <= len(account_id) <= 200 or any(ord(c)<32 for c in account_id):
                 raise ValueError('Den valgte konto er ugyldig.')
+            has_account_selection = 'analysis_account_ids' in body
+            analysis_account_ids = body.get('analysis_account_ids', [])
+            if has_account_selection and (
+                not isinstance(analysis_account_ids, list) or len(analysis_account_ids) > 100
+                or any(not isinstance(aid, str) or not 1 <= len(aid) <= 200
+                       or any(ord(char) < 32 for char in aid) for aid in analysis_account_ids)
+                or len(set(analysis_account_ids)) != len(analysis_account_ids)
+            ):
+                raise ValueError('Vælg gyldige, forskellige konti til opsparingsanalysen.')
             if amount <= 0:
                 raise ValueError('Opsparingsmålet skal være større end 0.')
             if saved_amount < 0 or saved_amount > amount:
@@ -442,6 +451,14 @@ def create_app(config=None):
                     (account_id, source, currency)).fetchone()
                 if linked_account is None:
                     raise ValueError('Vælg en konto fra den aktuelle datakilde og valuta.')
+            if request.method != 'DELETE' and has_account_selection and analysis_account_ids:
+                placeholders = ','.join('?' for _ in analysis_account_ids)
+                valid_account_ids = {row['id'] for row in db.execute(
+                    f'''SELECT id FROM accounts WHERE id IN ({placeholders})
+                        AND source=? AND currency=? AND selection_pending=0''',
+                    (*analysis_account_ids, source, currency))}
+                if valid_account_ids != set(analysis_account_ids):
+                    raise ValueError('En af analysekontiene findes ikke i den valgte datakilde og valuta.')
             if request.method == 'POST':
                 existing = db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? LIMIT 1', (source, currency)).fetchone()
                 has_featured = db.execute('SELECT 1 FROM savings_goals WHERE source=? AND currency=? AND featured=1 LIMIT 1', (source, currency)).fetchone()
@@ -466,6 +483,11 @@ def create_app(config=None):
                     fallback = db.execute('SELECT id FROM savings_goals WHERE source=? AND currency=? ORDER BY deadline,id LIMIT 1', (source, currency)).fetchone()
                     if fallback:
                         db.execute('UPDATE savings_goals SET featured=1 WHERE id=?', (fallback['id'],))
+            if request.method != 'DELETE' and (request.method == 'POST' or has_account_selection):
+                db.execute('DELETE FROM savings_goal_analysis_accounts WHERE goal_id=?', (goal_id,))
+                db.executemany(
+                    'INSERT INTO savings_goal_analysis_accounts(goal_id,account_id) VALUES (?,?)',
+                    [(goal_id, aid) for aid in analysis_account_ids])
         return jsonify(ok=True, id=goal_id)
     @app.get('/api/config')
     def configuration():
