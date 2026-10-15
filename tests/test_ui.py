@@ -71,6 +71,9 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('.mode-switch')).to_be_visible()
 
     def test_savings_goals_create_edit_source_switch_and_delete(self):
+        # Browser tests share a database; do not depend on an earlier test's goals.
+        with connect(self.app.extensions['db_path']) as db:
+            db.execute("DELETE FROM savings_goals WHERE source='demo'")
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
         expect(self.page.locator('#savingsList')).to_contain_text('Hvad drømmer du om?')
@@ -234,7 +237,8 @@ class UITests(unittest.TestCase):
     def test_last_sync_timestamp_is_shown_below_refresh_button(self):
         data=self.app.test_client().get('/api/dashboard?source=demo').json
         data['has_bank_connections']=False
-        data['accounts'][0]['synced_at']='2026-10-07T13:22:00+00:00'
+        for account in data['accounts']:
+            account['synced_at']='2026-10-07T13:22:00+00:00'
         self.page.route('**/api/dashboard?source=live*',lambda route:route.fulfill(json=data))
         self.page.locator('[data-source="live"]').click()
         expect(self.page.locator('#lastSyncText')).to_be_visible()
