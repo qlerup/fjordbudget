@@ -103,15 +103,16 @@ function renderDashboard() {
   window.renderFeaturedGoal?.(d.featured_goal);
   renderAccounts();
 }
-function transactionRow(t) {
+function transactionRow(t, showAccountDetails=false) {
   const requiresMerchant=!(t.requires_merchant===0 || t.requires_merchant===false);
   const display=requiresMerchant && t.merchant ? t.merchant : t.description;
   const detail=requiresMerchant ? (t.merchant ? t.description : (t.amount>=0?'Indgående':'Ukendt forhandler')) : '';
   const subtitle=detail ? dateName(t.booked_on)+' · '+detail : dateName(t.booked_on);
+  const accountDetail=showAccountDetails===true && t.account ? `<br><strong class="transaction-account-detail">Konto: ${esc(t.account)}</strong>` : '';
   const state=transactionState(t);
   const categoryControl=`<button type="button" class="category-picker-button ${t.category?'confirmed':''}" data-edit-category="${t.id}" data-category="${esc(t.category)}" data-description="${esc(t.description)}" aria-label="Kategori for ${esc(t.description)}"><span>${esc(t.category || 'Vælg kategori')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`;
   const merchantControl=requiresMerchant?`<button type="button" class="merchant-picker-button ${t.merchant?'confirmed':''}" data-edit-merchant="${t.id}" data-description="${esc(t.description)}" data-merchant="${esc(t.merchant || '')}" aria-label="Forhandler for ${esc(t.description)}"><span>${esc(t.merchant || 'Vælg forhandler')}</span><svg aria-hidden="true"><use href="#icon-chevron"/></svg></button>`:'';
-  return `<tr class="${state.className}" title="${esc(state.title)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}</span></span></div></td><td>${esc(t.account)}</td><td class="category-control-cell">${categoryControl}</td><td class="merchant-control-cell">${merchantControl}</td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
+  return `<tr class="${state.className}" title="${esc(state.title)}"><td><div class="merchant"><span class="merchant-logo">${esc(display.slice(0,1).toUpperCase())}</span><span><span class="merchant-name" title="${esc(t.description)}">${esc(display)}</span><span class="merchant-kind">${esc(subtitle)}${accountDetail}</span></span></div></td><td>${esc(t.account)}</td><td class="category-control-cell">${categoryControl}</td><td class="merchant-control-cell">${merchantControl}</td><td>${esc(dateName(t.booked_on))}</td><td class="amount-cell ${t.amount>0?'positive':t.amount<0?'negative':''}">${t.amount>0?'+':''}${esc(money(t.amount,t.currency,2))}</td></tr>`;
 }
 async function loadTransactions() {
   const generation=++transactionsGeneration;
@@ -128,7 +129,7 @@ async function loadTransactions() {
 async function loadIncompleteTransactions() {
   showError('incompleteTransactionsError','');
   const data=await api('/api/transactions?'+query({missing:'1',per_page:'200'}));
-  $('incompleteTransactionRows').innerHTML=data.items.map(transactionRow).join('');
+  $('incompleteTransactionRows').innerHTML=data.items.map(t=>transactionRow(t,true)).join('');
   $('incompleteTransactionsEmpty').hidden=!!data.items.length;
   $('incompleteTransactionsModalCount').textContent=data.total===0?'0 posteringer mangler oplysninger':
     (data.total===1?'1 postering mangler oplysninger':`${data.total} posteringer mangler oplysninger`) +
