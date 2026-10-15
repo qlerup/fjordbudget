@@ -51,6 +51,8 @@ attachSavingsMoneyInput('savingsSavedAmount');
 
 function savingsStatus(goal){
   const a=goal.analysis;
+  if(!(goal.analysis_account_ids || []).length && a.status!=='complete' && a.status!=='expired')
+    return ['neutral','Vælg konti til analysen','Rediger målet og sæt flueben ved de konti, der skal bruges til spareforslag.'];
   const amount=money(a.required_monthly,goal.currency,0);
   if(a.status==='complete')return ['complete','Målet er nået','Du har allerede sparet hele målbeløbet op.'];
   if(a.status==='expired')return ['danger','Deadline er passeret',`Der mangler ${money(a.remaining,goal.currency,0)} på målet.`];
@@ -67,7 +69,7 @@ function renderSavingsProfile(profile){
   const merchants=profile.merchants.slice(0,5);
   const period=savingsDateLabel(profile.period_start)+' – '+savingsDateLabel(profile.period_end);
   $('savingsProfile').innerHTML=profile.months_analyzed?`
-    <p class="savings-period-caption">Viser <strong>${esc(period)}</strong></p>
+    <p class="savings-period-caption">Samlet overblik for <strong>${esc(period)}</strong> · målenes spareforslag bruger kun de konti, du vælger på hvert mål.</p>
     <div class="savings-profile-summary">
       <article><span>Indtægt i perioden</span><strong>${esc(money(profile.total_income,$('currency').value,0))}</strong></article>
       <article><span>Udgifter i perioden</span><strong>${esc(money(profile.total_expenses,$('currency').value,0))}</strong></article>
@@ -100,11 +102,16 @@ async function loadSavings(){
         ? `<p class="savings-account-source">${svg('bank')}<span>Følger <strong>${esc(goal.account_name)}</strong> live${goal.account_balance_available?'':' · saldo afventer'}</span></p>`
         : '';
       const suggestions=goal.analysis.suggestions || [];
+      const chosenAccounts=(goal.analysis_account_ids || []).map(id=>savingsAccounts.find(account=>account.id===id)).filter(Boolean);
+      const analysisSource=chosenAccounts.length
+        ? '<p class="savings-account-source">'+svg('bank')+'<span>Spareforslag fra: <strong>'+chosenAccounts.map(account=>esc(account.name)).join(', ')+'</strong></span></p>'
+        : '<p class="savings-account-source">Ingen konti valgt til spareforslag</p>';
       return `<article class="savings-card ${goal.featured?'featured':''}">
         <div class="savings-card-top"><span class="savings-icon">${svg('target')}</span>${goal.featured?'<span class="goal-featured">Vises på overblikket</span>':''}</div>
         <h3>${esc(goal.name)}</h3>
         <p class="savings-target">${esc(money(goal.saved_amount,goal.currency,2))} <small>af ${esc(money(goal.target_amount,goal.currency,2))}</small></p>
         ${accountLine}
+        ${analysisSource}
         <div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div>
         <p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>
         <div class="goal-status ${tone}"><strong>${esc(label)}</strong><span>${esc(text)}</span></div>
@@ -138,6 +145,12 @@ function openSavings(goal=null){
     const hidden=account.included?'':' · skjult i overblik';
     return '<option value="'+esc(account.id)+'">'+esc(account.name)+suffix+hidden+'</option>';
   }).join('');
+  const selected=new Set(goal?.analysis_account_ids || []);
+  $('savingsAnalysisAccountChoices').innerHTML=savingsAccounts.length?savingsAccounts.map(account=>{
+    const suffix=account.last4?' · •• '+esc(account.last4):'';
+    const hidden=account.included?'':' · skjult i overblikket';
+    return '<label class="checkbox-row savings-analysis-account"><input type="checkbox" name="analysis_account_ids" value="'+esc(account.id)+'"'+(selected.has(account.id)?' checked':'')+'><span>'+esc(account.name)+suffix+hidden+'</span></label>';
+  }).join(''):'<p class="small muted">Der er ingen tilgængelige konti i denne datakilde og valuta. Du kan gemme målet og vælge konti senere.</p>';
   if(goal){
     $('savingsName').value=goal.name;
     $('savingsAmount').value=formatSavingsAmount((goal.target_amount/100).toFixed(2).replace('.',','));
@@ -181,6 +194,7 @@ $('savingsForm').addEventListener('submit',async event=>{
     values.target_amount=values.target_amount.replaceAll('.','').replace(',','.');
     values.saved_amount=(values.saved_amount || '0').replaceAll('.','').replace(',','.');
     values.account_id=values.account_id || null;
+    values.analysis_account_ids=Array.from(form.querySelectorAll('input[name="analysis_account_ids"]:checked'),input=>input.value);
     values.featured=$('savingsFeatured').checked;
     await api('/api/savings-goals'+(form.dataset.id?'/'+form.dataset.id:'')+'?'+form.dataset.scope,{method:form.dataset.id?'PUT':'POST',body:JSON.stringify(values)});
     $('savingsDialog').close();toast('Opsparingsmålet er gemt');await refresh();if(view==='savings')await loadSavings();
