@@ -523,6 +523,36 @@ class InsightTests(unittest.TestCase):
             for item in profile['opportunities']
         ))
 
+    def test_savings_suggestions_use_a_typical_purchase_not_flat_percent(self):
+        from insights import _spending_opportunities
+        spending = {
+            'McDonalds': {
+                'total': 120000, 'amounts': [30000, 31000, 29000, 30000],
+                'months': {'2026-09'}, 'categories': {'Fritid': 120000},
+            },
+            'Large one-off': {
+                'total': 180000, 'amounts': [180000],
+                'months': {'2026-09'}, 'categories': {'Shopping': 180000},
+            },
+            'Monthly rent': {
+                'total': 200000, 'amounts': [100000, 100000],
+                'months': {'2026-08', '2026-09'}, 'categories': {'Bolig': 200000},
+            },
+        }
+        results = _spending_opportunities(spending, {'monthlyrent': False}, 1, 1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['name'], 'McDonalds')
+        self.assertEqual(results[0]['suggested_cut'], 30000)
+        self.assertEqual(results[0]['typical_purchase'], 30000)
+        self.assertEqual(results[0]['average_visits_per_month'], 4)
+        self.assertEqual(results[0]['suggestion_kind'], 'skip_one_visit')
+        # Spending concentrated in one of three months should not be
+        # extrapolated into a recurring monthly opportunity.
+        concentrated = {
+            'McDonalds': {**spending['McDonalds'], 'months': {'2026-09'}},
+        }
+        self.assertEqual(_spending_opportunities(concentrated, {}, 3, 3), [])
+
     def test_savings_opportunities_are_merchant_only(self):
         profile = self.client.get('/api/savings-goals?source=demo').json['profile']
         self.assertTrue(profile['opportunities'])
@@ -620,7 +650,8 @@ class InsightTests(unittest.TestCase):
         daily_merchants = {item['name'] for item in daily['analysis']['suggestions']}
         bills_merchants = {item['name'] for item in bills['analysis']['suggestions']}
         self.assertTrue(daily_merchants)
-        self.assertTrue(bills_merchants)
+        # Rent and one-off recurring bills are not "skip a visit" opportunities.
+        self.assertFalse(bills_merchants)
         self.assertTrue(daily_merchants.isdisjoint(bills_merchants))
 
         changed = self.client.put(f"/api/savings-goals/{first.json['id']}?source=demo",

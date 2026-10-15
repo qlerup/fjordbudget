@@ -63,7 +63,8 @@ function savingsStatus(goal){
   return ['danger','Målet er ikke realistisk endnu',`Du mangler ca. ${money(a.monthly_shortfall,goal.currency,0)} om måneden, og de fundne besparelser dækker ikke hele forskellen.`];
 }
 function savingsSuggestion(item,currency){
-  return `<li><div><strong>${esc(item.name)}</strong><span>Forhandler · normalt ca. ${esc(money(item.monthly_average,currency,0))}/md.</span></div><b>+${esc(money(item.recommended_cut,currency,0))}/md.</b></li>`;
+  const visits=new Intl.NumberFormat('da-DK',{maximumFractionDigits:1}).format(item.average_visits_per_month);
+  return `<li><div><strong>${esc(item.name)}</strong><span>${esc(item.purchases)} køb i perioden · ca. ${esc(visits)} køb/md. · ${esc(money(item.monthly_average,currency,0))}/md. brugt</span><small>Prøv ét besøg færre om måneden. Et typisk køb var ${esc(money(item.typical_purchase,currency,0))}.</small></div><b>Op til ${esc(money(item.recommended_cut,currency,0))}/md.</b></li>`;
 }
 function renderSavingsProfile(profile){
   const merchants=profile.merchants.slice(0,5);
@@ -77,7 +78,7 @@ function renderSavingsProfile(profile){
     </div>
     <div class="spending-breakdown">
       <div><h3>Forhandlere i perioden</h3>${merchants.length?`<ol>${merchants.map(item=>`<li><span>${esc(item.name)}<small>${item.purchases} køb${item.adjustable===false?' · fast udgift':''}</small></span><b>${esc(money(item.total,$('currency').value,0))}</b></li>`).join('')}</ol>`:'<p class="muted">Angiv forhandler på posteringer, så analysen kan blive mere konkret.</p>'}</div>
-      <div><h3>Sådan findes besparelser</h3><p class="muted">Kun forhandlere bruges til forslag ved opsparingsmål. Kategorier hører til budgetdelen og påvirker ikke besparelsesforslagene. Forhandlere markeret som fast udgift bliver altid udeladt.</p></div>
+      <div><h3>Sådan findes besparelser</h3><p class="muted">Opsparingsforslag kræver gentagne køb hos en forhandler. FjordBudget estimerer værdien af ét færre besøg ud fra typiske købsbeløb – ikke en fast procentdel. Engangskøb og forhandlere markeret som fast udgift udelades. Kategorier bruges ikke til forslagene.</p></div>
     </div>
     <p class="analysis-note">Kun posteringer fra den valgte periode er med. Målvurderingen omregner perioden til et månedligt niveau, så den kan sammenlignes med hvad målet kræver pr. måned.</p>`:
     `<div class="empty-state"><h3>Ingen posteringer i perioden</h3><p>Der er ingen posteringer mellem ${esc(period)}. Vælg en anden periode for at analysere andre datoer.</p></div>`;
@@ -116,7 +117,7 @@ async function loadSavings(){
         <p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>
         <div class="goal-status ${tone}"><strong>${esc(label)}</strong><span>${esc(text)}</span></div>
         ${goal.analysis.months_analyzed?`<div class="goal-numbers"><span>Kræver <b>${esc(money(goal.analysis.required_monthly,goal.currency,0))}/md.</b></span><span>Råderum <b>${esc(money(goal.analysis.average_available,goal.currency,0))}/md.</b></span></div>`:''}
-        ${suggestions.length?`<div class="goal-suggestions"><h4>${goal.analysis.monthly_shortfall?'Forslag til at lukke forskellen':'Muligheder hvis du vil nå målet hurtigere'}</h4><ul>${suggestions.map(item=>savingsSuggestion(item,goal.currency)).join('')}</ul>${goal.analysis.projected_with_changes?`<p>Med disse ændringer peger beregningen mod <strong>${esc(monthName(goal.analysis.projected_with_changes))}</strong>.</p>`:''}</div>`:''}
+        ${suggestions.length?`<div class="goal-suggestions"><h4>${goal.analysis.monthly_shortfall?'Forslag til at lukke forskellen':'Muligheder hvis du vil nå målet hurtigere'}</h4><p class="muted">Konkrete scenarier ud fra gentagne køb, ikke garanterede besparelser.</p><ul>${suggestions.map(item=>savingsSuggestion(item,goal.currency)).join('')}</ul>${goal.analysis.projected_with_changes?`<p>Hvis du fastholder disse ændringer, peger estimatet mod <strong>${esc(monthName(goal.analysis.projected_with_changes))}</strong>.</p>`:''}</div>`:(goal.analysis.months_analyzed?`<p class="analysis-note">Ingen sikre forslag til færre besøg i perioden. Engangskøb regnes ikke som en fast månedlig besparelse.</p>`:'')}
         <div class="savings-actions"><button type="button" class="button quiet" data-edit-savings="${goal.id}" aria-label="Rediger ${esc(goal.name)}">Rediger</button><button type="button" class="text-button" data-delete-savings="${goal.id}" aria-label="Slet ${esc(goal.name)}">Slet</button></div>
       </article>`;
     }).join(''):'<div class="empty-state"><h3>Hvad drømmer du om?</h3><p>Opret dit første mål. FjordBudget beregner derefter, hvad det kræver pr. måned.</p></div>';

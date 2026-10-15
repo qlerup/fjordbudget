@@ -82,6 +82,16 @@ function renderAccounts() {
 function budgetRows(categories, editable=false) {
   return categories.map(c=>`<div class="budget-row"><span class="budget-category"><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}${editable?`<button type="button" class="text-button" data-delete-budget-category="${esc(c.name)}" aria-label="Fjern budgetkategori ${esc(c.name)}">Fjern</button>`:''}</span><span class="budget-value"><b>${esc(money(c.spent))}</b> / ${c.budget?esc(money(c.budget)):'Intet budget'}</span><div class="progress"><div class="progress-fill ${c.budget&&c.spent>c.budget?'over':''}" style="width:${c.budget?Math.min(100,c.spent/c.budget*100):0}%"></div></div></div>`).join('');
 }
+function renderLastMonthReview(review){
+  const month=review?.month;
+  const items=review?.items || [];
+  $('lastMonthReviewPeriod').textContent=month
+    ? monthName(month)+' · dine største køb hos forhandlere, der ikke er markeret som fast udgift'
+    : 'Sidste afsluttede måned';
+  $('lastMonthReviewList').innerHTML=items.length
+    ? '<ol>'+items.map(item=>`<li><div class="spending-review-info"><strong>${esc(item.name)}</strong><span>${item.purchases} køb i måneden</span></div><b>${esc(money(item.spent))}</b></li>`).join('')+'</ol>'
+    : '<p class="muted">Der er endnu ingen kendte forhandlere at vise for sidste måned. Gennemgå dine posteringer, så bliver overblikket mere præcist.</p>';
+}
 function renderDashboard() {
   const d=dashboard;
   $('balance').textContent=money(d.balance);
@@ -94,6 +104,7 @@ function renderDashboard() {
   $('incompleteTransactionsCount').textContent=incomplete;
   $('incompleteTransactionsText').textContent=incomplete===0?'Alt er udfyldt denne måned':incomplete===1?'1 postering mangler oplysninger':`${incomplete} posteringer mangler oplysninger`;
   $('incompleteTransactionsCard').classList.toggle('complete',incomplete===0);
+  renderLastMonthReview(d.last_month_review);
   $('budgetProgress').innerHTML=`<div class="budget-progress-label"><strong>${esc(money(d.budget_spent))} brugt</strong><span>${d.budget?esc(money(d.budget))+' i budget':'Intet budget endnu'}</span></div><div class="progress"><div class="progress-fill ${d.budget&&d.budget_spent>d.budget?'over':''}" style="width:${d.budget?Math.min(100,d.budget_spent/d.budget*100):0}%"></div></div>`;
   $('budgetPreview').innerHTML=budgetRows(d.categories.slice(0,3)); $('budgetFull').innerHTML=d.categories.length?budgetRows(d.categories,true):'<p class="empty-state">Tilføj din første budgetkategori ovenfor.</p>';
   const max=Math.max(1,...d.history.flatMap(h=>[h.income,h.expenses]));

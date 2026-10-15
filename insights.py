@@ -1,12 +1,11 @@
 from collections import defaultdict
 from datetime import date, timedelta
 from math import ceil
+from statistics import median
 import re
 
 from db import connect, transaction_title
 
-
-MERCHANT_SAVINGS_RATE = 0.10
 
 
 def _merchant_key(value):
@@ -25,6 +24,71 @@ def _month_label(number):
 
 def _average(values):
     return int(round(sum(values) / len(values))) if values else 0
+
+
+def _spending_opportunities(merchant_spend, preferences, months_equivalent, period_months):
+    """Find plausible one-fewer-visit opportunities based on real purchases.
+
+    Unlike flat percentage suggestions, each estimate uses the median of
+    actual purchase amounts and skips one-off spending.
+    """
+    opportunities = []
+    for name, item in merchant_spend.items():
+        if not preferences.get(_merchant_key(name), True):
+            continue
+        amounts = item['amounts']
+        active_months = len(item['months'])
+        visits_per_month = len(amounts) / months_equivalent
+        if len(amounts) < 2 or visits_per_month < 1.5:
+            continue
+        if period_months > 1 and active_months < 2:
+            continue
+        monthly_average = int(round(item['total'] / months_equivalent))
+        typical_purchase = int(median(amounts))
+        saving = min(typical_purchase, monthly_average // 2)
+        if saving < 2500:
+            continue
+        category = max(item['categories'], key=item['categories'].get)
+        opportunities.append({
+            'type': 'merchant', 'name': name, 'category': category,
+            'monthly_average': monthly_average,
+            'suggested_cut': saving, 'yearly_effect': saving * 12,
+            'purchases': len(amounts), 'active_months': active_months,
+            'average_visits_per_month': round(visits_per_month, 1),
+            'typical_purchase': typical_purchase, 'suggestion_kind': 'skip_one_visit',
+        })
+    opportunities.sort(key=lambda item: (-item['suggested_cut'], item['name'].casefold()))
+    return opportunities[:10]
+
+
+def last_month_spending(db, source, currency, today=None):
+    """Top four adjustable merchants in the last completed calendar month.
+
+    The dashboard is independent of savings goals and the month picker.
+    Recorded spend is not a claim that every purchase was unnecessary.
+    """
+    today = today or date.today()
+    month = (today.replace(day=1) - timedelta(days=1)).strftime('%Y-%m')
+    preferences = {row['merchant_key']: bool(row['adjustable']) for row in db.execute(
+        'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
+    grouped = {}
+    for row in db.execute(
+        '''SELECT t.merchant,COUNT(*) purchases,SUM(-t.amount) total
+           FROM transactions t JOIN accounts a ON a.id=t.account_id
+           WHERE a.source=? AND a.included=1 AND a.selection_pending=0
+             AND t.currency=? AND substr(t.booked_on,1,7)=?
+             AND t.amount<0 AND t.category!='Overførsler'
+             AND t.merchant IS NOT NULL AND trim(t.merchant)!=''
+           GROUP BY t.merchant''', (source, currency, month)):
+        name = row['merchant'].strip()
+        key = _merchant_key(name)
+        if not key or not preferences.get(key, True):
+            continue
+        item = grouped.setdefault(key, {'name': name, 'spent': 0, 'purchases': 0})
+        item['spent'] += int(row['total'])
+        item['purchases'] += int(row['purchases'])
+    items = sorted(grouped.values(), key=lambda item: (-item['spent'], item['name'].casefold()))
+    return {'month': month, 'items': items[:4]}
 
 
 def _account_filter(account_ids):
@@ -71,7 +135,7 @@ def _profile(db, source, currency, today, account_ids=None):
         monthly[row['month']] = {'income': row['income'] or 0, 'expenses': row['expenses'] or 0}
 
     category_spend = defaultdict(int)
-    merchant_spend = defaultdict(lambda: {'total': 0, 'count': 0, 'months': set(), 'categories': defaultdict(int)})
+    merchant_spend = defaultdict(lambda: {'total': 0, 'count': 0, 'months': set(), 'categories': defaultdict(int), 'amounts': []})
     for row in db.execute(
         f'''SELECT substr(t.booked_on,1,7) month,t.amount,t.category,t.merchant
             FROM transactions t JOIN accounts a ON a.id=t.account_id
@@ -86,6 +150,7 @@ def _profile(db, source, currency, today, account_ids=None):
             item['total'] += spend
             item['count'] += 1
             item['months'].add(row['month'])
+            item['amounts'].append(spend)
             item['categories'][row['category']] += spend
 
     month_count = len(months)
@@ -113,19 +178,7 @@ def _profile(db, source, currency, today, account_ids=None):
         })
     merchants.sort(key=lambda item: item['monthly_average'], reverse=True)
 
-    opportunities = []
-    for merchant in merchants:
-        if not merchant['adjustable']:
-            continue
-        saving = int(round(merchant['monthly_average'] * MERCHANT_SAVINGS_RATE))
-        if saving >= 2500:
-            opportunities.append({
-                'type': 'merchant', 'name': merchant['name'], 'category': merchant['category'],
-                'monthly_average': merchant['monthly_average'], 'suggested_cut': saving,
-                'yearly_effect': saving * 12, 'purchases': merchant['purchases'],
-            })
-
-    opportunities.sort(key=lambda item: item['suggested_cut'], reverse=True)
+    opportunities = _spending_opportunities(merchant_spend, merchant_preferences, month_count, month_count)
 
     incomes = [monthly[month]['income'] for month in months]
     expenses = [monthly[month]['expenses'] for month in months]
@@ -184,7 +237,7 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
     total_available = total_income - total_expenses
 
     category_spend = defaultdict(int)
-    merchant_spend = defaultdict(lambda: {'total': 0, 'count': 0, 'months': set(), 'categories': defaultdict(int)})
+    merchant_spend = defaultdict(lambda: {'total': 0, 'count': 0, 'months': set(), 'categories': defaultdict(int), 'amounts': []})
     for row in db.execute(
         f'''SELECT substr(t.booked_on,1,7) month,t.amount,t.category,t.merchant
            FROM transactions t JOIN accounts a ON a.id=t.account_id
@@ -200,6 +253,7 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
             item['total'] += spend
             item['count'] += 1
             item['months'].add(row['month'])
+            item['amounts'].append(spend)
             item['categories'][row['category']] += spend
 
     categories = [{
@@ -226,19 +280,7 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
         })
     merchants.sort(key=lambda item: item['total'], reverse=True)
 
-    opportunities = []
-    for merchant in merchants:
-        if not merchant['adjustable']:
-            continue
-        saving = int(round(merchant['monthly_average'] * MERCHANT_SAVINGS_RATE))
-        if saving >= 2500:
-            opportunities.append({
-                'type': 'merchant', 'name': merchant['name'], 'category': merchant['category'],
-                'monthly_average': merchant['monthly_average'], 'suggested_cut': saving,
-                'yearly_effect': saving * 12, 'purchases': merchant['purchases'],
-            })
-
-    opportunities.sort(key=lambda item: item['suggested_cut'], reverse=True)
+    opportunities = _spending_opportunities(merchant_spend, merchant_preferences, month_equivalent, ceil(month_equivalent))
 
     return {
         'period_start': start_iso,
@@ -276,7 +318,7 @@ def _goal_analysis(goal, profile, today):
         for item in profile['opportunities']:
             if still_needed <= 0:
                 break
-            amount = min(item['suggested_cut'], still_needed)
+            amount = item['suggested_cut']
             suggestions.append({**item, 'recommended_cut': amount, 'yearly_effect': amount * 12})
             still_needed -= amount
     else:

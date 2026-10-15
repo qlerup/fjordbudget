@@ -572,6 +572,28 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('[data-section="transactions"]')).to_be_visible()
         expect(self.page.locator('#transactionRows')).to_contain_text('Overview missing test')
 
+    def test_last_month_merchant_review_is_separate_from_savings_and_mobile_friendly(self):
+        self.page.set_viewport_size({'width':390,'height':844})
+        review = self.page.locator('.spending-review-panel')
+        expect(review).to_be_visible()
+        expect(review.locator('#lastMonthReviewTitle')).to_contain_text('Forbrug, der er værd at kigge på')
+        expect(self.page.locator('#lastMonthReviewList li')).to_have_count(4)
+        expected_month = self.page.evaluate("""() => {
+            const now=new Date(), prior=new Date(now.getFullYear(),now.getMonth()-1,15);
+            return monthName(prior.getFullYear()+'-'+String(prior.getMonth()+1).padStart(2,'0'));
+        }""")
+        expect(self.page.locator('#lastMonthReviewPeriod')).to_contain_text(expected_month)
+        original = self.page.locator('#lastMonthReviewList').inner_text()
+        # The dashboard insight always covers the last finished month,
+        # regardless of which calendar month is currently selected.
+        self.page.locator('#month').fill('2024-01')
+        self.page.locator('#month').dispatch_event('change')
+        expect(self.page.locator('#lastMonthReviewPeriod')).to_contain_text(expected_month)
+        self.assertEqual(self.page.locator('#lastMonthReviewList').inner_text(), original)
+        self.assertLessEqual(self.page.evaluate('document.documentElement.scrollWidth'),390)
+        self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
+        expect(review).not_to_be_visible()
+
     def test_mobile_layout_dialog_and_navigation(self):
         self.page.set_viewport_size({'width':390,'height':844})
         expect(self.page.locator('#appContent')).to_be_visible()

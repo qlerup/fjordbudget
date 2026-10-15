@@ -163,6 +163,49 @@ class AppTests(unittest.TestCase):
             with self.subTest(value=invalid),self.assertRaises(ValueError):
                 cents(invalid)
 
+    def test_dashboard_last_month_review_is_independent_and_excludes_fixed_expenses(self):
+        previous = (date.today().replace(day=1) - timedelta(days=1)).strftime('%Y-%m')
+        current = date.today().strftime('%Y-%m')
+        with connect(self.db) as db:
+            for account_id, included in [('review-visible', 1), ('review-hidden', 0)]:
+                db.execute(
+                    '''INSERT INTO accounts(id,source,name,bank,last4,currency,included,selection_pending)
+                       VALUES (?,'live','Test','Bank','9999','DKK',?,0)''',
+                    (account_id, included))
+            entries = [
+                ('McDonalds', -130000, 'Fritid', 'review-visible', previous),
+                ('McDonalds', -10000, 'Fritid', 'review-visible', previous),
+                ('Apcoa', -90000, 'Transport', 'review-visible', previous),
+                ('Jem & Fix', -80000, 'Shopping', 'review-visible', previous),
+                ('Proshop', -70000, 'Shopping', 'review-visible', previous),
+                ('Small shop', -10000, 'Shopping', 'review-visible', previous),
+                ('Fixed expense', -400000, 'Bolig', 'review-visible', previous),
+                ('Transfer', -500000, 'Overførsler', 'review-visible', previous),
+                ('Hidden expense', -800000, 'Shopping', 'review-hidden', previous),
+                ('Current month', -900000, 'Shopping', 'review-visible', current),
+            ]
+            for i, (merchant, amount, category, account_id, month) in enumerate(entries):
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                                amount,currency,category,merchant)
+                       VALUES (?,?,?,?,?,'DKK',?,?)''',
+                    (account_id, f'review-{i}', month + '-12', merchant, amount, category, merchant))
+            db.execute(
+                """INSERT INTO merchant_preferences(source,merchant_key,name,adjustable)
+                   VALUES ('live','fixedexpense','Fixed expense',0)""")
+        response = self.client.get('/api/dashboard?source=live&currency=DKK&month=2024-01')
+        self.assertEqual(response.status_code, 200)
+        insight = response.json['last_month_review']
+        self.assertEqual(insight['month'], previous)
+        self.assertEqual(
+            [item['name'] for item in insight['items']],
+            ['McDonalds', 'Apcoa', 'Jem & Fix', 'Proshop'])
+        self.assertEqual(insight['items'][0]['spent'], 140000)
+        self.assertEqual(insight['items'][0]['purchases'], 2)
+        self.assertTrue(all(item['spent'] > 0 for item in insight['items']))
+        self.assertEqual(self.client.get('/api/dashboard?source=demo').json[
+            'last_month_review']['month'], previous)
+
     def test_budget_suggestion_uses_previous_twelve_complete_months(self):
         with connect(self.db) as db:
             db.execute("""INSERT INTO accounts(id,source,name,bank,last4,currency,included,selection_pending)

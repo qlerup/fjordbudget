@@ -22,7 +22,7 @@ from banking import BankError, EnableBanking, account_name, sync_all
 from merchant_matching import apply_learned_merchants
 from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, transaction_rule_title, category_list, budget_category_list
 from hub_auth import register_hub_auth
-from insights import build_insights
+from insights import build_insights, last_month_spending
 
 
 def merchant_key(value):
@@ -547,6 +547,7 @@ def create_app(config=None):
             budgets = {r['category']: r['amount'] for r in db.execute('SELECT category,amount FROM budgets WHERE source=? AND month=? AND currency=?', (source, month, currency))}
             months = [r[0] for r in db.execute('''SELECT DISTINCT substr(t.booked_on,1,7) FROM transactions t JOIN accounts a ON a.id=t.account_id WHERE a.source=? AND a.included=1 AND a.selection_pending=0 ORDER BY 1 DESC''', (source,))]
             connections = [dict(r) for r in db.execute('SELECT id,bank,valid_until,created_at FROM connections ORDER BY created_at DESC')] if source == 'live' else []
+            last_month_review = last_month_spending(db, source, currency)
             history = [dict(r) for r in db.execute('''SELECT substr(t.booked_on,1,7) month,
                  SUM(CASE WHEN t.amount>0 THEN t.amount ELSE 0 END) income,
                  SUM(CASE WHEN t.amount<0 THEN -t.amount ELSE 0 END) expenses
@@ -570,7 +571,8 @@ def create_app(config=None):
                        balance=sum(a['balance'] for a in selected if a['balance'] is not None), missing_balances=sum(a['balance'] is None for a in selected),
                        budget=sum(budgets.values()), budget_spent=sum(c['spent'] for c in categories), categories=categories, months=months,
                        history=list(reversed(history)), month=month, featured_goal=goal_insights['featured_goal'],
-                       hidden_account_count=hidden_account_count, incomplete_transactions=incomplete_transactions)
+                       hidden_account_count=hidden_account_count, incomplete_transactions=incomplete_transactions,
+                       last_month_review=last_month_review)
 
     @app.get('/api/transactions')
     def transactions():
