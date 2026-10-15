@@ -27,20 +27,30 @@ def _average(values):
     return int(round(sum(values) / len(values))) if values else 0
 
 
-def _history_months(db, source, currency, today):
+def _account_filter(account_ids):
+    if account_ids is None:
+        return 'a.included=1', ()
+    if not account_ids:
+        return '0=1', ()
+    return 't.account_id IN (' + ','.join('?' for _ in account_ids) + ')', tuple(account_ids)
+
+
+def _history_months(db, source, currency, today, account_ids=None):
+    account_filter, account_params = _account_filter(account_ids)
     current = today.strftime('%Y-%m')
     months = [row[0] for row in db.execute(
-        '''SELECT DISTINCT substr(t.booked_on,1,7)
+        f'''SELECT DISTINCT substr(t.booked_on,1,7)
            FROM transactions t JOIN accounts a ON a.id=t.account_id
-           WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7)<=?
+           WHERE a.source=? AND {account_filter} AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7)<=?
            ORDER BY 1 DESC LIMIT 7''',
-        (source, currency, current))]
+        (source, *account_params, currency, current))]
     completed = [month for month in months if month < current][:6]
     return completed if len(completed) >= 2 else months[:6]
 
 
-def _profile(db, source, currency, today):
-    months = _history_months(db, source, currency, today)
+def _profile(db, source, currency, today, account_ids=None):
+    account_filter, account_params = _account_filter(account_ids)
+    months = _history_months(db, source, currency, today, account_ids)
     if not months:
         return {
             'months': [], 'months_analyzed': 0, 'average_income': 0,
@@ -55,9 +65,9 @@ def _profile(db, source, currency, today):
                    SUM(CASE WHEN t.amount>0 AND t.category!='Overførsler' THEN t.amount ELSE 0 END) income,
                    SUM(CASE WHEN t.amount<0 AND t.category!='Overførsler' THEN -t.amount ELSE 0 END) expenses
             FROM transactions t JOIN accounts a ON a.id=t.account_id
-            WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7) IN ({placeholders})
+            WHERE a.source=? AND {account_filter} AND a.selection_pending=0 AND t.currency=? AND substr(t.booked_on,1,7) IN ({placeholders})
             GROUP BY 1''',
-        (source, currency, *months)):
+        (source, *account_params, currency, *months)):
         monthly[row['month']] = {'income': row['income'] or 0, 'expenses': row['expenses'] or 0}
 
     category_spend = defaultdict(int)
@@ -65,9 +75,9 @@ def _profile(db, source, currency, today):
     for row in db.execute(
         f'''SELECT substr(t.booked_on,1,7) month,t.amount,t.category,t.merchant
             FROM transactions t JOIN accounts a ON a.id=t.account_id
-            WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=? AND t.amount<0 AND t.category!='Overførsler'
+            WHERE a.source=? AND {account_filter} AND a.selection_pending=0 AND t.currency=? AND t.amount<0 AND t.category!='Overførsler'
               AND substr(t.booked_on,1,7) IN ({placeholders})''',
-        (source, currency, *months)):
+        (source, *account_params, currency, *months)):
         spend = -row['amount']
         category_spend[row['category']] += spend
         merchant = (row['merchant'] or '').strip()
@@ -152,21 +162,22 @@ def _month_equivalent(start_date, end_date):
     return max(total, 1 / 31)
 
 
-def _period_profile(db, source, currency, start_date, end_date):
+def _period_profile(db, source, currency, start_date, end_date, account_ids=None):
+    account_filter, account_params = _account_filter(account_ids)
     start_iso = start_date.isoformat()
     end_iso = end_date.isoformat()
     period_days = (end_date - start_date).days + 1
     month_equivalent = _month_equivalent(start_date, end_date)
 
     monthly_rows = list(db.execute(
-        '''SELECT substr(t.booked_on,1,7) month,
+        f'''SELECT substr(t.booked_on,1,7) month,
                   SUM(CASE WHEN t.amount>0 AND t.category!='Overførsler' THEN t.amount ELSE 0 END) income,
                   SUM(CASE WHEN t.amount<0 AND t.category!='Overførsler' THEN -t.amount ELSE 0 END) expenses
            FROM transactions t JOIN accounts a ON a.id=t.account_id
-           WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=?
+           WHERE a.source=? AND {account_filter} AND a.selection_pending=0 AND t.currency=?
              AND t.booked_on BETWEEN ? AND ?
            GROUP BY 1 ORDER BY 1''',
-        (source, currency, start_iso, end_iso)))
+        (source, *account_params, currency, start_iso, end_iso)))
 
     total_income = sum(int(row['income'] or 0) for row in monthly_rows)
     total_expenses = sum(int(row['expenses'] or 0) for row in monthly_rows)
@@ -175,12 +186,12 @@ def _period_profile(db, source, currency, start_date, end_date):
     category_spend = defaultdict(int)
     merchant_spend = defaultdict(lambda: {'total': 0, 'count': 0, 'months': set(), 'categories': defaultdict(int)})
     for row in db.execute(
-        '''SELECT substr(t.booked_on,1,7) month,t.amount,t.category,t.merchant
+        f'''SELECT substr(t.booked_on,1,7) month,t.amount,t.category,t.merchant
            FROM transactions t JOIN accounts a ON a.id=t.account_id
-           WHERE a.source=? AND a.included=1 AND a.selection_pending=0 AND t.currency=?
+           WHERE a.source=? AND {account_filter} AND a.selection_pending=0 AND t.currency=?
              AND t.amount<0 AND t.category!='Overførsler'
              AND t.booked_on BETWEEN ? AND ?''',
-        (source, currency, start_iso, end_iso)):
+        (source, *account_params, currency, start_iso, end_iso)):
         spend = -row['amount']
         category_spend[row['category']] += spend
         merchant = (row['merchant'] or '').strip()
@@ -331,13 +342,37 @@ def build_insights(db_path, source, currency, today=None, period_start=None, per
                LEFT JOIN accounts a ON a.id=g.account_id AND a.source=g.source AND a.currency=g.currency
                WHERE g.source=? AND g.currency=? ORDER BY g.featured DESC,g.deadline,g.id''',
             (source, currency))]
-    for goal in goals:
-        goal['manual_saved_amount'] = int(goal['saved_amount'] or 0)
-        goal['uses_live_balance'] = bool(goal.get('account_id') and goal.get('account_name'))
-        goal['account_balance_available'] = bool(goal['uses_live_balance'] and goal.get('account_balance') is not None)
-        if goal['uses_live_balance']:
-            goal['saved_amount'] = int(goal['account_balance']) if goal['account_balance'] is not None else 0
-        goal['analysis'] = _goal_analysis(goal, profile, today)
+        selected_by_goal = defaultdict(list)
+        if goals:
+            placeholders = ','.join('?' for _ in goals)
+            for row in db.execute(
+                f'''SELECT ga.goal_id,ga.account_id
+                    FROM savings_goal_analysis_accounts ga
+                    JOIN accounts a ON a.id=ga.account_id
+                    WHERE ga.goal_id IN ({placeholders}) AND a.source=? AND a.currency=?
+                      AND a.selection_pending=0
+                    ORDER BY ga.account_id''',
+                (*[goal['id'] for goal in goals], source, currency)):
+                selected_by_goal[row['goal_id']].append(row['account_id'])
+
+        scoped_profiles = {}
+        for goal in goals:
+            goal['manual_saved_amount'] = int(goal['saved_amount'] or 0)
+            goal['uses_live_balance'] = bool(goal.get('account_id') and goal.get('account_name'))
+            goal['account_balance_available'] = bool(goal['uses_live_balance'] and goal.get('account_balance') is not None)
+            if goal['uses_live_balance']:
+                goal['saved_amount'] = int(goal['account_balance']) if goal['account_balance'] is not None else 0
+
+            account_ids = tuple(selected_by_goal[goal['id']])
+            goal['analysis_account_ids'] = list(account_ids)
+            if account_ids not in scoped_profiles:
+                scoped_profiles[account_ids] = (
+                    _period_profile(db, source, currency, period_start, period_end, account_ids)
+                    if period_start is not None and period_end is not None
+                    else _profile(db, source, currency, today, account_ids)
+                )
+            goal['analysis'] = _goal_analysis(goal, scoped_profiles[account_ids], today)
+
     featured = next((goal for goal in goals if goal['featured']), goals[0] if goals else None)
     return {
         'profile': profile,

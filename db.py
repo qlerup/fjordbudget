@@ -99,6 +99,11 @@ def initialize(path):
           deadline TEXT NOT NULL,
           featured INTEGER NOT NULL DEFAULT 0 CHECK(featured IN (0,1)),
           account_id TEXT REFERENCES accounts(id));
+        CREATE TABLE IF NOT EXISTS savings_goal_analysis_accounts (
+          goal_id INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
+          account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+          PRIMARY KEY(goal_id,account_id));
+        CREATE INDEX IF NOT EXISTS savings_goal_analysis_account ON savings_goal_analysis_accounts(account_id);
         CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS budgets (
           source TEXT NOT NULL, month TEXT NOT NULL, currency TEXT NOT NULL,

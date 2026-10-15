@@ -239,6 +239,7 @@ class InsightTests(unittest.TestCase):
     def test_goal_analysis_flags_unrealistic_goal_and_tracks_featured_progress(self):
         body = {
             'name': 'Stor drøm',
+            'analysis_account_ids': ['demo-daily', 'demo-bills'],
             'target_amount': '1000000',
             'saved_amount': '10000',
             'deadline': month_after(1),
@@ -270,6 +271,66 @@ class InsightTests(unittest.TestCase):
         items = self.client.get('/api/savings-goals?source=demo').json['items']
         self.assertEqual([item['id'] for item in items if item['featured']], [second])
         self.assertEqual(self.client.get('/api/dashboard?source=demo').json['featured_goal']['id'], second)
+
+    def test_savings_analysis_uses_only_explicit_goal_accounts(self):
+        url = '/api/savings-goals?source=demo'
+        base = {'target_amount': '1000000', 'saved_amount': '0',
+                'deadline': month_after(2)}
+        first = self.client.post(url, json={**base, 'name': 'Daglig konto',
+            'analysis_account_ids': ['demo-daily']}, headers=self.headers)
+        second = self.client.post(url, json={**base, 'name': 'Budgetkonto',
+            'analysis_account_ids': ['demo-bills']}, headers=self.headers)
+        third = self.client.post(url, json={**base, 'name': 'Uden konti'},
+            headers=self.headers)
+        self.assertEqual([first.status_code, second.status_code, third.status_code], [200, 200, 200])
+
+        def goals(client=self.client):
+            return {goal['name']: goal for goal in client.get(url).json['items']}
+
+        items = goals()
+        daily = items['Daglig konto']
+        bills = items['Budgetkonto']
+        empty = items['Uden konti']
+        self.assertEqual(daily['analysis_account_ids'], ['demo-daily'])
+        self.assertEqual(bills['analysis_account_ids'], ['demo-bills'])
+        self.assertEqual(empty['analysis_account_ids'], [])
+        self.assertEqual(empty['analysis']['status'], 'insufficient_data')
+        self.assertEqual(empty['analysis']['suggestions'], [])
+        self.assertEqual(empty['analysis']['months_analyzed'], 0)
+        self.assertGreater(daily['analysis']['average_income'], 0)
+        self.assertEqual(bills['analysis']['average_income'], 0)
+        daily_merchants = {item['name'] for item in daily['analysis']['suggestions']}
+        bills_merchants = {item['name'] for item in bills['analysis']['suggestions']}
+        self.assertTrue(daily_merchants)
+        self.assertTrue(bills_merchants)
+        self.assertTrue(daily_merchants.isdisjoint(bills_merchants))
+
+        changed = self.client.put(f"/api/savings-goals/{first.json['id']}?source=demo",
+            json={**base, 'name': 'Daglig konto',
+                  'analysis_account_ids': ['demo-bills', 'demo-daily']},
+            headers=self.headers)
+        self.assertEqual(changed.status_code, 200)
+        updated = goals()['Daglig konto']
+        self.assertEqual(updated['analysis_account_ids'], ['demo-bills', 'demo-daily'])
+        self.assertGreater(updated['analysis']['average_income'], 0)
+
+        reopened = create_app({'TESTING': True, 'DATA_DIR': self.temp.name,
+                               'PROVIDER': Provider()}).test_client()
+        self.assertEqual(goals(reopened)['Daglig konto']['analysis_account_ids'],
+                         ['demo-bills', 'demo-daily'])
+
+        cleared = self.client.put(f"/api/savings-goals/{first.json['id']}?source=demo",
+            json={**base, 'name': 'Daglig konto', 'analysis_account_ids': []},
+            headers=self.headers)
+        self.assertEqual(cleared.status_code, 200)
+        self.assertEqual(goals()['Daglig konto']['analysis']['months_analyzed'], 0)
+        self.assertEqual(self.client.delete(
+            f"/api/savings-goals/{first.json['id']}?source=demo",
+            headers=self.headers).status_code, 200)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute(
+                'SELECT COUNT(*) FROM savings_goal_analysis_accounts WHERE goal_id=?',
+                (first.json['id'],)).fetchone()[0], 0)
 
     def test_goal_can_follow_live_account_balance_and_restore_manual_amount(self):
         body = {

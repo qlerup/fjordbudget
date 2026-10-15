@@ -118,6 +118,33 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.client.delete(f'{endpoint}/{goal_id}?source=live',headers=self.headers).status_code,200)
         self.assertEqual(self.client.get(endpoint+'?source=live').json['items'],[])
 
+    def test_savings_analysis_account_selection_validates_source_and_duplicates(self):
+        url = '/api/savings-goals?source=demo'
+        base = {'name': 'Test', 'target_amount': '5000', 'saved_amount': '0',
+                'deadline': '2027-06'}
+        for selected in ['demo-daily', ['demo-daily', 'demo-daily'], ['missing'],
+                         ['demo-daily', 1], [None], None]:
+            response = self.client.post(url, json={
+                **base, 'analysis_account_ids': selected}, headers=self.headers)
+            self.assertEqual(response.status_code, 400, selected)
+        self.assertEqual(self.client.post(
+            '/api/savings-goals?source=live',
+            json={**base, 'analysis_account_ids': ['demo-daily']},
+            headers=self.headers).status_code, 400)
+        created = self.client.post(url, json={
+            **base, 'analysis_account_ids': ['demo-daily']}, headers=self.headers)
+        self.assertEqual(created.status_code, 200)
+        goal_id = created.json['id']
+        self.assertEqual(self.client.get(url).json['items'][0]['analysis_account_ids'], ['demo-daily'])
+        invalid_update = self.client.put(f'{url.split("?")[0]}/{goal_id}?source=demo',
+            json={**base, 'analysis_account_ids': ['missing']}, headers=self.headers)
+        self.assertEqual(invalid_update.status_code, 400)
+        self.assertEqual(self.client.get(url).json['items'][0]['analysis_account_ids'], ['demo-daily'])
+        with connect(self.db) as db:
+            db.execute("UPDATE accounts SET included=0 WHERE id='demo-daily'")
+        self.assertEqual(self.client.get(url).json['items'][0]['analysis_account_ids'], ['demo-daily'])
+        self.assertGreater(self.client.get(url).json['items'][0]['analysis']['months_analyzed'], 0)
+
     def test_demo_availability_depends_on_bank_connection_not_accounts(self):
         self.assertFalse(self.client.get('/api/config').json['has_bank_connections'])
         with connect(self.db) as db:

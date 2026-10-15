@@ -71,6 +71,9 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('.mode-switch')).to_be_visible()
 
     def test_savings_goals_create_edit_source_switch_and_delete(self):
+        # Browser tests share a database; do not depend on an earlier test's goals.
+        with connect(self.app.extensions['db_path']) as db:
+            db.execute("DELETE FROM savings_goals WHERE source='demo'")
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
         expect(self.page.locator('#savingsList')).to_contain_text('Hvad drømmer du om?')
@@ -81,6 +84,11 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('#savingsAmount')).to_have_value('25.000,50')
         expect(self.page.locator('#savingsDeadline')).to_have_attribute('type','month')
         self.page.locator('#savingsDeadline').fill('2027-07')
+        filters=self.page.locator('#savingsAnalysisAccountChoices input[type=checkbox]')
+        expect(filters).to_have_count(3)
+        self.assertEqual(self.page.locator('#savingsAnalysisAccountChoices input:checked').count(),0)
+        self.page.locator('#savingsAnalysisAccountChoices input[value="demo-daily"]').check()
+        self.page.locator('#savingsAnalysisAccountChoices input[value="demo-bills"]').check()
         self.page.locator('#savingsForm button[type=submit]').click()
         expect(self.page.locator('.savings-card')).to_contain_text('Ferie <familie>')
         expect(self.page.locator('.savings-target')).to_contain_text('25.000,50')
@@ -90,9 +98,15 @@ class UITests(unittest.TestCase):
         self.page.locator('[data-edit-savings]').click()
         expect(self.page.locator('#savingsAmount')).to_have_value('25.000,50')
         expect(self.page.locator('#savingsDeadline')).to_have_value('2027-07')
+        expect(self.page.locator('#savingsAnalysisAccountChoices input[value="demo-daily"]')).to_be_checked()
+        expect(self.page.locator('#savingsAnalysisAccountChoices input[value="demo-bills"]')).to_be_checked()
+        expect(self.page.locator('#savingsAnalysisAccountChoices input[value="demo-save"]')).not_to_be_checked()
+        self.page.locator('#savingsAnalysisAccountChoices input[value="demo-daily"]').uncheck()
         self.page.locator('#savingsName').fill('Ny bil')
         self.page.locator('#savingsForm button[type=submit]').click()
         expect(self.page.locator('.savings-card h3')).to_have_text('Ny bil')
+        expect(self.page.locator('.savings-card')).to_contain_text('Spareforslag fra: Budgetkonto')
+        self.assertNotIn('Spareforslag fra: Lønkonto',self.page.locator('.savings-card').inner_text())
         self.page.locator('[data-source="live"]').click()
         expect(self.page.locator('#savingsList')).to_contain_text('Hvad drømmer du om?')
         self.page.locator('[data-source="demo"]').click()
@@ -223,7 +237,8 @@ class UITests(unittest.TestCase):
     def test_last_sync_timestamp_is_shown_below_refresh_button(self):
         data=self.app.test_client().get('/api/dashboard?source=demo').json
         data['has_bank_connections']=False
-        data['accounts'][0]['synced_at']='2026-10-07T13:22:00+00:00'
+        for account in data['accounts']:
+            account['synced_at']='2026-10-07T13:22:00+00:00'
         self.page.route('**/api/dashboard?source=live*',lambda route:route.fulfill(json=data))
         self.page.locator('[data-source="live"]').click()
         expect(self.page.locator('#lastSyncText')).to_be_visible()
