@@ -185,13 +185,15 @@ class InsightTests(unittest.TestCase):
             'merchant': 'REMA 1000', 'remember': True}, headers=self.headers)
         self.assertEqual(response.status_code, 200)
         with connect(self.db) as db:
-            self.assertIsNone(db.execute(
-                "SELECT merchant FROM transactions WHERE external_id='learn-c'").fetchone()[0])
+            # A distinctive merchant name is strong evidence already after
+            # its first manual confirmation.
+            self.assertEqual(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='learn-c'").fetchone()[0], 'REMA 1000')
 
         response = self.client.patch(url('learn-b'), json={
             'merchant': 'REMA 1000', 'remember': True}, headers=self.headers)
         self.assertEqual(response.status_code, 200)
-        self.assertGreaterEqual(response.json['updated'], 2)
+        self.assertGreaterEqual(response.json['updated'], 1)
         with connect(self.db) as db:
             learned = db.execute(
                 "SELECT merchant,merchant_manual FROM transactions WHERE external_id='learn-c'").fetchone()
@@ -250,9 +252,10 @@ class InsightTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute(
                 "SELECT merchant FROM transactions WHERE external_id='ref:learning-mobilepay-same'").fetchone()[0],
-                'Sofia Joya')
-            self.assertIsNone(db.execute(
-                "SELECT merchant FROM transactions WHERE external_id='ref:learning-mobilepay-other'").fetchone()[0])
+                'MobilePay')
+            self.assertEqual(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='ref:learning-mobilepay-other'").fetchone()[0],
+                'MobilePay')
             self.assertIsNone(db.execute(
                 "SELECT merchant FROM transactions WHERE external_id='ref:learning-mcd-numeric'").fetchone()[0])
 
@@ -353,13 +356,97 @@ class InsightTests(unittest.TestCase):
             with connect(self.db) as db:
                 matched = db.execute(
                     "SELECT merchant FROM transactions WHERE id=?", (ids[3],)).fetchone()[0]
-                self.assertEqual(matched, 'Gejser' if i == 2 else None)
+                self.assertEqual(matched, 'Gejser')
         with connect(self.db) as db:
             self.assertEqual(db.execute(
                 "SELECT COUNT(*) FROM merchant_rules WHERE source='demo' AND merchant='Gejser'"
             ).fetchone()[0], 0)
             self.assertEqual(db.execute(
                 "SELECT merchant_manual FROM transactions WHERE id=?", (ids[3],)).fetchone()[0], 0)
+
+    def test_bank_store_aliases_and_mobilepay_default_from_historical_merchants(self):
+        # The actual bank text varies by city, terminal ID, abbreviation and
+        # web-domain suffix. A manually confirmed canonical brand is sufficient
+        # when it is explicitly present in the bank's merchant tokens.
+        confirmed = [
+            ('MCD 02999 MATAS København', 'Matas'),
+            ('MCD 03210 proshop.dk', 'Proshop'),
+            ('MCD 03510 HM DK0012', 'H&M'),
+            ('MCD 04331 MCDNÆSTVED', "McDonald's"),
+            ('MCD 04332 WAGNER SLAGELSE', 'Wagner'),
+            ('MCD 04333 Flamingo Goals', 'Flamingo Goals'),
+        ]
+        raw = [
+            ('matas', 'MCD 05814 MATAS - 16896', 'Matas'),
+            ('proshop', 'MCD 05798 proshop.dk', 'Proshop'),
+            ('hm', 'MCD 05818 HM DK0829', 'H&M'),
+            ('mcdonalds', 'MCD 05810 MCDMARIBO', "McDonald's"),
+            ('wagner', 'MCD 05815 WAGNER NASTVED', 'Wagner'),
+            ('flamingo', 'MCD 05832 Flamingo Goals', 'Flamingo Goals'),
+            ('unrelated', 'MCD 05807 Mcompany ApS', None),
+            ('unrelated-mcd', 'MCD 05815 CARDSHOP', None),
+        ]
+        with connect(self.db) as db:
+            for i, (description, merchant) in enumerate(confirmed):
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                                amount,currency,category,merchant,merchant_manual)
+                       VALUES ('demo-daily',?,?,?,-12000,'DKK','Andet',?,1)''',
+                    (f'brand-confirmed-{i}', date.today().isoformat(),
+                     description, merchant))
+            for key, label, _ in raw:
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                                amount,currency,category)
+                       VALUES ('demo-daily',?,?,?,-12000,'DKK','Andet')''',
+                    (f'brand-unknown-{key}', date.today().isoformat(), label))
+            from merchant_matching import apply_learned_merchants
+            apply_learned_merchants(db, 'demo')
+            for key, label, expected in raw:
+                item = db.execute(
+                    'SELECT merchant,merchant_manual FROM transactions WHERE external_id=?',
+                    (f'brand-unknown-{key}',)).fetchone()
+                self.assertEqual(tuple(item), (expected, 0), label)
+
+    def test_mobilepay_groups_all_recipients_by_default_with_manual_overrides(self):
+        with connect(self.db) as db:
+            for key, desc, merchant, manual in [
+                ('maja', 'MobilePay Maja Larsen', None, 0),
+                ('miklas', 'MobilePay Miklas von der Lieth', None, 0),
+                ('frederik', 'MobilePay Frederik Siegumfeldt', None, 0),
+                ('recipient', 'MobilePay Sofia Joya', 'Sofia Joya', 1),
+                ('incoming', 'MobilePay Betaling fra Henrik', None, 0),
+            ]:
+                amount = 10000 if key == 'incoming' else -10000
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                                amount,currency,category,merchant,merchant_manual)
+                       VALUES ('demo-daily',?,?,?,?,'DKK','Andet',?,?)''',
+                    (f'mp-{key}', date.today().isoformat(), desc, amount, merchant, manual))
+            from merchant_matching import apply_learned_merchants
+            apply_learned_merchants(db, 'demo')
+            for key in ('maja', 'miklas', 'frederik', 'incoming'):
+                item = db.execute(
+                    'SELECT merchant,merchant_manual FROM transactions WHERE external_id=?',
+                    (f'mp-{key}',)).fetchone()
+                self.assertEqual(tuple(item), ('MobilePay', 0))
+            manual = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='mp-recipient'"
+            ).fetchone()
+            self.assertEqual(tuple(manual), ('Sofia Joya', 1))
+
+        import_account(self.db, 'demo-daily', [{
+            'status': 'BOOK', 'booking_date': date.today().isoformat(),
+            'credit_debit_indicator': 'DBIT',
+            'transaction_amount': {'amount': '42.00', 'currency': 'DKK'},
+            'remittance_information': ['MobilePay En Helt Ny Person'],
+            'entry_reference': 'mp-future',
+        }], [])
+        with connect(self.db) as db:
+            item = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='ref:mp-future'"
+            ).fetchone()
+            self.assertEqual(tuple(item), ('MobilePay', 0))
 
     def test_existing_saved_merchant_examples_are_applied_on_upgrade(self):
         with connect(self.db) as db:
