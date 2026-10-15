@@ -97,6 +97,13 @@
 #savingsManualAmountFields{display:grid;gap:10px}#savingsManualAmountFields[hidden]{display:none}
 .savings-account-source{display:flex;align-items:center;gap:7px;margin:-2px 0 12px;color:#617a59;font-size:12px;line-height:1.4}.savings-account-source svg{width:15px;height:15px}.savings-account-source strong{color:var(--ink)}
 .featured-goal-account{display:flex!important;align-items:center;gap:6px;color:#617a59!important}.featured-goal-account svg{width:14px;height:14px}
+.savings-account-filter{min-width:0;margin:10px 0 0;padding:12px;border:1px solid var(--line);border-radius:10px}
+.savings-account-filter legend{padding:0 5px;font-size:14px;font-weight:700;color:var(--ink)}
+.savings-account-filter .small{margin:0 0 10px;line-height:1.5}
+.savings-analysis-account-list{display:grid;gap:7px;max-height:240px;overflow-y:auto}
+.savings-form .savings-analysis-account{display:flex;align-items:center;gap:10px;margin:0;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:#fafbf8;cursor:pointer;overflow-wrap:anywhere}
+.savings-form .savings-analysis-account input[type=checkbox]{width:18px;height:18px;min-width:18px;max-width:18px;flex:0 0 18px;padding:0;margin:0;accent-color:var(--green)}
+.savings-form .savings-analysis-account span{flex:1;min-width:0}
 .savings-form .dialog-actions{margin-top:16px;flex-wrap:wrap}
 @media(max-width:760px){.sidebar{flex-wrap:wrap;gap:8px}.sidebar nav{width:100%;justify-content:space-between}.savings-card{padding:20px}.savings-panel .section-heading{flex-wrap:wrap}}
 
