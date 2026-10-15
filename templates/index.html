@@ -140,6 +140,11 @@
     <div id="savingsManualAmountFields">
       <label for="savingsSavedAmount">Hvor meget har du allerede sparet op?</label><input id="savingsSavedAmount" name="saved_amount" type="text" maxlength="24" pattern="[0-9]{1,3}(\.[0-9]{3})*(,[0-9]{1,2})?" title="Skriv et beløb med komma som decimaltegn" placeholder="0" value="0" inputmode="decimal">
     </div>
+    <fieldset class="savings-account-filter" aria-describedby="savingsAnalysisHint">
+      <legend>Hvilke konti skal bruges til spareforslag?</legend>
+      <p id="savingsAnalysisHint" class="small muted">Sæt flueben ved de konti, hvis posteringer skal indgå i analysen for netop dette mål. Ingen konti vælges automatisk. Dette er uafhængigt af kontoen, der viser din opsparede saldo.</p>
+      <div id="savingsAnalysisAccountChoices" class="savings-analysis-account-list"></div>
+    </fieldset>
     <label for="savingsDeadline">Hvornår skal målet være nået?</label><input id="savingsDeadline" name="deadline" type="month" required>
     <label class="checkbox-row"><input id="savingsFeatured" name="featured" type="checkbox"> <span>Vis dette mål på overblikket som dit aktive mål</span></label>
     <div id="savingsFormError" class="error-box" role="alert" hidden></div>
