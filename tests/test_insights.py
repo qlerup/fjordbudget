@@ -164,6 +164,162 @@ class InsightTests(unittest.TestCase):
         with connect(self.db) as db:
             self.assertEqual(db.execute("SELECT merchant FROM transactions WHERE external_id='mcd-b'").fetchone()[0],"McDonald's")
 
+    def test_merchant_recognition_learns_from_two_confirmed_store_variants(self):
+        labels = [
+            ('learn-a', 'MCD 01140 REMA TROMPETVEJ'),
+            ('learn-b', 'MCD 01141 REMA BOULEVARD'),
+            ('learn-c', 'MCD 01142 REMA ØSTERGADE'),
+            ('learn-netto', 'MCD 01999 NETTO HOLME OLS'),
+        ]
+        with connect(self.db) as db:
+            for external, description in labels:
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                       VALUES ('demo-daily',?,?,?,-37040,'DKK','Mad & indkøb')''',
+                    (external, date.today().isoformat(), description))
+            ids = {row['external_id']: row['id'] for row in db.execute(
+                "SELECT id,external_id FROM transactions WHERE external_id LIKE 'learn-%'")}
+
+        url = lambda key: f"/api/transactions/{ids[key]}/merchant"
+        response = self.client.patch(url('learn-a'), json={
+            'merchant': 'REMA 1000', 'remember': True}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        with connect(self.db) as db:
+            self.assertIsNone(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='learn-c'").fetchone()[0])
+
+        response = self.client.patch(url('learn-b'), json={
+            'merchant': 'REMA 1000', 'remember': True}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(response.json['updated'], 2)
+        with connect(self.db) as db:
+            learned = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='learn-c'").fetchone()
+            self.assertEqual(tuple(learned), ('REMA 1000', 0))
+            self.assertIsNone(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='learn-netto'").fetchone()[0])
+
+        imported = [
+            {'status': 'BOOK', 'booking_date': date.today().isoformat(),
+             'credit_debit_indicator': 'DBIT',
+             'transaction_amount': {'amount': '40.00', 'currency': 'DKK'},
+             'remittance_information': [name], 'entry_reference': ref}
+            for ref, name in [
+                ('learning-new-rema', 'MCD 11444 REMA HAVNEGADE'),
+                ('learning-new-netto', 'MCD 11445 NETTO HAVNEGADE')]]
+        import_account(self.db, 'demo-daily', imported, [])
+        with connect(self.db) as db:
+            matched = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='ref:learning-new-rema'").fetchone()
+            self.assertEqual(tuple(matched), ('REMA 1000', 0))
+            self.assertIsNone(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='ref:learning-new-netto'").fetchone()[0])
+        # A personal correction wins even if a future sync recognizes the brand.
+        corrected_id = ids['learn-c']
+        self.assertEqual(self.client.patch(
+            f'/api/transactions/{corrected_id}/merchant',
+            json={'merchant': 'Specialbutik', 'remember': False},
+            headers=self.headers).status_code, 200)
+        with connect(self.db) as db:
+            self.assertEqual(tuple(db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE id=?",
+                (corrected_id,)).fetchone()), ('Specialbutik', 1))
+
+    def test_merchant_recognition_handles_mobilepay_variants_without_guessing_people(self):
+        with connect(self.db) as db:
+            db.execute(
+                '''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                   VALUES ('demo-daily','learning-person',?,'MobilePay Sofia Joya',-30000,'DKK','Andet')''',
+                (date.today().isoformat(),))
+            row_id = db.execute(
+                "SELECT id FROM transactions WHERE external_id='learning-person'").fetchone()[0]
+        self.assertEqual(self.client.patch(
+            f'/api/transactions/{row_id}/merchant',
+            json={'merchant': 'Sofia Joya', 'remember': True},
+            headers=self.headers).status_code, 200)
+
+        bank_rows = [
+            {'status': 'BOOK', 'booking_date': date.today().isoformat(),
+             'credit_debit_indicator': 'DBIT',
+             'transaction_amount': {'amount': '100.00', 'currency': 'DKK'},
+             'remittance_information': [name], 'entry_reference': ref}
+            for ref, name in [('learning-mobilepay-same', 'MobilePay: Sofia-Joya'),
+                              ('learning-mobilepay-other', 'MobilePay Sofia Nielsen'),
+                              ('learning-mcd-numeric', 'MCD 06151')]]
+        import_account(self.db, 'demo-daily', bank_rows, [])
+        with connect(self.db) as db:
+            self.assertEqual(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='ref:learning-mobilepay-same'").fetchone()[0],
+                'Sofia Joya')
+            self.assertIsNone(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='ref:learning-mobilepay-other'").fetchone()[0])
+            self.assertIsNone(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='ref:learning-mcd-numeric'").fetchone()[0])
+
+    def test_conflicting_merchant_learning_stops_brand_wide_guesses(self):
+        labels = [
+            ('learning-conflict-a', 'MCD 10001 REMA TROMPETVEJ', 'REMA 1000'),
+            ('learning-conflict-b', 'MCD 10002 REMA BOULEVARD', 'REMA 1000'),
+            ('learning-conflict-c', 'MCD 10003 REMA ØSTERGADE', 'Anden forhandler'),
+        ]
+        with connect(self.db) as db:
+            for external, description, _ in labels:
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                       VALUES ('demo-daily',?,?,?,-12000,'DKK','Andet')''',
+                    (external, date.today().isoformat(), description))
+            ids = {row['external_id']: row['id'] for row in db.execute(
+                "SELECT id,external_id FROM transactions WHERE external_id LIKE 'learning-conflict-%'")}
+        for external, _, merchant in labels:
+            response = self.client.patch(
+                f'/api/transactions/{ids[external]}/merchant',
+                json={'merchant': merchant, 'remember': True}, headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+
+        raw = {'status': 'BOOK', 'booking_date': date.today().isoformat(),
+               'credit_debit_indicator': 'DBIT',
+               'transaction_amount': {'amount': '120.00', 'currency': 'DKK'},
+               'remittance_information': ['MCD 10004 REMA HAVNEGADE'],
+               'entry_reference': 'learning-conflict-new'}
+        import_account(self.db, 'demo-daily', [raw], [])
+        with connect(self.db) as db:
+            self.assertIsNone(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='ref:learning-conflict-new'").fetchone()[0])
+
+    def test_existing_saved_merchant_examples_are_applied_on_upgrade(self):
+        with connect(self.db) as db:
+            for i, label in enumerate([
+                'MCD 13110 LIDL NÆSTVED',
+                'MCD 13111 LIDL SLAGELSE',
+                'MCD 13112 LIDL RINGSTED',
+            ]):
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                       VALUES ('demo-daily',?,?,?,-12000,'DKK','Andet')''',
+                    (f'learn-upgrade-{i}', date.today().isoformat(), label))
+            for label in ['MCD 13110 LIDL NÆSTVED', 'MCD 13111 LIDL SLAGELSE']:
+                db.execute(
+                    "INSERT INTO merchant_rules(source,title,merchant) VALUES ('demo',?,?)",
+                    (transaction_rule_title(label), 'Lidl'))
+            # Simulate an installation that predates the new one-time backfill.
+            db.execute("DELETE FROM app_migrations WHERE name='learn-merchant-variants'")
+            db.execute(
+                '''UPDATE transactions SET merchant='Personligt valg',merchant_manual=1
+                   WHERE external_id='learn-upgrade-0' ''')
+        # Reinitialization must fill missing matches but respect manual corrections.
+        create_app({'TESTING': True, 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
+        with connect(self.db) as db:
+            matched = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='learn-upgrade-2'").fetchone()
+            self.assertEqual(tuple(matched), ('Lidl', 0))
+            preserved = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='learn-upgrade-0'").fetchone()
+            self.assertEqual(tuple(preserved), ('Personligt valg', 1))
+            seeded = db.execute(
+                "SELECT merchant FROM transactions WHERE account_id='demo-daily' AND description='Netto' LIMIT 1").fetchone()
+            self.assertIsNotNone(seeded)
+            self.assertEqual(seeded[0], 'Netto')
+
     def test_fixed_merchant_is_excluded_from_savings_opportunities(self):
         with connect(self.db) as db:
             row = db.execute(

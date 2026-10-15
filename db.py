@@ -160,6 +160,13 @@ def initialize(path):
             db.execute('ALTER TABLE categories ADD COLUMN budget_category TEXT REFERENCES budget_categories(name)')
             db.execute('UPDATE categories SET budget_category=name WHERE name IN (SELECT name FROM budget_categories)')
             db.execute("INSERT INTO app_migrations VALUES ('separate-budget-categories')")
+        if not db.execute("SELECT 1 FROM app_migrations WHERE name='learn-merchant-variants'").fetchone():
+            # Backfill previously imported entries from existing remembered merchant rules.
+            # Never overwrite manually confirmed choices.
+            from merchant_matching import apply_learned_merchants
+            for source in ('demo', 'live'):
+                apply_learned_merchants(db, source)
+            db.execute("INSERT INTO app_migrations VALUES ('learn-merchant-variants')")
 
 
 def category_list(db):

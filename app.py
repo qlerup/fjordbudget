@@ -19,6 +19,7 @@ from flask import Flask, g, jsonify, redirect, render_template, request, session
 from werkzeug.exceptions import HTTPException
 
 from banking import BankError, EnableBanking, account_name, sync_all
+from merchant_matching import apply_learned_merchants
 from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, transaction_rule_title, category_list, budget_category_list
 from hub_auth import register_hub_auth
 from insights import build_insights
@@ -691,7 +692,6 @@ def create_app(config=None):
             if row is None:
                 return jsonify(error='Posteringen blev ikke fundet.'), 404
             title = transaction_title(row['description'])
-            signature = transaction_rule_title(row['description'])
             if merchant:
                 key = merchant_key(merchant)
                 canonical = next((item['name'] for item in merchant_items(db, row['source'])
@@ -711,14 +711,14 @@ def create_app(config=None):
                                (row['source'], title, merchant))
                 else:
                     db.execute('DELETE FROM merchant_rules WHERE source=? AND title=?', (row['source'], title))
-                result = db.execute('''UPDATE transactions SET merchant=?,merchant_manual=1
-                                       WHERE transaction_rule_title(description)=?
-                                         AND account_id IN (SELECT id FROM accounts WHERE source=?)''',
-                                    (merchant, signature, row['source']))
-            else:
-                result = db.execute('UPDATE transactions SET merchant=?,merchant_manual=1 WHERE id=?',
-                                    (merchant, transaction_id))
-            updated = result.rowcount
+
+            # A user-confirmed choice is authoritative. Inferred matches are not
+            # marked manual and can safely be revised when the rules improve.
+            db.execute('UPDATE transactions SET merchant=?,merchant_manual=1 WHERE id=?',
+                       (merchant, transaction_id))
+            updated = 1
+            if remember:
+                updated += apply_learned_merchants(db, row['source'])
         return jsonify(ok=True, updated=updated, rule_saved=remember)
 
     @app.put('/api/budgets')

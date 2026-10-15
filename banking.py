@@ -12,6 +12,7 @@ import jwt
 import requests
 
 from db import CURRENCIES, categorize, cents, connect, transaction_title, transaction_rule_title, category_list
+from merchant_matching import MerchantMatcher
 
 
 class BankError(Exception):
@@ -143,7 +144,7 @@ def import_account(db_path, account_id, transactions, balances):
         category_rule_rows = db.execute('SELECT title,category FROM category_rules WHERE source=?', (account['source'],)).fetchall()
         merchant_rule_rows = db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?', (account['source'],)).fetchall()
         rules = dict(category_rule_rows)
-        merchant_rules = dict(merchant_rule_rows)
+        merchant_matcher = MerchantMatcher(merchant_rule_rows)
 
         def stable_rules(rows, value_key):
             grouped, ambiguous = {}, set()
@@ -159,7 +160,6 @@ def import_account(db_path, account_id, transactions, balances):
             return grouped
 
         stable_category_rules = stable_rules(category_rule_rows, 'category')
-        stable_merchant_rules = stable_rules(merchant_rule_rows, 'merchant')
         eligible = [b for b in balances if b.get('balance_type') in ranking and b.get('balance_amount', {}).get('currency') == account['currency']]
         balance = min(eligible, key=lambda b: ranking[b['balance_type']]) if eligible else None
         categories = {c['name'] for c in category_list(db)}
@@ -167,7 +167,7 @@ def import_account(db_path, account_id, transactions, balances):
             title = transaction_title(row[2])
             signature = transaction_rule_title(row[2])
             rule = rules.get(title) or stable_category_rules.get(signature)
-            merchant_rule = merchant_rules.get(title) or stable_merchant_rules.get(signature)
+            merchant_rule = merchant_matcher.match(row[2])
             row = (*row[:-1], rule or (row[-1] if row[-1] in categories else 'Andet'), int(rule is not None))
             db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual,merchant,merchant_manual)
               VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
@@ -175,9 +175,9 @@ def import_account(db_path, account_id, transactions, balances):
               currency=excluded.currency,
               category=CASE WHEN excluded.category_manual=1 THEN excluded.category WHEN transactions.category_manual=1 THEN transactions.category ELSE excluded.category END,
               category_manual=MAX(transactions.category_manual,excluded.category_manual),
-              merchant=CASE WHEN transactions.merchant_manual=1 THEN transactions.merchant WHEN excluded.merchant_manual=1 THEN excluded.merchant ELSE excluded.merchant END,
-              merchant_manual=MAX(transactions.merchant_manual,excluded.merchant_manual)''',
-                       (account_id, *row, merchant_rule, int(merchant_rule is not None)))
+              merchant=CASE WHEN transactions.merchant_manual=1 THEN transactions.merchant ELSE excluded.merchant END,
+              merchant_manual=transactions.merchant_manual''',
+                       (account_id, *row, merchant_rule, 0))
         db.execute('UPDATE accounts SET balance=?,balance_type=?,synced_at=? WHERE id=?',
                    (cents(balance['balance_amount']['amount']) if balance else None,
                     balance['balance_type'] if balance else None, datetime.now(timezone.utc).isoformat(), account_id))
