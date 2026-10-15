@@ -104,8 +104,8 @@ async function loadSavings(){
       const suggestions=goal.analysis.suggestions || [];
       const chosenAccounts=(goal.analysis_account_ids || []).map(id=>savingsAccounts.find(account=>account.id===id)).filter(Boolean);
       const analysisSource=chosenAccounts.length
-        ? '<p class="savings-account-source">'+svg('bank')+'<span>Spareforslag fra: <strong>'+chosenAccounts.map(account=>esc(account.name)).join(', ')+'</strong></span></p>'
-        : '<p class="savings-account-source">Ingen konti valgt til spareforslag</p>';
+        ? '<p class="savings-analysis-source">'+svg('bank')+'<span>Spareforslag fra: <strong>'+chosenAccounts.map(account=>esc(account.name)).join(', ')+'</strong></span></p>'
+        : '<p class="savings-analysis-source">Ingen konti valgt til spareforslag</p>';
       return `<article class="savings-card ${goal.featured?'featured':''}">
         <div class="savings-card-top"><span class="savings-icon">${svg('target')}</span>${goal.featured?'<span class="goal-featured">Vises på overblikket</span>':''}</div>
         <h3>${esc(goal.name)}</h3>
