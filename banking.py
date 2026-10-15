@@ -12,7 +12,7 @@ import jwt
 import requests
 
 from db import CURRENCIES, categorize, cents, connect, transaction_title, transaction_rule_title, category_list
-from merchant_matching import MerchantMatcher
+from merchant_matching import load_merchant_matcher
 
 
 class BankError(Exception):
@@ -144,7 +144,7 @@ def import_account(db_path, account_id, transactions, balances):
         category_rule_rows = db.execute('SELECT title,category FROM category_rules WHERE source=?', (account['source'],)).fetchall()
         merchant_rule_rows = db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?', (account['source'],)).fetchall()
         rules = dict(category_rule_rows)
-        merchant_matcher = MerchantMatcher(merchant_rule_rows)
+        merchant_matcher = load_merchant_matcher(db, account['source'])
 
         def stable_rules(rows, value_key):
             grouped, ambiguous = {}, set()

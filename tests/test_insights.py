@@ -286,6 +286,81 @@ class InsightTests(unittest.TestCase):
             self.assertIsNone(db.execute(
                 "SELECT merchant FROM transactions WHERE external_id='ref:learning-conflict-new'").fetchone()[0])
 
+    def test_repeated_historic_gejser_confirmations_recognize_new_locations(self):
+        # Several manually labelled purchases at ONE branch are useful history:
+        # two different remembered rule titles must not be required.
+        historical = 'MCD 00000 GEjSER Næstved'
+        unknown = 'MCD 00000 GEjSER Roskilde'
+        with connect(self.db) as db:
+            for i in range(3):
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                                amount,currency,category,merchant,merchant_manual)
+                       VALUES ('demo-daily',?,?,?,-8626,'DKK','Andet','Gejser',1)''',
+                    (f'gejser-confirmed-{i}', date.today().isoformat(), historical))
+            db.execute(
+                '''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                            amount,currency,category)
+                   VALUES ('demo-daily','gejser-unknown',?,?,-8626,'DKK','Andet')''',
+                (date.today().isoformat(), unknown))
+            db.execute(
+                '''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                            amount,currency,category)
+                   VALUES ('demo-daily','gejser-other',?,'MCD 00000 GEJSERBUTIK Roskilde',
+                           -8626,'DKK','Andet')''',
+                (date.today().isoformat(),))
+            db.execute("DELETE FROM app_migrations WHERE name='learn-merchant-history-v2'")
+
+        # Existing unrecognized transactions are backfilled on app update/start.
+        create_app({'TESTING': True, 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
+        with connect(self.db) as db:
+            learned = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='gejser-unknown'"
+            ).fetchone()
+            self.assertEqual(tuple(learned), ('Gejser', 0))
+            self.assertIsNone(db.execute(
+                "SELECT merchant FROM transactions WHERE external_id='gejser-other'"
+            ).fetchone()[0])
+
+        new = {'status': 'BOOK', 'booking_date': date.today().isoformat(),
+               'credit_debit_indicator': 'DBIT',
+               'transaction_amount': {'amount': '86.26', 'currency': 'DKK'},
+               'remittance_information': ['MCD 00000 GEJSER Køge'],
+               'entry_reference': 'gejser-future'}
+        import_account(self.db, 'demo-daily', [new], [])
+        with connect(self.db) as db:
+            result = db.execute(
+                "SELECT merchant,merchant_manual FROM transactions WHERE external_id='ref:gejser-future'"
+            ).fetchone()
+            self.assertEqual(tuple(result), ('Gejser', 0))
+
+    def test_manual_gejser_history_learns_without_remembering_single_rule(self):
+        labels = ['MCD 00000 GEJSER Næstved'] * 3
+        labels.append('MCD 00000 GEJSER Roskilde')
+        with connect(self.db) as db:
+            for i, text in enumerate(labels):
+                db.execute(
+                    '''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                       VALUES ('demo-daily',?,?,?,-4000,'DKK','Andet')''',
+                    (f'gejser-manual-{i}', date.today().isoformat(), text))
+            ids = [row[0] for row in db.execute(
+                "SELECT id FROM transactions WHERE external_id LIKE 'gejser-manual-%' ORDER BY external_id")]
+        for i in range(3):
+            result = self.client.patch(
+                f'/api/transactions/{ids[i]}/merchant',
+                json={'merchant': 'Gejser', 'remember': False}, headers=self.headers)
+            self.assertEqual(result.status_code, 200)
+            with connect(self.db) as db:
+                matched = db.execute(
+                    "SELECT merchant FROM transactions WHERE id=?", (ids[3],)).fetchone()[0]
+                self.assertEqual(matched, 'Gejser' if i == 2 else None)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM merchant_rules WHERE source='demo' AND merchant='Gejser'"
+            ).fetchone()[0], 0)
+            self.assertEqual(db.execute(
+                "SELECT merchant_manual FROM transactions WHERE id=?", (ids[3],)).fetchone()[0], 0)
+
     def test_existing_saved_merchant_examples_are_applied_on_upgrade(self):
         with connect(self.db) as db:
             for i, label in enumerate([

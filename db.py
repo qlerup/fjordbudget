@@ -167,6 +167,13 @@ def initialize(path):
             for source in ('demo', 'live'):
                 apply_learned_merchants(db, source)
             db.execute("INSERT INTO app_migrations VALUES ('learn-merchant-variants')")
+        if not db.execute("SELECT 1 FROM app_migrations WHERE name='learn-merchant-history-v2'").fetchone():
+            # Re-evaluate all previously imported unconfirmed transactions
+            # using remembered labels AND the full manual transaction history.
+            from merchant_matching import apply_learned_merchants
+            for source in ('demo', 'live'):
+                apply_learned_merchants(db, source)
+            db.execute("INSERT INTO app_migrations VALUES ('learn-merchant-history-v2')")
 
 
 def category_list(db):

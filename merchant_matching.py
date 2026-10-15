@@ -50,10 +50,33 @@ class MerchantMatcher:
     not teach the matcher. Conflicts always disable the broader match.
     """
 
-    def __init__(self, rule_rows):
+    def __init__(self, rule_rows, manual_rows=()):
         exact, stable, equivalent = defaultdict(set), defaultdict(set), defaultdict(set)
-        anchors = defaultdict(lambda: defaultdict(set))
+        anchors = defaultdict(lambda: defaultdict(lambda: {'rules': set(), 'manual_count': 0}))
         anchor_owners = defaultdict(set)
+
+        def record_anchor(description, merchant, *, remembered=False, count=0):
+            signature = _signature(description)
+            if signature is None:
+                return
+            kind, tokens = signature
+            if kind != 'purchase':
+                return
+            anchor = tokens[0]
+            if len(anchor) < 4 or not anchor.isalpha() or anchor in _GENERIC_ANCHORS:
+                return
+            # Conflicting labels make a brand-wide guess unsafe.
+            merchant_tokens = _tokens(merchant)
+            owner = ''.join(merchant_tokens)
+            anchor_owners[anchor].add(owner)
+            if not (anchor in merchant_tokens or anchor == owner):
+                return
+            example = anchors[anchor][owner]
+            example.setdefault('merchant', merchant)
+            if remembered:
+                example['rules'].add(signature)
+            if count:
+                example['manual_count'] += count
         for row in rule_rows:
             title, merchant = row['title'], row['merchant']
             exact[transaction_title(title)].add(merchant)
@@ -65,14 +88,13 @@ class MerchantMatcher:
             # Short generic fragments are not reliable by themselves.
             if len(tokens) >= 2 or (len(tokens) == 1 and len(tokens[0]) >= 5 and tokens[0].isalpha()):
                 equivalent[signature].add(merchant)
-            anchor = tokens[0]
-            if kind == 'purchase' and len(anchor) >= 4 and anchor.isalpha():
-                anchor_owners[anchor].add(merchant)
-            merchant_tokens = _tokens(merchant)
-            brand_matches = anchor in merchant_tokens or anchor == ''.join(merchant_tokens)
-            if (kind == 'purchase' and len(anchor) >= 4 and anchor.isalpha()
-                    and anchor not in _GENERIC_ANCHORS and brand_matches):
-                anchors[anchor][merchant].add(signature)
+            record_anchor(title, merchant, remembered=True)
+
+        for row in manual_rows:
+            merchant = (row['merchant'] or '').strip()
+            if merchant:
+                record_anchor(row['description'], merchant,
+                              count=int(row['confirmations']))
 
         self.exact = _unique(exact)
         self.stable = _unique(stable)
@@ -81,11 +103,12 @@ class MerchantMatcher:
         self.ambiguous_stable = {key for key, values in stable.items() if len(values) > 1}
         self.anchors = {}
         for anchor, by_merchant in anchors.items():
-            # At least two distinct store/name suffixes must confirm the brand.
+            # Repeated manual confirmations count even if the bank text is
+            # identical. Two distinct remembered store variants also suffice.
             if len(by_merchant) == 1 and len(anchor_owners[anchor]) == 1:
-                merchant, examples = next(iter(by_merchant.items()))
-                if len(examples) >= 2:
-                    self.anchors[anchor] = merchant
+                example = next(iter(by_merchant.values()))
+                if len(example['rules']) >= 2 or example['manual_count'] >= 3:
+                    self.anchors[anchor] = example['merchant']
 
     def match(self, description):
         title = transaction_title(description)
@@ -107,14 +130,22 @@ class MerchantMatcher:
         return self.anchors.get(tokens[0]) if kind == 'purchase' else None
 
 
-def apply_learned_merchants(db, source):
-    """Apply confirmed rules to non-manual entries, without deleting prior labels.
+def load_merchant_matcher(db, source):
+    """Learn from saved rules and historic manual labels, across all accounts."""
+    return MerchantMatcher(
+        db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?',
+                   (source,)).fetchall(),
+        db.execute(
+            '''SELECT t.description,t.merchant,COUNT(*) confirmations
+               FROM transactions t JOIN accounts a ON a.id=t.account_id
+               WHERE a.source=? AND t.amount<0 AND t.merchant_manual=1
+                 AND t.merchant IS NOT NULL AND trim(t.merchant)!=''
+               GROUP BY t.description,t.merchant''', (source,)).fetchall())
 
-    Never clear a merchant merely because no sufficiently confident rule matches:
-    older imported/demo entries can legitimately have labels without a rule.
-    """
-    matcher = MerchantMatcher(db.execute(
-        'SELECT title,merchant FROM merchant_rules WHERE source=?', (source,)))
+
+def apply_learned_merchants(db, source):
+    """Fill confident matches without overwriting manual confirmations."""
+    matcher = load_merchant_matcher(db, source)
     updates = []
     for row in db.execute(
         '''SELECT t.id,t.description,t.merchant FROM transactions t

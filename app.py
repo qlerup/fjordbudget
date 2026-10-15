@@ -716,9 +716,10 @@ def create_app(config=None):
             # marked manual and can safely be revised when the rules improve.
             db.execute('UPDATE transactions SET merchant=?,merchant_manual=1 WHERE id=?',
                        (merchant, transaction_id))
-            updated = 1
-            if remember:
-                updated += apply_learned_merchants(db, row['source'])
+            # Confirmed choices train the matcher even when the user has not
+            # explicitly saved a reusable rule. Multiple examples are required
+            # before brand-wide matching is allowed.
+            updated = 1 + apply_learned_merchants(db, row['source'])
         return jsonify(ok=True, updated=updated, rule_saved=remember)
 
     @app.put('/api/budgets')
