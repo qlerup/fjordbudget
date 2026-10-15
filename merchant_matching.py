@@ -92,9 +92,17 @@ class MerchantMatcher:
 
         for row in manual_rows:
             merchant = (row['merchant'] or '').strip()
-            if merchant:
-                record_anchor(row['description'], merchant,
-                              count=int(row['confirmations']))
+            if not merchant:
+                continue
+            saved = stable.get(transaction_rule_title(row['description']), set())
+            # A one-off manual correction (remember=False) is an exception
+            # when a different remembered rule already covers this text.
+            # It must stay on that transaction, not veto the merchant's brand.
+            if saved and ''.join(_tokens(merchant)) not in {
+                    ''.join(_tokens(name)) for name in saved}:
+                continue
+            record_anchor(row['description'], merchant,
+                          count=int(row['confirmations']))
 
         self.exact = _unique(exact)
         self.stable = _unique(stable)
