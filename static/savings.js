@@ -57,7 +57,7 @@ function savingsStatus(goal){
   if(a.status==='complete')return ['complete','Målet er nået','Du har allerede sparet hele målbeløbet op.'];
   if(a.status==='expired')return ['danger','Deadline er passeret',`Der mangler ${money(a.remaining,goal.currency,0)} på målet.`];
   if(a.status==='insufficient_data')return ['neutral','Mangler historik','FjordBudget skal bruge flere posteringer, før målet kan vurderes sikkert.'];
-  if(a.status==='realistic')return ['good','Målet ser realistisk ud',`Du skal spare ca. ${amount} om måneden. Dit historiske råderum er ca. ${money(a.average_available,goal.currency,0)}.`];
+  if(a.status==='realistic')return ['good','Målet ser realistisk ud',`Du skal spare ca. ${amount} op om måneden. Dit historiske råderum er ca. ${money(a.average_available,goal.currency,0)}.`];
   if(a.status==='tight')return ['warning','Målet er stramt, men muligt',`Næsten hele dit gennemsnitlige råderum på ${money(a.average_available,goal.currency,0)} skal gå til målet.`];
   if(a.status==='possible_with_changes')return ['warning','Målet kræver ændringer',`Du mangler ca. ${money(a.monthly_shortfall,goal.currency,0)} om måneden. FjordBudget har fundet steder, hvor det muligvis kan hentes.`];
   return ['danger','Målet er ikke realistisk endnu',`Du mangler ca. ${money(a.monthly_shortfall,goal.currency,0)} om måneden, og de fundne besparelser dækker ikke hele forskellen.`];
