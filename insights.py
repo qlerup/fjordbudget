@@ -390,11 +390,27 @@ def _goal_analysis(goal, profile, today):
         months_needed = ceil(remaining / positive_available)
         projected_deadline = _month_label(current_month + months_needed - 1)
 
-    improved_available = positive_available + sum(item['recommended_cut'] for item in suggestions)
+    improved_available = max(0, available + sum(item['recommended_cut'] for item in suggestions))
     projected_with_changes = None
     if remaining and improved_available > 0:
         months_needed = ceil(remaining / improved_available)
         projected_with_changes = _month_label(current_month + months_needed - 1)
+
+    for item in suggestions:
+        if not remaining or not months_remaining:
+            item['goal_impact'] = None
+            continue
+        monthly_with_change = max(0, available + item['recommended_cut'])
+        extra_monthly = monthly_with_change - positive_available
+        extra = min(remaining, extra_monthly * months_remaining)
+        months_with_change = ceil(remaining / monthly_with_change) if monthly_with_change else None
+        months_without_change = ceil(remaining / positive_available) if positive_available else None
+        item['goal_impact'] = {
+            'extra_by_deadline': extra,
+            'remaining_percent': extra / remaining * 100,
+            'projected_deadline': _month_label(current_month + months_with_change - 1) if months_with_change else None,
+            'months_sooner': max(0, months_without_change-months_with_change) if months_without_change and months_with_change else 0,
+        }
 
     return {
         'status': status,
@@ -409,7 +425,7 @@ def _goal_analysis(goal, profile, today):
         'projected_deadline': projected_deadline,
         'projected_with_changes': projected_with_changes,
         'max_by_deadline': saved + positive_available * months_remaining,
-        'max_with_suggestions': saved + (positive_available + potential_total) * months_remaining,
+        'max_with_suggestions': saved + max(0, available + potential_total) * months_remaining,
         'months_analyzed': profile['months_analyzed'],
         'suggestions': suggestions,
     }

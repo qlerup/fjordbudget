@@ -154,6 +154,7 @@ class UITests(unittest.TestCase):
             expect(card.locator('.suggestion-history')).to_contain_text('måneders historik')
             expect(card.locator('.goal-suggestions')).to_contain_text('Hvis du stopper med at handle her')
             expect(card.locator('.goal-suggestions')).not_to_contain_text('ét besøg færre')
+            expect(card.locator('.suggestion-goal-impact').first).to_contain_text('tættere på Skip UI mål')
             with connect(db_path) as db:
                 goal_id = db.execute("SELECT id FROM savings_goals WHERE name='Skip UI mål'").fetchone()[0]
             count=card.locator('[data-skip-suggestion]').count()

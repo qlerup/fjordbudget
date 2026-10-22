@@ -67,6 +67,8 @@ Suggestions use up to the last 12 completed calendar months on the goal's select
 
 The goal lists the total number of relevant suggestions. The first three are visible initially; “Vis flere forslag” reveals the rest. There is no fixed limit on eligible merchants. The projected date with changes assumes all listed suggestions are followed, including those in the expandable list.
 
+Each scenario also shows its individual contribution by the goal's deadline, capped at the remaining goal amount, its share of that remaining amount, and any estimated earlier completion month. These effects assume the freed amount is saved each month; an existing monthly deficit must be covered first. Individual scenarios are assessed separately, so capped progress percentages should not be added together.
+
 Use “Spring over denne måned” to exclude a merchant from one goal's savings calculations for the current calendar month. The next relevant opportunity replaces it when available. Skips persist across reloads and apply to the goal on the overview too; “Tag med igen” restores a suggestion. Next month, skipped merchants become eligible again. The selected analysis dates still determine the spending history. Nothing automatically changes budgets or transactions.
 
 ## Data and backup

@@ -107,7 +107,8 @@ class AnnualSavingsTests(unittest.TestCase):
             result = build_insights(self.db, 'demo', 'DKK', today=self.today,
                                     period_start=date(2026,month,1), period_end=date(2026,month,30))
             results.append(next(g['analysis'] for g in result['goals'] if g['id']==ident))
-        self.assertEqual(results[0]['suggestions'], results[1]['suggestions'])
+        self.assertEqual([{k:v for k,v in item.items() if k!='goal_impact'} for item in results[0]['suggestions']],
+                         [{k:v for k,v in item.items() if k!='goal_impact'} for item in results[1]['suggestions']])
         self.assertEqual(results[0]['suggestion_history'], results[1]['suggestion_history'])
         self.assertNotEqual(results[0]['average_available'], results[1]['average_available'])
         self.assertEqual(len(results[0]['suggestions']),1)
