@@ -319,19 +319,27 @@ def _savings_history_profile(db, source, currency, today, account_ids, excluded_
     profile = _period_profile(db, source, currency, start, end, account_ids, excluded_keys)
     recent_start = max(start, date.fromisoformat(_month_label(current - 3) + '-01'))
     recent = _period_profile(db, source, currency, recent_start, end, account_ids, excluded_keys)
-    recent_opportunities = {_merchant_key(item['name']): item for item in recent['opportunities']}
+    recent_merchants = {_merchant_key(item['name']): item for item in recent['merchants']}
+    month_count = ceil(_month_equivalent(start, end))
+    recent_month_count = ceil(_month_equivalent(recent_start, end))
     opportunities = []
-    for item in profile['opportunities']:
-        latest = recent_opportunities.get(_merchant_key(item['name']))
-        # No recent repeat purchases means the old habit cannot justify a saving now.
-        if latest is None:
+    for item in profile['merchants']:
+        key = _merchant_key(item['name'])
+        latest = recent_merchants.get(key)
+        # Show a counterfactual spending scenario, never count old/inactive habits.
+        if (key in excluded_keys or not item['adjustable'] or item['purchases'] < 2
+                or (month_count > 1 and item['active_months'] < 2) or latest is None):
+            continue
+        saving = min(item['monthly_average'], latest['monthly_average'])
+        if saving < 2500:
             continue
         opportunities.append({**item,
-            'suggested_cut': min(item['suggested_cut'], latest['suggested_cut']),
-            'yearly_effect': min(item['suggested_cut'], latest['suggested_cut']) * 12,
-            'typical_purchase': latest['typical_purchase'],
+            'type': 'merchant', 'suggestion_kind': 'stop_merchant_purchases',
+            'suggested_cut': saving, 'yearly_effect': saving * 12,
+            'average_visits_per_month': round(item['purchases'] / month_count, 1),
+            'saving_reference': 'recent' if latest['monthly_average'] < item['monthly_average'] else 'history',
             'recent_monthly_average': latest['monthly_average'],
-            'recent_visits_per_month': latest['average_visits_per_month'],
+            'recent_visits_per_month': round(latest['purchases'] / recent_month_count, 1),
             'recent_reduced': latest['monthly_average'] < item['monthly_average'] * .8,
         })
     opportunities.sort(key=lambda item: (item['recent_reduced'], -item['suggested_cut'], item['name'].casefold()))

@@ -152,6 +152,8 @@ class UITests(unittest.TestCase):
             card = self.page.locator('.savings-card').filter(has=self.page.get_by_role('heading',name='Skip UI mål',exact=True))
             expect(card).to_be_visible()
             expect(card.locator('.suggestion-history')).to_contain_text('måneders historik')
+            expect(card.locator('.goal-suggestions')).to_contain_text('Hvis du stopper med at handle her')
+            expect(card.locator('.goal-suggestions')).not_to_contain_text('ét besøg færre')
             with connect(db_path) as db:
                 goal_id = db.execute("SELECT id FROM savings_goals WHERE name='Skip UI mål'").fetchone()[0]
             count=card.locator('[data-skip-suggestion]').count()

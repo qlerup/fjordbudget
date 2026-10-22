@@ -653,6 +653,13 @@ class InsightTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/dashboard?source=demo').json['featured_goal']['id'], second)
 
     def test_savings_analysis_uses_only_explicit_goal_accounts(self):
+        from app import merchant_key
+        # Fixed costs are explicit merchant preferences, not inferred from
+        # having one purchase per month (which can also be optional spending).
+        with connect(self.db) as db:
+            for row in db.execute("SELECT DISTINCT merchant FROM transactions WHERE account_id='demo-bills' AND merchant IS NOT NULL"):
+                db.execute('''INSERT OR REPLACE INTO merchant_preferences(source,merchant_key,name,adjustable)
+                              VALUES ('demo',?,?,0)''', (merchant_key(row['merchant']),row['merchant']))
         url = '/api/savings-goals?source=demo'
         base = {'target_amount': '1000000', 'saved_amount': '0',
                 'deadline': month_after(2)}
@@ -682,7 +689,7 @@ class InsightTests(unittest.TestCase):
         daily_merchants = {item['name'] for item in daily['analysis']['suggestions']}
         bills_merchants = {item['name'] for item in bills['analysis']['suggestions']}
         self.assertTrue(daily_merchants)
-        # Rent and one-off recurring bills are not "skip a visit" opportunities.
+        # Merchants explicitly marked as fixed expenses are excluded.
         self.assertFalse(bills_merchants)
         self.assertTrue(daily_merchants.isdisjoint(bills_merchants))
 

@@ -52,11 +52,15 @@ class AnnualSavingsTests(unittest.TestCase):
         stable, reduced = result['opportunities']
         self.assertEqual(stable['purchases'], 24)
         self.assertEqual(stable['monthly_average'], 20000)
+        self.assertEqual(stable['suggested_cut'], 20000)
+        self.assertEqual(stable['suggestion_kind'], 'stop_merchant_purchases')
+        self.assertEqual(stable['saving_reference'], 'history')
         self.assertFalse(stable['recent_reduced'])
         self.assertEqual(reduced['monthly_average'], 315000)
         self.assertEqual(reduced['recent_monthly_average'], 60000)
-        self.assertEqual(reduced['suggested_cut'], 30000)
-        self.assertEqual(reduced['yearly_effect'], 360000)
+        self.assertEqual(reduced['suggested_cut'], 60000)
+        self.assertEqual(reduced['yearly_effect'], 720000)
+        self.assertEqual(reduced['saving_reference'], 'recent')
         self.assertTrue(reduced['recent_reduced'])
 
     def test_short_history_includes_zero_spend_months_and_does_not_divide_by_twelve(self):
@@ -75,6 +79,21 @@ class AnnualSavingsTests(unittest.TestCase):
         self.assertEqual(result['opportunities'], [])
         self.assertEqual(result['suggestion_history']['months_analyzed'], 0)
         self.assertIsNone(result['suggestion_history']['period_start'])
+
+    def test_once_a_month_recurring_purchases_use_full_average_not_one_purchase_reduction(self):
+        with connect(self.db) as db:
+            for month, amount in (('2026-06',20000),('2026-07',30000),
+                                  ('2026-08',40000),('2026-09',50000)):
+                self.purchase(db,month,'Monthly Shop',amount,1)
+            result=self.history(db)
+        item=result['opportunities'][0]
+        self.assertEqual(item['monthly_average'],35000)
+        self.assertEqual(item['recent_monthly_average'],40000)
+        self.assertEqual(item['suggested_cut'],35000)
+        self.assertEqual(item['yearly_effect'],420000)
+        with connect(self.db) as db:
+            db.execute("INSERT INTO merchant_preferences VALUES ('demo','monthlyshop','Monthly Shop',0)")
+            self.assertEqual(self.history(db)['opportunities'],[])
 
     def test_changing_selected_period_does_not_change_suggestions(self):
         with connect(self.db) as db:
