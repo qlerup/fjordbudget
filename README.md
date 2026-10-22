@@ -44,13 +44,18 @@ database, bank credentials, session/encryption keys and owner account.
 
 Enable Banking **Account Information Services (AIS)** reads accounts, balances and booked transactions. No payments are implemented; payment endpoints are rejected even if provider credentials permit them. POST starts consent/exchanges its authorization code; DELETE only disconnects read consent.
 
-1. Create an application in [Enable Banking](https://enablebanking.com/cp/applications).
-2. Use Sandbox for tests. Production access to your own accounts depends on provider approval, coverage, terms and any charges; not all banks/accounts are promised.
+Open **Forbind bank** for the built-in six-step setup guide. It includes the exact
+application fields, copy buttons for this installation's URLs and description,
+private PEM-file import, and instructions for both account linking and app consent.
+The same guide can be reopened after setup when adding another bank or account.
+
+1. Create your own user and application in [Enable Banking](https://enablebanking.com/cp/applications). Each owner uses their own credentials and accounts.
+2. Select **Production** for real accounts and generate/export the private key in the browser. Restricted personal use requires linking your own accounts in Enable Banking first; unrestricted activation is a separate contractual offering. Coverage, account availability and provider terms still apply. Sandbox is only for test data.
 3. Register the exact callback. The app displays the callback for the address you are using; log in through the final HTTPS domain before registering it. The Hub deployment uses its configured HTTPS callback. Never expose the legacy unauthenticated `AUTH_MODE=local` override through a tunnel.
-4. Enter the app ID and complete private RSA PEM key in Connect bank and save. No environment change/restart is needed; API credentials can be replaced later.
-5. Credentials are encrypted in `/data/bank-credentials.enc`, with restricted permissions, and never returned to the browser. Saved credentials override optional `ENABLE_BANKING_APP_ID` and `secrets/enablebanking.pem` configuration.
-6. Locally, use `localhost` rather than `127.0.0.1` so the callback cookie follows the redirect.
-7. Select the bank and approve read access there. MitID and bank login take place outside FjordBudget.
+4. On Enable Banking's website use **Activate by linking accounts**, or **Link accounts** below **Linked accounts**, and select every account you want accessible. Repeat for additional banks or new accounts. This does not create FjordBudget's consent.
+5. Enter the app ID and import the downloaded private `.pem` file, or paste its complete text, in Connect bank and save. No environment change/restart is needed; API credentials can be replaced later.
+6. Credentials are encrypted in `/data/bank-credentials.enc`, with restricted permissions, and never returned to the browser. Saved credentials override optional `ENABLE_BANKING_APP_ID` and `secrets/enablebanking.pem` configuration.
+7. Select the bank in FjordBudget and approve read access there. This second approval creates the app's consent. MitID and bank login take place outside FjordBudget. Pick the imported accounts to include in your overview.
 
 Each new consent's first synchronization requests the **longest available history** (`strategy=longest`); the bank determines the actual range. A completion modal reports the oldest returned booking and resulting history. Later refreshes request the last 90 days when the previous fetch is at least 30 minutes old. Imported history remains, and Update balances works manually at any time.
 

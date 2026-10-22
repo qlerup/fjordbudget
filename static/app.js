@@ -242,9 +242,7 @@ async function openBank() {
   $('bankDialog').showModal(); showError('bankError','');
   $('bankSetup').hidden=config.provider_configured; $('bankPicker').hidden=!config.provider_configured;
   $('editBankCredentials').hidden=!config.provider_configured;
-  $('callbackUrl').textContent=config.callback_url;
-  $('privacyUrl').textContent=config.privacy_url || location.origin+'/privacy';
-  $('termsUrl').textContent=config.terms_url || location.origin+'/terms';
+  window.FjordBankGuide.prepare(config);
   $('connections').innerHTML='';
   try {
     if(config.provider_configured){
@@ -426,7 +424,7 @@ async function openBankRefresh(){ $('bankDialog').close(); await openBank(); }
 $('bankDialog').addEventListener('close', () => {closeBankDropdown();$('bankCredentialsForm').reset();});
 $('editBankCredentials').onclick=()=>{
   $('bankSetup').hidden=false; $('bankPicker').hidden=true;
-  $('editBankCredentials').hidden=true; $('bankAppId').focus();
+  $('editBankCredentials').hidden=true; window.FjordBankGuide.credentials();
 };
 $('bankCredentialsForm').addEventListener('submit', async event=>{
   event.preventDefault();
@@ -435,7 +433,7 @@ $('bankCredentialsForm').addEventListener('submit', async event=>{
   try {
     await api('/api/bank/credentials',{method:'POST',body:JSON.stringify({app_id:$('bankAppId').value.trim(),private_key:$('bankPrivateKey').value})});
     $('bankCredentialsForm').reset(); config.provider_configured=true;
-    toast('API-oplysninger gemt lokalt.'); await openBankRefresh();
+    toast('API-oplysninger gemt lokalt.'); await openBankRefresh(); window.FjordBankGuide.showStep(5);
   } catch(error){showError('bankError',error.message);}
   finally {button.disabled=false;button.textContent='Gem og fortsæt';}
 });
