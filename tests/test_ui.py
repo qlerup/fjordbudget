@@ -150,13 +150,28 @@ class UITests(unittest.TestCase):
             expect(card).to_be_visible()
             with connect(db_path) as db:
                 goal_id = db.execute("SELECT id FROM savings_goals WHERE name='Skip UI mål'").fetchone()[0]
-            expect(card.locator('[data-skip-suggestion]')).to_have_count(3)
+            count=card.locator('[data-skip-suggestion]').count()
+            self.assertGreaterEqual(count,4)
+            expect(card.locator('.goal-suggestion-count')).to_have_text(f'Der er fundet {count} relevante forslag.')
+            expect(card.locator('.goal-more-suggestions')).to_be_visible()
+            extra=card.locator('.goal-more-suggestions [data-skip-suggestion]').first
+            expect(extra).not_to_be_visible()
+            card.locator('.goal-more-suggestions summary').click()
+            expect(extra).to_be_visible()
+            for width in (390,1440):
+                self.page.set_viewport_size({'width':width,'height':1050})
+                self.assertTrue(card.evaluate('e=>e.scrollWidth<=e.clientWidth+1'))
+                folder=Path(__file__).resolve().parents[1]/'test-results'
+                folder.mkdir(exist_ok=True)
+                card.screenshot(path=str(folder/f'all-savings-suggestions-{width}.png'))
+            card.locator('.goal-more-suggestions summary').click()
+            expect(extra).not_to_be_visible()
             expect(card.locator('.goal-suggestions')).to_contain_text(names[0])
             card.locator('[data-skip-suggestion]').first.click()
             expect(card.locator('.goal-skipped')).to_contain_text(names[0])
             expect(card.locator('.goal-suggestions')).not_to_contain_text(names[0])
             expect(card.locator('.goal-suggestions')).to_contain_text(names[3])
-            expect(card.locator('[data-skip-suggestion]')).to_have_count(3)
+            expect(card.locator('[data-skip-suggestion]')).to_have_count(count-1)
             self.page.reload()
             self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
             expect(card.locator('.goal-suggestions')).not_to_contain_text(names[0])

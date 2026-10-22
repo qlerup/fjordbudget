@@ -63,6 +63,8 @@ Goals have a target, saved amount and deadline. Optionally link an account to us
 
 Savings suggestions use repeated purchases at learned merchants, not budget categories. Fixed-expense merchants and one-off purchases are excluded. The estimate uses one fewer visit per month, based on the median purchase amount and capped at half the monthly spending.
 
+The goal lists the total number of relevant suggestions. The first three are visible initially; “Vis flere forslag” reveals the rest. There is no fixed limit on eligible merchants. The projected date with changes assumes all listed suggestions are followed, including those in the expandable list.
+
 Use “Spring over denne måned” to exclude a merchant from one goal's savings calculations for the current calendar month. The next relevant opportunity replaces it when available. Skips persist across reloads and apply to the goal on the overview too; “Tag med igen” restores a suggestion. Next month, skipped merchants become eligible again. The selected analysis dates still determine the spending history. Nothing automatically changes budgets or transactions.
 
 ## Data and backup

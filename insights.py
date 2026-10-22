@@ -58,7 +58,7 @@ def _spending_opportunities(merchant_spend, preferences, months_equivalent, peri
             'typical_purchase': typical_purchase, 'suggestion_kind': 'skip_one_visit',
         })
     opportunities.sort(key=lambda item: (-item['suggested_cut'], item['name'].casefold()))
-    return opportunities[:10]
+    return opportunities
 
 
 def last_month_spending(db, source, currency, today=None):
@@ -191,7 +191,7 @@ def _profile(db, source, currency, today, account_ids=None, excluded_keys=()):
         'average_available': _average(available),
         'categories': categories,
         'merchants': merchants,
-        'opportunities': opportunities[:10],
+        'opportunities': opportunities,
     }
 
 
@@ -296,7 +296,7 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
         'average_available': int(round(total_available / month_equivalent)),
         'categories': categories,
         'merchants': merchants,
-        'opportunities': opportunities[:10],
+        'opportunities': opportunities,
     }
 
 def _goal_analysis(goal, profile, today):
@@ -312,17 +312,8 @@ def _goal_analysis(goal, profile, today):
     gap = max(0, required - positive_available)
 
     potential_total = sum(item['suggested_cut'] for item in profile['opportunities'])
-    suggestions = []
-    if gap:
-        still_needed = gap
-        for item in profile['opportunities']:
-            if still_needed <= 0:
-                break
-            amount = item['suggested_cut']
-            suggestions.append({**item, 'recommended_cut': amount, 'yearly_effect': amount * 12})
-            still_needed -= amount
-    else:
-        suggestions = [{**item, 'recommended_cut': item['suggested_cut']} for item in profile['opportunities'][:3]]
+    suggestions = [{**item, 'recommended_cut': item['suggested_cut']}
+                   for item in profile['opportunities']]
 
     if remaining == 0:
         status = 'complete'

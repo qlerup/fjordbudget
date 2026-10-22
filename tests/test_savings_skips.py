@@ -60,11 +60,13 @@ class SavingsSkipTests(unittest.TestCase):
 
     def test_persists_replaces_and_updates_all_savings_calculations(self):
         before = self.analysis()
-        self.assertEqual([s['name'] for s in before['suggestions']], ['Cafe 00', 'Cafe 01', 'Cafe 02'])
+        self.assertEqual(len(before['suggestions']), 12)
+        self.assertEqual([s['name'] for s in before['suggestions'][:3]], ['Cafe 00', 'Cafe 01', 'Cafe 02'])
         self.assertEqual(self.skip('Cafe 00').status_code, 200)
         after = self.analysis()
-        self.assertEqual([s['name'] for s in after['suggestions']], ['Cafe 01', 'Cafe 02', 'Cafe 03'])
-        self.assertEqual(after['potential_extra_saving'], before['potential_extra_saving'] - 10000)
+        self.assertEqual(len(after['suggestions']), 11)
+        self.assertEqual([s['name'] for s in after['suggestions'][:3]], ['Cafe 01', 'Cafe 02', 'Cafe 03'])
+        self.assertEqual(after['potential_extra_saving'], before['potential_extra_saving'] - 24000)
         self.assertEqual(after['max_with_suggestions'],
                          after['max_by_deadline'] + after['potential_extra_saving'] * after['months_remaining'])
         self.assertEqual(after['average_available'], before['average_available'])

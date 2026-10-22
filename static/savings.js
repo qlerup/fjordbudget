@@ -71,6 +71,13 @@ function savingsSkippedSuggestions(goal){
   if(!skipped.length)return '';
   return `<details class="goal-skipped"><summary>Sprunget over i ${esc(monthName(goal.analysis.suggestion_month))} (${skipped.length})</summary><p>Disse forslag tæller ikke med i målets besparelser denne måned. De kan vises igen næste måned.</p><ul>${skipped.map(item=>`<li><span>${esc(item.name)}</span><button type="button" class="text-button" data-restore-suggestion="${goal.id}" data-merchant="${esc(item.name)}" aria-label="Tag ${esc(item.name)} med igen">Tag med igen</button></li>`).join('')}</ul></details>`;
 }
+function savingsSuggestions(goal){
+  const suggestions=goal.analysis.suggestions || [];
+  if(!suggestions.length)return goal.analysis.months_analyzed?`<p class="analysis-note">${goal.analysis.skipped_suggestions?.length?'Ingen flere relevante spareforslag denne måned.':'Ingen sikre forslag til færre besøg i perioden. Engangskøb regnes ikke som en fast månedlig besparelse.'}</p>`:'';
+  const more=suggestions.slice(3);
+  const rows=items=>items.map(item=>savingsSuggestion(item,goal.currency,goal)).join('');
+  return `<div class="goal-suggestions"><h4>${goal.analysis.monthly_shortfall?'Forslag til at lukke forskellen':'Muligheder hvis du vil nå målet hurtigere'}</h4><p class="muted">Konkrete scenarier ud fra gentagne køb, ikke garanterede besparelser.</p><p class="goal-suggestion-count">${suggestions.length===1?'Der er fundet 1 relevant forslag.':`Der er fundet ${suggestions.length} relevante forslag.`}</p><ul>${rows(suggestions.slice(0,3))}</ul>${more.length?`<details class="goal-more-suggestions"><summary><span class="suggestions-show-more">Vis ${more.length} flere forslag</span><span class="suggestions-show-less">Vis færre forslag</span></summary><ul>${rows(more)}</ul></details>`:''}${goal.analysis.projected_with_changes?`<p>Hvis du fastholder ${suggestions.length===1?'dette forslag':`alle ${suggestions.length} forslag`}, peger estimatet mod <strong>${esc(monthName(goal.analysis.projected_with_changes))}</strong>.</p>`:''}</div>`;
+}
 function renderSavingsProfile(profile){
   const merchants=profile.merchants.slice(0,5);
   const period=savingsDateLabel(profile.period_start)+' – '+savingsDateLabel(profile.period_end);
@@ -108,7 +115,6 @@ async function loadSavings(){
       const accountLine=goal.uses_live_balance
         ? `<p class="savings-account-source">${svg('bank')}<span>Følger <strong>${esc(goal.account_name)}</strong> live${goal.account_balance_available?'':' · saldo afventer'}</span></p>`
         : '';
-      const suggestions=goal.analysis.suggestions || [];
       const chosenAccounts=(goal.analysis_account_ids || []).map(id=>savingsAccounts.find(account=>account.id===id)).filter(Boolean);
       const analysisSource=chosenAccounts.length
         ? '<p class="savings-analysis-source">'+svg('bank')+'<span>Spareforslag fra: <strong>'+chosenAccounts.map(account=>esc(account.name)).join(', ')+'</strong></span></p>'
@@ -123,7 +129,7 @@ async function loadSavings(){
         <p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>
         <div class="goal-status ${tone}"><strong>${esc(label)}</strong><span>${esc(text)}</span></div>
         ${goal.analysis.months_analyzed?`<div class="goal-numbers"><span>Kræver <b>${esc(money(goal.analysis.required_monthly,goal.currency,0))}/md.</b></span><span>Råderum <b>${esc(money(goal.analysis.average_available,goal.currency,0))}/md.</b></span></div>`:''}
-        ${suggestions.length?`<div class="goal-suggestions"><h4>${goal.analysis.monthly_shortfall?'Forslag til at lukke forskellen':'Muligheder hvis du vil nå målet hurtigere'}</h4><p class="muted">Konkrete scenarier ud fra gentagne køb, ikke garanterede besparelser.</p><ul>${suggestions.map(item=>savingsSuggestion(item,goal.currency,goal)).join('')}</ul>${goal.analysis.projected_with_changes?`<p>Hvis du fastholder disse ændringer, peger estimatet mod <strong>${esc(monthName(goal.analysis.projected_with_changes))}</strong>.</p>`:''}</div>`:(goal.analysis.months_analyzed?`<p class="analysis-note">${goal.analysis.skipped_suggestions?.length?'Ingen flere relevante spareforslag denne måned.':'Ingen sikre forslag til færre besøg i perioden. Engangskøb regnes ikke som en fast månedlig besparelse.'}</p>`:'')}
+        ${savingsSuggestions(goal)}
         ${savingsSkippedSuggestions(goal)}
         <div class="savings-actions"><button type="button" class="button quiet" data-edit-savings="${goal.id}" aria-label="Rediger ${esc(goal.name)}">Rediger</button><button type="button" class="text-button" data-delete-savings="${goal.id}" aria-label="Slet ${esc(goal.name)}">Slet</button></div>
       </article>`;
