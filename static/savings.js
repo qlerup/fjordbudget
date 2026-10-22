@@ -51,11 +51,12 @@ attachSavingsMoneyInput('savingsSavedAmount');
 
 function savingsStatus(goal){
   const a=goal.analysis;
-  if(!(goal.analysis_account_ids || []).length && a.status!=='complete' && a.status!=='expired')
+  if(!(goal.analysis_account_ids || []).length && !['complete','expired','due_this_month'].includes(a.status))
     return ['neutral','Vælg konti til analysen','Rediger målet og sæt flueben ved de konti, der skal bruges til spareforslag.'];
   const amount=money(a.required_monthly,goal.currency,0);
   if(a.status==='complete')return ['complete','Målet er nået','Du har allerede sparet hele målbeløbet op.'];
   if(a.status==='expired')return ['danger','Deadline er passeret',`Der mangler ${money(a.remaining,goal.currency,0)} på målet.`];
+  if(a.status==='due_this_month')return ['warning','Målet har deadline denne måned',`Der mangler ${money(a.remaining,goal.currency,2)}, som skal lægges til side inden månedens udgang. Der er ingen fremtidige opsparingsmåneder før deadline.`];
   if(a.status==='insufficient_data')return ['neutral','Mangler historik','FjordBudget skal bruge flere posteringer, før målet kan vurderes sikkert.'];
   if(a.status==='realistic')return ['good','Målet ser realistisk ud',`Du skal spare ca. ${amount} op om måneden. Dit historiske råderum er ca. ${money(a.average_available,goal.currency,0)}.`];
   if(a.status==='tight')return ['warning','Målet er stramt, men muligt',`Næsten hele dit gennemsnitlige råderum på ${money(a.average_available,goal.currency,0)} skal gå til målet.`];
@@ -135,7 +136,8 @@ async function loadSavings(){
         <div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div>
         <p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>
         <div class="goal-status ${tone}"><strong>${esc(label)}</strong><span>${esc(text)}</span></div>
-        ${goal.analysis.months_analyzed?`<div class="goal-numbers"><span>Kræver <b>${esc(money(goal.analysis.required_monthly,goal.currency,0))}/md.</b></span><span>Råderum <b>${esc(money(goal.analysis.average_available,goal.currency,0))}/md.</b></span></div>`:''}
+        ${goal.analysis.months_analyzed && goal.analysis.months_remaining>0?`<div class="goal-numbers"><span>Kræver <b>${esc(money(goal.analysis.required_monthly,goal.currency,0))}/md.</b></span><span>Råderum <b>${esc(money(goal.analysis.average_available,goal.currency,0))}/md.</b></span></div>`:''}
+        ${goal.analysis.remaining && goal.analysis.months_remaining>0?`<p class="analysis-note goal-timing">Beregnet fra ${esc(monthName(goal.analysis.first_saving_month))} til og med ${esc(deadline)} (${goal.analysis.months_remaining} ${goal.analysis.months_remaining===1?'måned':'måneder'}). Denne måneds opsparing regnes som en del af den nuværende saldo.</p>`:''}
         ${savingsSuggestions(goal)}
         ${savingsSkippedSuggestions(goal)}
         <div class="savings-actions"><button type="button" class="button quiet" data-edit-savings="${goal.id}" aria-label="Rediger ${esc(goal.name)}">Rediger</button><button type="button" class="text-button" data-delete-savings="${goal.id}" aria-label="Slet ${esc(goal.name)}">Slet</button></div>
@@ -198,7 +200,7 @@ window.renderFeaturedGoal=function(goal){
   const [tone,label,text]=savingsStatus(goal);
   const liveAccount=goal.uses_live_balance?`<small class="featured-goal-account">${svg('bank')} Følger ${esc(goal.account_name)} live</small>`:'';
   panel.innerHTML=`<div class="featured-goal-copy"><p class="eyebrow">DIT AKTIVE MÅL</p><h2>${esc(goal.name)}</h2><p>${esc(text)}</p><button type="button" class="text-button" data-view="savings">Se analyse og forslag <span>→</span></button></div>
-    <div class="featured-goal-numbers"><span>${esc(money(goal.saved_amount,goal.currency,0))} af ${esc(money(goal.target_amount,goal.currency,0))}</span>${liveAccount}<div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div><strong class="${tone}">${esc(label)}</strong>${a.months_analyzed?`<small>${esc(money(a.required_monthly,goal.currency,0))}/md. nødvendigt · ${esc(money(a.average_available,goal.currency,0))}/md. historisk råderum</small>`:''}</div>`;
+    <div class="featured-goal-numbers"><span>${esc(money(goal.saved_amount,goal.currency,0))} af ${esc(money(goal.target_amount,goal.currency,0))}</span>${liveAccount}<div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div><strong class="${tone}">${esc(label)}</strong>${a.months_analyzed && a.months_remaining>0?`<small>${esc(money(a.required_monthly,goal.currency,0))}/md. nødvendigt fra ${esc(monthName(a.first_saving_month))} · ${esc(money(a.average_available,goal.currency,0))}/md. historisk råderum</small>`:''}</div>`;
 };
 $('newSavingsGoal').addEventListener('click',()=>openSavings());
 $('savingsList').addEventListener('click',async event=>{

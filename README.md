@@ -67,7 +67,9 @@ Suggestions use up to the last 12 completed calendar months on the goal's select
 
 The goal lists the total number of relevant suggestions. The first three are visible initially; “Vis flere forslag” reveals the rest. There is no fixed limit on eligible merchants. The projected date with changes assumes all listed suggestions are followed, including those in the expandable list.
 
-Each scenario also shows its individual contribution by the goal's deadline, capped at the remaining goal amount, its share of that remaining amount, and any estimated earlier completion month. These effects assume the freed amount is saved each month; an existing monthly deficit must be covered first. Individual scenarios are assessed separately, so capped progress percentages should not be added together.
+Goal calculations assume this month's deposit is already reflected in the current saved balance. New deposits start next calendar month and include the deadline month. The card shows this calculation period. Required monthly savings, projected completion dates, and each scenario's effect all use this same start month. A goal due this month shows the amount still needed before month-end instead of treating the month as another future deposit.
+
+Each scenario also shows its individual contribution by the goal's deadline, capped at the remaining goal amount, its share of that remaining amount, and any estimated earlier completion month. These effects assume the freed amount is saved each month starting next month; an existing monthly deficit must be covered first. Individual scenarios are assessed separately, so capped progress percentages should not be added together.
 
 Use “Spring over” to choose between excluding a merchant for the current calendar month or permanently for that goal. The next relevant opportunity replaces it when available. Both choices persist across reloads and apply to the goal on the overview too; “Tag med igen” restores a suggestion. Monthly skips expire next month; permanent skips remain until restored. The selected analysis dates still determine the spending history. Nothing automatically changes budgets or transactions.
 

@@ -121,6 +121,36 @@ class UITests(unittest.TestCase):
         self.page.get_by_role('button',name='Mit budget',exact=True).click()
         expect(self.page.locator('#month')).to_be_visible()
 
+    def test_savings_timing_starts_next_month_and_handles_deadline_this_month(self):
+        db_path=self.app.extensions['db_path']
+        month_number=date.today().year*12+date.today().month-1
+        year,month0=divmod(month_number+4,12)
+        with connect(db_path) as db:
+            goal_id=db.execute('''INSERT INTO savings_goals(source,currency,name,target_amount,saved_amount,deadline)
+                VALUES ('demo','DKK','Timing regression',10000000,5110218,?)''',
+                (f'{year:04d}-{month0+1:02d}',)).lastrowid
+            db.execute("INSERT INTO savings_goal_analysis_accounts VALUES (?,'demo-daily')",(goal_id,))
+        try:
+            self.page.locator('.nav-item[data-view="savings"]').click()
+            card=self.page.locator('.savings-card').filter(has=self.page.get_by_role('heading',name='Timing regression'))
+            expect(card.locator('.goal-timing')).to_contain_text('(4 måneder)')
+            expect(card.locator('.goal-timing')).to_contain_text('Denne måneds opsparing regnes som en del af den nuværende saldo.')
+            expect(card.locator('.goal-numbers')).to_contain_text('12.224 kr.')
+            for width in (320,1440):
+                self.page.set_viewport_size({'width':width,'height':1050})
+                self.assertTrue(card.evaluate('e=>e.scrollWidth<=e.clientWidth+1'))
+            with connect(db_path) as db:
+                db.execute('UPDATE savings_goals SET deadline=? WHERE id=?',(date.today().strftime('%Y-%m'),goal_id))
+            self.page.reload()
+            self.page.locator('.nav-item[data-view="savings"]').click()
+            expect(card.locator('.goal-status')).to_contain_text('Målet har deadline denne måned')
+            expect(card.locator('.goal-status')).to_contain_text('48.897,82 kr.')
+            expect(card.locator('.goal-numbers')).to_have_count(0)
+            expect(card.locator('.suggestion-goal-impact')).to_have_count(0)
+        finally:
+            with connect(db_path) as db:
+                db.execute('DELETE FROM savings_goals WHERE id=?',(goal_id,))
+
     def test_savings_monthly_skip_replacement_reload_undo_and_mobile(self):
         from datetime import timedelta
         db_path = self.app.extensions['db_path']

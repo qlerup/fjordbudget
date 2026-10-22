@@ -359,8 +359,11 @@ def _goal_analysis(goal, profile, today):
     saved = int(goal.get('saved_amount') or 0)
     remaining = max(0, target - saved)
     current_month = _month_number(today.strftime('%Y-%m'))
+    # The current balance already includes this month's savings. Future deposits
+    # start next month; counting this month again would overstate the runway.
+    first_saving_month = current_month + 1
     deadline_month = _month_number(goal['deadline'][:7])
-    months_remaining = max(0, deadline_month - current_month + 1)
+    months_remaining = max(0, deadline_month - first_saving_month + 1)
     required = ceil(remaining / months_remaining) if remaining and months_remaining else (remaining if remaining else 0)
     available = profile['average_available']
     positive_available = max(0, available)
@@ -372,8 +375,10 @@ def _goal_analysis(goal, profile, today):
 
     if remaining == 0:
         status = 'complete'
-    elif months_remaining == 0:
+    elif deadline_month < current_month:
         status = 'expired'
+    elif months_remaining == 0:
+        status = 'due_this_month'
     elif not profile['months_analyzed']:
         status = 'insufficient_data'
     elif required <= positive_available * 0.8:
@@ -388,13 +393,13 @@ def _goal_analysis(goal, profile, today):
     projected_deadline = None
     if remaining and positive_available > 0:
         months_needed = ceil(remaining / positive_available)
-        projected_deadline = _month_label(current_month + months_needed - 1)
+        projected_deadline = _month_label(first_saving_month + months_needed - 1)
 
     improved_available = max(0, available + sum(item['recommended_cut'] for item in suggestions))
     projected_with_changes = None
     if remaining and improved_available > 0:
         months_needed = ceil(remaining / improved_available)
-        projected_with_changes = _month_label(current_month + months_needed - 1)
+        projected_with_changes = _month_label(first_saving_month + months_needed - 1)
 
     for item in suggestions:
         if not remaining or not months_remaining:
@@ -408,7 +413,7 @@ def _goal_analysis(goal, profile, today):
         item['goal_impact'] = {
             'extra_by_deadline': extra,
             'remaining_percent': extra / remaining * 100,
-            'projected_deadline': _month_label(current_month + months_with_change - 1) if months_with_change else None,
+            'projected_deadline': _month_label(first_saving_month + months_with_change - 1) if months_with_change else None,
             'months_sooner': max(0, months_without_change-months_with_change) if months_without_change and months_with_change else 0,
         }
 
@@ -416,6 +421,7 @@ def _goal_analysis(goal, profile, today):
         'status': status,
         'remaining': remaining,
         'months_remaining': months_remaining,
+        'first_saving_month': _month_label(first_saving_month),
         'required_monthly': required,
         'average_income': profile['average_income'],
         'average_expenses': profile['average_expenses'],
