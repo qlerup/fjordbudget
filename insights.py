@@ -304,6 +304,48 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
         'opportunities': opportunities,
     }
 
+def _savings_history_profile(db, source, currency, today, account_ids, excluded_keys=()):
+    """Calendar-year baseline, bounded by imported history, checked against recent use."""
+    current = _month_number(today.strftime('%Y-%m'))
+    window_start = date.fromisoformat(_month_label(current - 12) + '-01')
+    end = today.replace(day=1) - timedelta(days=1)
+    account_filter, account_params = _account_filter(account_ids)
+    oldest = db.execute(
+        f'''SELECT MIN(t.booked_on) FROM transactions t JOIN accounts a ON a.id=t.account_id
+            WHERE a.source=? AND {account_filter} AND a.selection_pending=0 AND t.currency=?
+              AND t.booked_on BETWEEN ? AND ?''',
+        (source, *account_params, currency, window_start.isoformat(), end.isoformat())).fetchone()[0]
+    start = date.fromisoformat(oldest).replace(day=1) if oldest else window_start
+    profile = _period_profile(db, source, currency, start, end, account_ids, excluded_keys)
+    recent_start = max(start, date.fromisoformat(_month_label(current - 3) + '-01'))
+    recent = _period_profile(db, source, currency, recent_start, end, account_ids, excluded_keys)
+    recent_opportunities = {_merchant_key(item['name']): item for item in recent['opportunities']}
+    opportunities = []
+    for item in profile['opportunities']:
+        latest = recent_opportunities.get(_merchant_key(item['name']))
+        # No recent repeat purchases means the old habit cannot justify a saving now.
+        if latest is None:
+            continue
+        opportunities.append({**item,
+            'suggested_cut': min(item['suggested_cut'], latest['suggested_cut']),
+            'yearly_effect': min(item['suggested_cut'], latest['suggested_cut']) * 12,
+            'typical_purchase': latest['typical_purchase'],
+            'recent_monthly_average': latest['monthly_average'],
+            'recent_visits_per_month': latest['average_visits_per_month'],
+            'recent_reduced': latest['monthly_average'] < item['monthly_average'] * .8,
+        })
+    opportunities.sort(key=lambda item: (item['recent_reduced'], -item['suggested_cut'], item['name'].casefold()))
+    profile['opportunities'] = opportunities
+    profile['suggestion_history'] = {
+        'period_start': start.isoformat() if oldest else None,
+        'period_end': end.isoformat(),
+        'months_analyzed': _month_number(end.strftime('%Y-%m')) - _month_number(start.strftime('%Y-%m')) + 1 if oldest else 0,
+        'recent_period_start': recent_start.isoformat() if oldest else None,
+        'recent_period_end': end.isoformat(),
+    }
+    return profile
+
+
 def _goal_analysis(goal, profile, today):
     target = int(goal['target_amount'])
     saved = int(goal.get('saved_amount') or 0)
@@ -415,12 +457,16 @@ def build_insights(db_path, source, currency, today=None, period_start=None, per
             excluded_keys = tuple(sorted(item['merchant_key'] for item in skipped))
             profile_key = (account_ids, excluded_keys)
             if profile_key not in scoped_profiles:
-                scoped_profiles[profile_key] = (
+                period_profile = (
                     _period_profile(db, source, currency, period_start, period_end, account_ids, excluded_keys)
                     if period_start is not None and period_end is not None
                     else _profile(db, source, currency, today, account_ids, excluded_keys)
                 )
+                history = _savings_history_profile(db, source, currency, today, account_ids, excluded_keys)
+                scoped_profiles[profile_key] = {**period_profile, 'opportunities': history['opportunities'],
+                                                'suggestion_history': history['suggestion_history']}
             goal['analysis'] = _goal_analysis(goal, scoped_profiles[profile_key], today)
+            goal['analysis']['suggestion_history'] = scoped_profiles[profile_key]['suggestion_history']
             goal['analysis']['suggestion_month'] = suggestion_month
             goal['analysis']['skipped_suggestions'] = [{'name': item['name']} for item in skipped]
 

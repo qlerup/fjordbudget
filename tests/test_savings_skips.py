@@ -104,6 +104,12 @@ class SavingsSkipTests(unittest.TestCase):
                                        json={'merchant': 'Cafe 01', 'month': self.month})
             self.assertEqual(response.status_code, 404)
         next_month = (self.today.replace(day=28) + timedelta(days=4)).replace(day=1)
+        with connect(self.db) as db:
+            for visit in range(2):
+                db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,
+                              description,amount,currency,category,merchant)
+                              VALUES ('demo-daily',?,?,'Cafe',-24000,'DKK','Fritid','Cafe 00')''',
+                           (f'new-month-{visit}', self.today.replace(day=1).isoformat()))
         result = build_insights(self.db, 'demo', 'DKK', today=next_month,
                                 period_start=self.start, period_end=self.end)
         analysis = next(g['analysis'] for g in result['goals'] if g['id'] == self.goal)

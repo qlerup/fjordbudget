@@ -130,11 +130,14 @@ class UITests(unittest.TestCase):
         goal_id = None
         with connect(db_path) as db:
             for index, name in enumerate(names):
-                for visit in range(2):
-                    db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                for month_offset in range(1,5):
+                    number=date.today().year*12+date.today().month-1-month_offset
+                    year,month0=divmod(number,12)
+                    for visit in range(2):
+                        db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,
                                   amount,currency,category,merchant) VALUES ('demo-daily',?,?,?,?,'DKK','Fritid',?)''',
-                               (f'ui-skip-{index}-{visit}', previous_start.isoformat(), name,
-                                -(1000000-index*100000), name))
+                                   (f'ui-skip-{index}-{month_offset}-{visit}', f'{year:04d}-{month0+1:02d}-01', name,
+                                    -(1000000-index*100000), name))
             db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
                           VALUES ('demo-daily','ui-skip-income',?,'Løn',100000000,'DKK','Indkomst')''',
                        (previous_start.isoformat(),))
@@ -148,6 +151,7 @@ class UITests(unittest.TestCase):
             self.page.locator('#savingsForm button[type=submit]').click()
             card = self.page.locator('.savings-card').filter(has=self.page.get_by_role('heading',name='Skip UI mål',exact=True))
             expect(card).to_be_visible()
+            expect(card.locator('.suggestion-history')).to_contain_text('måneders historik')
             with connect(db_path) as db:
                 goal_id = db.execute("SELECT id FROM savings_goals WHERE name='Skip UI mål'").fetchone()[0]
             count=card.locator('[data-skip-suggestion]').count()
