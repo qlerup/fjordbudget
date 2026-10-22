@@ -63,7 +63,7 @@ def _spending_opportunities(merchant_spend, preferences, months_equivalent, peri
 
 
 def last_month_spending(db, source, currency, today=None):
-    """Top four adjustable merchants in the last completed calendar month.
+    """Top ten adjustable merchants in the last completed calendar month.
 
     The dashboard is independent of savings goals and the month picker.
     Recorded spend is not a claim that every purchase was unnecessary.
@@ -89,7 +89,7 @@ def last_month_spending(db, source, currency, today=None):
         item['spent'] += int(row['total'])
         item['purchases'] += int(row['purchases'])
     items = sorted(grouped.values(), key=lambda item: (-item['spent'], item['name'].casefold()))
-    return {'month': month, 'items': items[:4]}
+    return {'month': month, 'items': items[:10]}
 
 
 def _account_filter(account_ids):

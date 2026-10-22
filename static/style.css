@@ -324,4 +324,5 @@
 .spending-review-info span{font-size:12px;color:var(--muted)}
 .spending-review-list li>b{font-size:16px;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--green)}
 .spending-review-note{font-size:12px;line-height:1.55;color:var(--muted);margin:9px 0 0}
+.spending-review-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:12px 0 4px;margin:0 0 12px}.spending-review-pagination>span{display:grid;gap:3px;text-align:center;color:var(--muted);font-size:12px}.spending-review-pagination strong{font-weight:600}.spending-review-pagination small{font-size:11px}.spending-review-pagination .button{min-height:38px;padding:8px 12px}
 @media(max-width:760px){.spending-review-panel{margin-top:12px}.spending-review-list li{align-items:flex-start}.spending-review-list li>b{font-size:14px}}

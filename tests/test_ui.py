@@ -678,12 +678,55 @@ class UITests(unittest.TestCase):
         expect(self.page.locator('[data-section="transactions"]')).to_be_visible()
         expect(self.page.locator('#transactionRows')).to_contain_text('Overview missing test')
 
+    def test_last_month_review_two_pages_and_currency_reset(self):
+        from datetime import timedelta
+        db_path=self.app.extensions['db_path']
+        previous=(date.today().replace(day=1)-timedelta(days=1)).strftime('%Y-%m')
+        with connect(db_path) as db:
+            for index in range(12):
+                db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                              amount,currency,category,merchant)
+                              VALUES ('demo-daily',?,?,'Review page',?,'DKK','Fritid',?)''',
+                           (f'review-page-{index}',previous+'-12',-(2000000-index*10000),f'Review Page {index:02d}'))
+        try:
+            self.page.reload()
+            review=self.page.locator('.spending-review-panel')
+            rows=self.page.locator('#lastMonthReviewList li')
+            expect(rows).to_have_count(5)
+            expect(rows.first).to_contain_text('Review Page 00')
+            expect(self.page.locator('#lastMonthReviewPrevious')).to_be_disabled()
+            expect(self.page.locator('#lastMonthReviewRange')).to_have_text('Viser 1–5 af 10')
+            self.page.locator('#lastMonthReviewNext').click()
+            expect(rows).to_have_count(5)
+            expect(rows.first).to_contain_text('Review Page 05')
+            expect(rows.last).to_contain_text('Review Page 09')
+            expect(self.page.locator('#lastMonthReviewPage')).to_have_text('Side 2 af 2')
+            expect(self.page.locator('#lastMonthReviewNext')).to_be_disabled()
+            for width in (390,1440):
+                self.page.set_viewport_size({'width':width,'height':1050})
+                self.assertTrue(review.evaluate('e=>e.scrollWidth<=e.clientWidth+1'))
+                folder=Path(__file__).resolve().parents[1]/'test-results'
+                folder.mkdir(exist_ok=True)
+                review.screenshot(path=str(folder/f'last-month-review-page2-{width}.png'))
+            self.page.locator('#lastMonthReviewPrevious').click()
+            expect(rows.first).to_contain_text('Review Page 00')
+            self.page.locator('#lastMonthReviewNext').click()
+            self.page.locator('#currency').select_option('EUR')
+            expect(self.page.locator('#lastMonthReviewPagination')).to_be_hidden()
+            expect(rows).to_have_count(0)
+            self.page.locator('#currency').select_option('DKK')
+            expect(rows.first).to_contain_text('Review Page 00')
+            expect(self.page.locator('#lastMonthReviewPage')).to_have_text('Side 1 af 2')
+        finally:
+            with connect(db_path) as db:
+                db.execute("DELETE FROM transactions WHERE external_id LIKE 'review-page-%'")
+
     def test_last_month_merchant_review_is_separate_from_savings_and_mobile_friendly(self):
         self.page.set_viewport_size({'width':390,'height':844})
         review = self.page.locator('.spending-review-panel')
         expect(review).to_be_visible()
         expect(review.locator('#lastMonthReviewTitle')).to_contain_text('Forbrug, der er værd at kigge på')
-        expect(self.page.locator('#lastMonthReviewList li')).to_have_count(4)
+        expect(self.page.locator('#lastMonthReviewList li')).to_have_count(5)
         expected_month = self.page.evaluate("""() => {
             const now=new Date(), prior=new Date(now.getFullYear(),now.getMonth()-1,15);
             return monthName(prior.getFullYear()+'-'+String(prior.getMonth()+1).padStart(2,'0'));

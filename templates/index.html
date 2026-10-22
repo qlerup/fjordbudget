@@ -6,7 +6,7 @@
   <title>FjordBudget · Din økonomi, samlet</title>
   <link rel="icon" href="/static/icon.svg?v=brand-budget-green-20261005" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/app.js?v=budget-suggestion-20261007" defer></script>
+  <script src="/static/app.js?v=spending-review-pages-20261022" defer></script>
   <script src="/static/savings.js?v=annual-suggestions-20261022" defer></script>
   <script src="/static/merchants.js?v=category-merchant-choice-20261007" defer></script>
 <link rel="apple-touch-icon" href="/static/logos/icon-180.png?v=brand-budget-green-20261005"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"><link rel="stylesheet" href="/static/hub-session.css?v=email-update1"><script defer src="/static/hub-session.js?v=email-update1"></script>
@@ -71,8 +71,13 @@
         </button>
       </section>
       <section class="panel spending-review-panel" data-section="attention" aria-labelledby="lastMonthReviewTitle">
-        <div class="section-heading"><div><p class="eyebrow">SIDSTE MÅNED</p><h2 id="lastMonthReviewTitle">Forbrug, der er værd at kigge på</h2><p id="lastMonthReviewPeriod">Dine fire største forhandlere i den sidste afsluttede måned</p></div></div>
+        <div class="section-heading"><div><p class="eyebrow">SIDSTE MÅNED</p><h2 id="lastMonthReviewTitle">Forbrug, der er værd at kigge på</h2><p id="lastMonthReviewPeriod">Op til ti af dine største forhandlere i den sidste afsluttede måned</p></div></div>
         <div id="lastMonthReviewList" class="spending-review-list" aria-live="polite"></div>
+        <nav id="lastMonthReviewPagination" class="spending-review-pagination" aria-label="Sider med sidste måneds forbrug" hidden>
+          <button id="lastMonthReviewPrevious" type="button" class="button quiet" aria-controls="lastMonthReviewList">Forrige</button>
+          <span><strong id="lastMonthReviewPage"></strong><small id="lastMonthReviewRange"></small></span>
+          <button id="lastMonthReviewNext" type="button" class="button quiet" aria-controls="lastMonthReviewList">Næste</button>
+        </nav>
         <p class="spending-review-note">Beløbene er faktiske køb – ikke automatisk mulige besparelser. Faste udgifter og overførsler er udeladt. Du kan markere en forhandler som fast udgift under Forhandlere.</p>
       </section>
       <section id="featuredGoalPanel" class="panel featured-goal-panel" data-section="insights" hidden aria-live="polite"></section>

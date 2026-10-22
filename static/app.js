@@ -82,16 +82,32 @@ function renderAccounts() {
 function budgetRows(categories, editable=false) {
   return categories.map(c=>`<div class="budget-row"><span class="budget-category"><i class="category-dot" style="background:${c.color}"></i>${esc(c.name)}${editable?`<button type="button" class="text-button" data-delete-budget-category="${esc(c.name)}" aria-label="Fjern budgetkategori ${esc(c.name)}">Fjern</button>`:''}</span><span class="budget-value"><b>${esc(money(c.spent))}</b> / ${c.budget?esc(money(c.budget)):'Intet budget'}</span><div class="progress"><div class="progress-fill ${c.budget&&c.spent>c.budget?'over':''}" style="width:${c.budget?Math.min(100,c.spent/c.budget*100):0}%"></div></div></div>`).join('');
 }
+let lastMonthReviewPage=1,lastMonthReviewScope='',lastMonthReviewItems=[];
 function renderLastMonthReview(review){
   const month=review?.month;
-  const items=review?.items || [];
+  const scope=source+'|'+$('currency').value+'|'+month;
+  if(scope!==lastMonthReviewScope){lastMonthReviewPage=1;lastMonthReviewScope=scope;}
+  lastMonthReviewItems=(review?.items || []).slice(0,10);
   $('lastMonthReviewPeriod').textContent=month
     ? monthName(month)+' · dine største køb hos forhandlere, der ikke er markeret som fast udgift'
     : 'Sidste afsluttede måned';
-  $('lastMonthReviewList').innerHTML=items.length
-    ? '<ol>'+items.map(item=>`<li><div class="spending-review-info"><strong>${esc(item.name)}</strong><span>${item.purchases} køb i måneden</span></div><b>${esc(money(item.spent))}</b></li>`).join('')+'</ol>'
-    : '<p class="muted">Der er endnu ingen kendte forhandlere at vise for sidste måned. Gennemgå dine posteringer, så bliver overblikket mere præcist.</p>';
+  renderLastMonthReviewPage();
 }
+function renderLastMonthReviewPage(){
+  const pages=Math.max(1,Math.ceil(lastMonthReviewItems.length/5));
+  lastMonthReviewPage=Math.max(1,Math.min(pages,lastMonthReviewPage));
+  const start=(lastMonthReviewPage-1)*5,items=lastMonthReviewItems.slice(start,start+5);
+  $('lastMonthReviewList').innerHTML=items.length
+    ? '<ol start="'+(start+1)+'">'+items.map(item=>`<li><div class="spending-review-info"><strong>${esc(item.name)}</strong><span>${item.purchases} køb i måneden</span></div><b>${esc(money(item.spent))}</b></li>`).join('')+'</ol>'
+    : '<p class="muted">Der er endnu ingen kendte forhandlere at vise for sidste måned. Gennemgå dine posteringer, så bliver overblikket mere præcist.</p>';
+  $('lastMonthReviewPagination').hidden=pages===1;
+  $('lastMonthReviewPage').textContent='Side '+lastMonthReviewPage+' af '+pages;
+  $('lastMonthReviewRange').textContent='Viser '+(start+1)+'–'+(start+items.length)+' af '+lastMonthReviewItems.length;
+  $('lastMonthReviewPrevious').disabled=lastMonthReviewPage===1;
+  $('lastMonthReviewNext').disabled=lastMonthReviewPage===pages;
+}
+$('lastMonthReviewPrevious').addEventListener('click',()=>{lastMonthReviewPage--;renderLastMonthReviewPage();});
+$('lastMonthReviewNext').addEventListener('click',()=>{lastMonthReviewPage++;renderLastMonthReviewPage();});
 function renderDashboard() {
   const d=dashboard;
   $('balance').textContent=money(d.balance);

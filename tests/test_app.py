@@ -199,10 +199,21 @@ class AppTests(unittest.TestCase):
         self.assertEqual(insight['month'], previous)
         self.assertEqual(
             [item['name'] for item in insight['items']],
-            ['McDonalds', 'Apcoa', 'Jem & Fix', 'Proshop'])
+            ['McDonalds', 'Apcoa', 'Jem & Fix', 'Proshop', 'Small shop'])
         self.assertEqual(insight['items'][0]['spent'], 140000)
         self.assertEqual(insight['items'][0]['purchases'], 2)
         self.assertTrue(all(item['spent'] > 0 for item in insight['items']))
+        with connect(self.db) as db:
+            for index in range(10):
+                db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                              amount,currency,category,merchant)
+                              VALUES ('review-visible',?,?,'Extra shop',-5000,'DKK','Shopping',?)''',
+                           (f'review-extra-{index}', previous+'-12', f'Extra {index}'))
+        expanded=self.client.get('/api/dashboard?source=live&currency=DKK').json['last_month_review']['items']
+        self.assertEqual(len(expanded),10)
+        self.assertEqual([item['name'] for item in expanded[:5]],
+                         ['McDonalds','Apcoa','Jem & Fix','Proshop','Small shop'])
+        self.assertEqual([item['name'] for item in expanded[5:]], [f'Extra {i}' for i in range(5)])
         self.assertEqual(self.client.get('/api/dashboard?source=demo').json[
             'last_month_review']['month'], previous)
 
