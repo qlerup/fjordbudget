@@ -20,7 +20,7 @@ class UITests(unittest.TestCase):
     def setUpClass(cls):
         logging.getLogger('werkzeug').setLevel(logging.ERROR)
         cls.temp=tempfile.TemporaryDirectory()
-        cls.app=create_app({'DATA_DIR':cls.temp.name,'TESTING':True})
+        cls.app=create_app({'DATA_DIR':cls.temp.name,'TESTING':True,'AUTH_MODE':'local'})
         cls.server=make_server('127.0.0.1',0,cls.app,threaded=True)
         cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True)
         cls.thread.start()

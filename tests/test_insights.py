@@ -26,7 +26,7 @@ def month_after(offset):
 class InsightTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.app = create_app({'TESTING': True, 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
+        self.app = create_app({'TESTING': True, 'AUTH_MODE': 'local', 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
         self.client = self.app.test_client()
         html = self.client.get('/').text
         self.headers = {'X-CSRF-Token': re.search(r'name="csrf-token" content="([^"]+)"', html)[1]}
@@ -347,7 +347,7 @@ class InsightTests(unittest.TestCase):
             db.execute("DELETE FROM app_migrations WHERE name='learn-merchant-history-v2'")
 
         # Existing unrecognized transactions are backfilled on app update/start.
-        create_app({'TESTING': True, 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
+        create_app({'TESTING': True, 'AUTH_MODE': 'local', 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
         with connect(self.db) as db:
             learned = db.execute(
                 "SELECT merchant,merchant_manual FROM transactions WHERE external_id='gejser-unknown'"
@@ -501,7 +501,7 @@ class InsightTests(unittest.TestCase):
                 '''UPDATE transactions SET merchant='Personligt valg',merchant_manual=1
                    WHERE external_id='learn-upgrade-0' ''')
         # Reinitialization must fill missing matches but respect manual corrections.
-        create_app({'TESTING': True, 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
+        create_app({'TESTING': True, 'AUTH_MODE': 'local', 'DATA_DIR': self.temp.name, 'PROVIDER': Provider()})
         with connect(self.db) as db:
             matched = db.execute(
                 "SELECT merchant,merchant_manual FROM transactions WHERE external_id='learn-upgrade-2'").fetchone()
@@ -702,7 +702,7 @@ class InsightTests(unittest.TestCase):
         self.assertEqual(updated['analysis_account_ids'], ['demo-bills', 'demo-daily'])
         self.assertGreater(updated['analysis']['average_income'], 0)
 
-        reopened = create_app({'TESTING': True, 'DATA_DIR': self.temp.name,
+        reopened = create_app({'TESTING': True, 'AUTH_MODE': 'local', 'DATA_DIR': self.temp.name,
                                'PROVIDER': Provider()}).test_client()
         self.assertEqual(goals(reopened)['Daglig konto']['analysis_account_ids'],
                          ['demo-bills', 'demo-daily'])

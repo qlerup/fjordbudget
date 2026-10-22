@@ -15,7 +15,7 @@ class SavingsSkipTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.app = create_app({'TESTING': True, 'DATA_DIR': self.temp.name})
+        self.app = create_app({'TESTING': True, 'AUTH_MODE': 'local', 'DATA_DIR': self.temp.name})
         self.client = self.app.test_client()
         self.headers = {'X-CSRF-Token': re.search(
             r'name="csrf-token" content="([^"]+)"', self.client.get('/').text)[1]}

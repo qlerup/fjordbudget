@@ -35,7 +35,7 @@
 </defs></svg>
 <aside class="sidebar">
   <a class="brand" href="/" aria-label="FjordBudget start"><img src="/static/logos/wordmark.svg?v=brand-budget-green-20261005" width="182" height="46" alt="FjordBudget"></a>
-  <div class="workspace"><span class="workspace-avatar">P</span><div>Min privatøkonomi<small>Dit personlige overblik</small></div><span class="workspace-dot"></span></div>
+  <div class="workspace"><span class="workspace-avatar">P</span><div>{{ installation_name if local_login else 'Min privatøkonomi' }}<small>Dit personlige overblik</small></div><span class="workspace-dot"></span></div>
   <p class="nav-label">DIT OVERBLIK</p>
   <nav aria-label="Hovedmenu">
     <button class="nav-item active" data-view="overview"><svg><use href="#icon-grid"/></svg>Overblik</button>
@@ -48,8 +48,8 @@
   <button class="nav-item" id="openSettings" type="button" aria-label="Indstillinger"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-2Z"/></svg>Indstillinger</button></nav>
   <p class="nav-label second-label">FORBINDELSER</p>
   <button class="nav-item" data-connect><svg><use href="#icon-bank"/></svg>Mine banker</button>
-  <div class="sidebar-bottom"><div class="privacy-icon"><svg><use href="#icon-shield"/></svg></div><strong>Din økonomi. Dit overblik.</strong><p>Kun læseadgang til banken.<br>Ingen betalinger eller overførsler.</p><span class="local-status"><i></i> {{ 'Beskyttet med FjordHub-login' if managed else 'Kører lokalt på din computer' }}</span></div>
-  {% if managed %}<button id="logoutButton" class="text-button" type="button">Log ud</button>{% endif %}<div class="sidebar-footer"><span class="avatar">P</span><div>Privat arbejdsrum<small>FjordBudget · {{ 'FjordHub' if managed else 'Lokal version' }}</small></div></div>
+  <div class="sidebar-bottom"><div class="privacy-icon"><svg><use href="#icon-shield"/></svg></div><strong>Din økonomi. Dit overblik.</strong><p>Kun læseadgang til banken.<br>Ingen betalinger eller overførsler.</p><span class="local-status"><i></i> {{ 'Beskyttet med FjordHub-login' if managed else 'Beskyttet med egen konto' if local_login else 'Kører lokalt på din computer' }}</span></div>
+  {% if managed or local_login %}<button id="logoutButton" class="text-button" type="button">Log ud</button>{% endif %}<div class="sidebar-footer"><span class="avatar">P</span><div>Privat arbejdsrum<small>FjordBudget · {{ 'FjordHub' if managed else 'Egen installation' if local_login else 'Lokal version' }}</small></div></div>
 </aside>
 <main>
   <header class="topbar"><span class="breadcrumb">Privatøkonomi <span>/</span> <strong id="breadcrumb">Overblik</strong></span><div class="topbar-right"><span class="read-badge"><svg><use href="#icon-shield"/></svg>Kun læseadgang</span><span class="avatar">P</span></div></header>

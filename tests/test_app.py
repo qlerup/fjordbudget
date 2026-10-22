@@ -41,7 +41,7 @@ class AppTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.provider = Provider()
-        self.app = create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        self.app = create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name,'PROVIDER':self.provider})
         self.client = self.app.test_client()
         html = self.client.get('/').text
         self.csrf = re.search(r'name="csrf-token" content="([^"]+)"',html)[1]
@@ -90,7 +90,7 @@ class AppTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM budgets WHERE category='Ferie'").fetchone()[0], 0)
         self.assertEqual(self.client.delete(endpoint, json={'name':'Ferie'}, headers=self.headers).status_code, 400)
         self.client.delete(endpoint, json={'name':'Transport'}, headers=self.headers)
-        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name,'PROVIDER':self.provider})
         self.assertNotIn('Transport', [c['name'] for c in self.client.get('/api/categories').json['budget_categories']])
 
     def test_savings_goals_validation_scope_persistence_and_delete(self):
@@ -113,7 +113,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(self.client.get(endpoint+'?source=live').json['items'][0]['deadline'],'2027-06')
         self.assertEqual(self.client.delete(f'{endpoint}/{goal_id}',headers=self.headers).status_code,404)
         self.assertEqual(self.client.put(f'{endpoint}/{goal_id}?source=live',json={**body,'name':'Bil','target_amount':'20000'},headers=self.headers).status_code,200)
-        restarted=create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider}).test_client()
+        restarted=create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name,'PROVIDER':self.provider}).test_client()
         self.assertEqual(restarted.get(endpoint+'?source=live').json['items'][0]['name'],'Bil')
         self.assertEqual(self.client.delete(f'{endpoint}/{goal_id}?source=live',headers=self.headers).status_code,200)
         self.assertEqual(self.client.get(endpoint+'?source=live').json['items'],[])
@@ -264,7 +264,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(response.status_code,200)
         self.assertEqual(self.client.get('/api/dashboard?source=live').json['budget'],98760)
         self.assertNotEqual(self.client.get('/api/dashboard?source=demo').json['budget'],98760)
-        reopened=create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider}).test_client()
+        reopened=create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name,'PROVIDER':self.provider}).test_client()
         self.assertEqual(reopened.get('/api/dashboard?source=live').json['budget'],98760)
         self.assertEqual(reopened.get('/api/dashboard?source=live&currency=EUR').json['budget'],0)
 
@@ -512,7 +512,7 @@ class AppTests(unittest.TestCase):
             tid=db.execute("SELECT id FROM transactions WHERE external_id='rule1'").fetchone()[0]
         response=self.client.patch('/api/transactions/'+str(tid),json={'category':'Indkomst'},headers=self.headers)
         self.assertEqual(response.json['updated'],2)
-        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name,'PROVIDER':self.provider})
         raw={'status':'BOOK','booking_date':'2026-09-01','credit_debit_indicator':'CRDT',
              'transaction_amount':{'amount':'200','currency':'DKK'},'remittance_information':['løn overførsel'],'entry_reference':'rule-new'}
         import_account(self.db,'demo-save',[raw],[])
@@ -576,7 +576,7 @@ class AppTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT amount FROM budgets WHERE source='live' AND month='2025-01' AND category='Travel'").fetchone()[0],12300)
         self.assertEqual(self.client.delete(url,json={'name':'Andet','replacement':'Bolig'},headers=self.headers).status_code,400)
         self.client.delete(url,json={'name':'Shopping','replacement':'Andet'},headers=self.headers)
-        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name,'PROVIDER':self.provider})
         self.assertNotIn('Shopping',self.client.get('/api/config').json['categories'])
         raw={'status':'BOOK','booking_date':'2026-09-01','credit_debit_indicator':'DBIT','transaction_amount':{'amount':'12','currency':'DKK'},'remittance_information':['Matas'],'entry_reference':'deleted-default'}
         import_account(self.db,'demo-daily',[raw],[])
@@ -618,7 +618,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(after['expenses'],before['expenses'])
         self.assertEqual(after['budget_spent'],before['budget_spent']+34500)
         self.assertEqual(after['budget'],before['budget'])
-        create_app({'TESTING':True,'DATA_DIR':self.temp.name,'PROVIDER':self.provider})
+        create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name,'PROVIDER':self.provider})
         self.assertEqual(next(c for c in self.client.get(endpoint).json['items'] if c['name']=='Custom')['budget_category'],'Andet')
         self.client.patch(endpoint,json={'name':'Custom','budget_category':None},headers=self.headers)
         self.assertEqual(self.client.get('/api/dashboard?source=demo').json['budget_spent'],before['budget_spent'])
@@ -635,14 +635,14 @@ class AppTests(unittest.TestCase):
                     CREATE TABLE budgets(source TEXT,month TEXT,currency TEXT,category TEXT,amount INTEGER,PRIMARY KEY(source,month,currency,category));
                     INSERT INTO budgets VALUES ('live','2026-01','DKK','Legacy',12345);""")
             db.close()
-            migrated=create_app({'TESTING':True,'DATA_DIR':directory,'PROVIDER':self.provider})
+            migrated=create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':directory,'PROVIDER':self.provider})
             client=migrated.test_client()
             data=client.get('/api/categories').json
             self.assertEqual(data['items'][0]['budget_category'],'Legacy')
             self.assertTrue(data['items'][0]['requires_merchant'])
             with connect(path) as db:
                 self.assertEqual(db.execute("SELECT amount FROM budgets WHERE category='Legacy'").fetchone()[0],12345)
-            create_app({'TESTING':True,'DATA_DIR':directory,'PROVIDER':self.provider})
+            create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':directory,'PROVIDER':self.provider})
             self.assertEqual(client.get('/api/categories').json,data)
 
     def test_provider_pagination_continues_through_empty_page(self):

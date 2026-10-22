@@ -1,0 +1,27 @@
+[Unit]
+Description=FjordBudget
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=fjordbudget
+Group=fjordbudget
+WorkingDirectory=/opt/fjordbudget
+EnvironmentFile=/etc/fjordbudget.env
+Environment=PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ExecStart=/opt/fjordbudget/.venv/bin/gunicorn --bind 0.0.0.0:8060 --workers 1 --threads 8 --timeout 120 --access-logfile /dev/null app:create_app()
+Restart=on-failure
+RestartSec=5
+StateDirectory=fjordbudget
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/fjordbudget
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

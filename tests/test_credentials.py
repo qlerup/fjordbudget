@@ -21,7 +21,7 @@ class CredentialTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.config = {'TESTING': True, 'DATA_DIR': self.temp.name}
+        self.config = {'TESTING': True, 'AUTH_MODE': 'local', 'DATA_DIR': self.temp.name}
         self.app = create_app(self.config)
         self.client = self.app.test_client()
         csrf = re.search(r'name="csrf-token" content="([^"]+)"', self.client.get('/').text)[1]

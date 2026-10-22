@@ -65,7 +65,7 @@ class CommunityTests(unittest.TestCase):
 
     def participant(self):
         self.client_number+=1
-        app=create_app({'TESTING':True,'DATA_DIR':self.temp.name+'/app'+str(self.client_number),
+        app=create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name+'/app'+str(self.client_number),
             'COMMUNITY_SERVER_URL':'http://localhost:8088',
             'COMMUNITY_SERVER_PUBLIC_KEY':self.server.extensions['vault'].public_key})
         sync=app.extensions['community_sync']
@@ -272,7 +272,7 @@ class CommunityTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             create_server({'DATA_DIR':self.temp.name+'/no-password','ADMIN_PASSWORD_HASH':''})
         with self.assertRaises(ValueError):
-            create_app({'TESTING':True,'DATA_DIR':self.temp.name+'/bad-url','COMMUNITY_SERVER_URL':'https://user:secret@example.dk'})
+            create_app({'TESTING':True,'AUTH_MODE':'local','DATA_DIR':self.temp.name+'/bad-url','COMMUNITY_SERVER_URL':'https://user:secret@example.dk'})
         app,sync=self.participant()
         sync.configure(True,CONSENT_VERSION);sync.sync_once()
         with self.assertRaises(ValueError):

@@ -23,8 +23,16 @@ class BudgetCookies(SecureCookieSessionInterface):
 
 
 def register_hub_auth(app, db_path):
+    if app.config['AUTH_MODE']=='auto':
+        hub_url,hub_key=app.config['FJORDHUB_URL'],app.config['FJORDHUB_API_KEY']
+        if bool(hub_url)!=bool(hub_key):
+            raise RuntimeError('Incomplete FjordHub configuration')
+        app.config['AUTH_MODE']='fjordhub' if hub_url and hub_key else 'solo'
     managed = app.config['AUTH_MODE'] == 'fjordhub'
     app.session_interface = BudgetCookies()
+    if app.config['AUTH_MODE']=='solo':
+        from local_auth import register_local_auth
+        return register_local_auth(app,db_path)
     if not managed:
         if app.config['AUTH_MODE'] != 'local':
             raise RuntimeError('Unknown AUTH_MODE')

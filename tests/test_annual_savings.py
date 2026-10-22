@@ -16,7 +16,7 @@ class AnnualSavingsTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        app = create_app({'TESTING': True, 'DATA_DIR': self.temp.name})
+        app = create_app({'TESTING': True, 'AUTH_MODE': 'local', 'DATA_DIR': self.temp.name})
         self.db = app.extensions['db_path']
         with connect(self.db) as db:
             db.execute('DELETE FROM transactions')

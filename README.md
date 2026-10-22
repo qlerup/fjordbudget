@@ -23,7 +23,22 @@ docker compose start
 
 Open `http://localhost:8060`. The demo contains fictional accounts and four months of transactions. My bank data opens a separate area; demo and real data are never mixed.
 
-The desktop `compose.yaml` binds only `127.0.0.1:8060` and has no login. Use the Hub deployment for LAN/internet access. Never switch an exposed server deployment to `AUTH_MODE=local`.
+The app automatically detects its login flow. With both `FJORDHUB_URL` and
+`FJORDHUB_API_KEY`, it uses FjordHub; without them, a fresh installation opens
+**Første opsætning**, just like FjordLens. Create the first owner's username and
+password, then log in. No one-time setup code or separate app edition is needed.
+Once the owner exists, setup cannot create another account. An initialization
+marker prevents missing owner data from silently reopening registration.
+
+The desktop `compose.yaml` still binds only `127.0.0.1:8060`. Its default also uses
+first setup. `AUTH_MODE=local` remains a legacy unauthenticated loopback/test mode;
+never use that explicit override for a network deployment. The automatic choice
+is the default and requires no `AUTH_MODE` setting. Partial Hub credentials fail
+closed rather than unexpectedly enabling local registration.
+
+For a dedicated LXC, see [native app installation](deploy/README.md). This is the
+same app and repository as the Hub installation. Each deployment has its own
+database, bank credentials, session/encryption keys and owner account.
 
 ## Read-only bank access
 
@@ -31,7 +46,7 @@ Enable Banking **Account Information Services (AIS)** reads accounts, balances a
 
 1. Create an application in [Enable Banking](https://enablebanking.com/cp/applications).
 2. Use Sandbox for tests. Production access to your own accounts depends on provider approval, coverage, terms and any charges; not all banks/accounts are promised.
-3. Register the exact callback. Local deployment uses `http://localhost:8060/bank/callback`; the Hub deployment displays its configured HTTPS callback. Do not expose the local unauthenticated deployment through a tunnel.
+3. Register the exact callback. The app displays the callback for the address you are using; log in through the final HTTPS domain before registering it. The Hub deployment uses its configured HTTPS callback. Never expose the legacy unauthenticated `AUTH_MODE=local` override through a tunnel.
 4. Enter the app ID and complete private RSA PEM key in Connect bank and save. No environment change/restart is needed; API credentials can be replaced later.
 5. Credentials are encrypted in `/data/bank-credentials.enc`, with restricted permissions, and never returned to the browser. Saved credentials override optional `ENABLE_BANKING_APP_ID` and `secrets/enablebanking.pem` configuration.
 6. Locally, use `localhost` rather than `127.0.0.1` so the callback cookie follows the redirect.

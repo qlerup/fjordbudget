@@ -44,7 +44,9 @@ def persistent_key(path, factory):
 def create_app(config=None):
     app = Flask(__name__)
     app.config.update(DATA_DIR=os.environ.get('DATA_DIR', str(Path(__file__).parent/'data')),
-                      AUTH_MODE=os.environ.get('AUTH_MODE', 'local'),
+                      AUTH_MODE=os.environ.get('AUTH_MODE', 'auto'),
+                      INSTALLATION_NAME=os.environ.get('INSTALLATION_NAME','FjordBudget'),
+                      TRUSTED_PROXY_IPS=os.environ.get('TRUSTED_PROXY_IPS','127.0.0.1,::1'),
                       FJORDHUB_URL=os.environ.get('FJORDHUB_URL', ''),
                       FJORDHUB_API_KEY=os.environ.get('FJORDHUB_API_KEY', ''),
                       SESSION_COOKIE_NAME='fjordbudget_session', PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
@@ -76,7 +78,7 @@ def create_app(config=None):
 
     @app.before_request
     def protect_local_app():
-        if request.endpoint == 'login':
+        if request.endpoint in ('login','setup'):
             return None  # Login form validates its own synchronizer token.
         if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
             expected = session.get('csrf')
@@ -127,7 +129,8 @@ def create_app(config=None):
     def index():
         session.setdefault('csrf', secrets.token_urlsafe(32))
         session.setdefault('browser', secrets.token_urlsafe(32))
-        return render_template('index.html', csrf=session['csrf'], managed=app.config['AUTH_MODE']=='fjordhub')
+        return render_template('index.html', csrf=session['csrf'], managed=app.config['AUTH_MODE']=='fjordhub',
+            local_login=app.config['AUTH_MODE']=='solo',installation_name=app.config['INSTALLATION_NAME'])
 
     @app.get('/privacy')
     def privacy():
