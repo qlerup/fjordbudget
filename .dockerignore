@@ -9,3 +9,7 @@ tests
 test-results
 .pytest_cache
 .venv
+fjordbudget_server
+Dockerfile.server
+compose.server.yaml
+scripts/smoke_community_container.py

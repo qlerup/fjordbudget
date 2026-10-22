@@ -9,3 +9,11 @@ __pycache__/
 .pytest_cache/
 test-results/
 .venv/
+
+# Private Proxmox server implementation and server integration tests.
+/fjordbudget_server/
+/Dockerfile.server
+/compose.server.yaml
+/scripts/smoke_community_container.py
+/tests/test_community.py
+/tests/test_community_browser.py

@@ -90,8 +90,9 @@ Use “Spring over” to choose between excluding a merchant for the current cal
 
 ## Shared merchant knowledge (optional)
 
-FjordBudget Server is a separate service for a dedicated LXC, with its own database,
-admin UI and moderation queue. See [server installation and operation](fjordbudget_server/README.md).
+FjordBudget connects to a separately operated FjordBudget Server. This repository
+contains the app and its client integration; the server implementation, deployment
+files and moderation UI are maintained privately outside this repository.
 Both app Compose files support `COMMUNITY_SERVER_URL=https://your-server` and
 `COMMUNITY_SERVER_PUBLIC_KEY` (the server's pinned public transport key).
 Each owner explicitly enables sharing in **Indstillinger**, with an explanation and
