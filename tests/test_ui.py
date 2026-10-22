@@ -121,6 +121,62 @@ class UITests(unittest.TestCase):
         self.page.get_by_role('button',name='Mit budget',exact=True).click()
         expect(self.page.locator('#month')).to_be_visible()
 
+    def test_savings_monthly_skip_replacement_reload_undo_and_mobile(self):
+        from datetime import timedelta
+        db_path = self.app.extensions['db_path']
+        previous_end = date.today().replace(day=1) - timedelta(days=1)
+        previous_start = previous_end.replace(day=1)
+        names = ['Skip Cafe <familie> & venner', 'Skip Butik B', 'Skip Butik C', 'Skip Butik D']
+        goal_id = None
+        with connect(db_path) as db:
+            for index, name in enumerate(names):
+                for visit in range(2):
+                    db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,
+                                  amount,currency,category,merchant) VALUES ('demo-daily',?,?,?,?,'DKK','Fritid',?)''',
+                               (f'ui-skip-{index}-{visit}', previous_start.isoformat(), name,
+                                -(1000000-index*100000), name))
+            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                          VALUES ('demo-daily','ui-skip-income',?,'Løn',100000000,'DKK','Indkomst')''',
+                       (previous_start.isoformat(),))
+        try:
+            self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
+            self.page.locator('#newSavingsGoal').click()
+            self.page.locator('#savingsName').fill('Skip UI mål')
+            self.page.locator('#savingsAmount').fill('1000')
+            self.page.locator('#savingsDeadline').fill(f'{date.today().year+1}-12')
+            self.page.locator('#savingsAnalysisAccountChoices input[value="demo-daily"]').check()
+            self.page.locator('#savingsForm button[type=submit]').click()
+            card = self.page.locator('.savings-card').filter(has=self.page.get_by_role('heading',name='Skip UI mål',exact=True))
+            expect(card).to_be_visible()
+            with connect(db_path) as db:
+                goal_id = db.execute("SELECT id FROM savings_goals WHERE name='Skip UI mål'").fetchone()[0]
+            expect(card.locator('[data-skip-suggestion]')).to_have_count(3)
+            expect(card.locator('.goal-suggestions')).to_contain_text(names[0])
+            card.locator('[data-skip-suggestion]').first.click()
+            expect(card.locator('.goal-skipped')).to_contain_text(names[0])
+            expect(card.locator('.goal-suggestions')).not_to_contain_text(names[0])
+            expect(card.locator('.goal-suggestions')).to_contain_text(names[3])
+            expect(card.locator('[data-skip-suggestion]')).to_have_count(3)
+            self.page.reload()
+            self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
+            expect(card.locator('.goal-suggestions')).not_to_contain_text(names[0])
+            card.locator('.goal-skipped summary').click()
+            expect(card.locator('[data-restore-suggestion]')).to_be_visible()
+            for width in (390,1440):
+                self.page.set_viewport_size({'width':width,'height':1050})
+                self.assertTrue(card.evaluate('e=>e.scrollWidth<=e.clientWidth+1'))
+                folder = Path(__file__).resolve().parents[1] / 'test-results'
+                folder.mkdir(exist_ok=True)
+                card.screenshot(path=str(folder/f'savings-monthly-skips-{width}.png'))
+            card.locator('[data-restore-suggestion]').click()
+            expect(card.locator('.goal-suggestions')).to_contain_text(names[0])
+            expect(card.locator('.goal-skipped')).to_have_count(0)
+        finally:
+            with connect(db_path) as db:
+                db.execute("DELETE FROM transactions WHERE external_id LIKE 'ui-skip-%'")
+                if goal_id is not None:
+                    db.execute('DELETE FROM savings_goals WHERE id=?',(goal_id,))
+
     def test_savings_goal_can_follow_account_balance_live(self):
         self.page.set_viewport_size({'width':390,'height':844})
         self.page.get_by_role('button',name='Opsparingsmål',exact=True).click()
@@ -541,6 +597,37 @@ class UITests(unittest.TestCase):
         self.page.locator('[data-connect]').first.click()
         expect(self.page.locator('#bankSetup')).to_be_visible()
         expect(self.page.locator('.permission-box')).to_contain_text('kan ikke betale')
+
+    def test_incomplete_dialog_keeps_all_columns_visible_with_long_accounts(self):
+        db_path=self.app.extensions['db_path']
+        with connect(db_path) as db:
+            old_name=db.execute("SELECT custom_name FROM accounts WHERE id='demo-daily'").fetchone()[0]
+            db.execute("UPDATE accounts SET custom_name='Opsparing til køb af bolig med et meget langt kontonavn' WHERE id='demo-daily'")
+            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category)
+                          VALUES ('demo-daily','modal-width',?,'MCD 05758 SP FOLKEHUSET ABSALON med en lang banktekst',-123456789,'DKK','Andet')''',
+                       (date.today().isoformat(),))
+        try:
+            self.page.reload()
+            self.page.locator('#incompleteTransactionsCard').click()
+            dialog=self.page.locator('#incompleteTransactionsDialog')
+            row=self.page.locator('#incompleteTransactionRows tr').filter(has_text='MCD 05758 SP FOLKEHUSET ABSALON')
+            expect(row).to_be_visible()
+            for width in (1110,1440,800,390):
+                self.page.set_viewport_size({'width':width,'height':1000})
+                self.assertTrue(dialog.evaluate('e=>e.scrollWidth<=e.clientWidth+1'))
+                self.assertTrue(dialog.locator('.table-scroll').evaluate('e=>e.scrollWidth<=e.clientWidth+1'))
+                for selector in ('.amount-cell','.category-picker-button','.merchant-picker-button'):
+                    element=row.locator(selector)
+                    expect(element).to_be_visible()
+                    self.assertTrue(element.evaluate('e=>{const r=e.getBoundingClientRect(),d=e.closest("dialog").getBoundingClientRect();return r.left>=d.left&&r.right<=d.right}'))
+                    self.assertTrue(element.evaluate('e=>e.scrollWidth<=e.clientWidth+1'))
+                folder=Path(__file__).resolve().parents[1]/'test-results'
+                folder.mkdir(exist_ok=True)
+                self.page.screenshot(path=str(folder/f'incomplete-dialog-{width}.png'))
+        finally:
+            with connect(db_path) as db:
+                db.execute("UPDATE accounts SET custom_name=? WHERE id='demo-daily'",(old_name,))
+                db.execute("DELETE FROM transactions WHERE external_id='modal-width'")
 
     def test_overview_uses_incomplete_card_and_transactions_live_in_menu(self):
         with connect(self.app.extensions['db_path']) as db:

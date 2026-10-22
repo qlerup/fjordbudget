@@ -26,7 +26,7 @@ def _average(values):
     return int(round(sum(values) / len(values))) if values else 0
 
 
-def _spending_opportunities(merchant_spend, preferences, months_equivalent, period_months):
+def _spending_opportunities(merchant_spend, preferences, months_equivalent, period_months, excluded_keys=()):
     """Find plausible one-fewer-visit opportunities based on real purchases.
 
     Unlike flat percentage suggestions, each estimate uses the median of
@@ -34,7 +34,7 @@ def _spending_opportunities(merchant_spend, preferences, months_equivalent, peri
     """
     opportunities = []
     for name, item in merchant_spend.items():
-        if not preferences.get(_merchant_key(name), True):
+        if _merchant_key(name) in excluded_keys or not preferences.get(_merchant_key(name), True):
             continue
         amounts = item['amounts']
         active_months = len(item['months'])
@@ -112,7 +112,7 @@ def _history_months(db, source, currency, today, account_ids=None):
     return completed if len(completed) >= 2 else months[:6]
 
 
-def _profile(db, source, currency, today, account_ids=None):
+def _profile(db, source, currency, today, account_ids=None, excluded_keys=()):
     account_filter, account_params = _account_filter(account_ids)
     months = _history_months(db, source, currency, today, account_ids)
     if not months:
@@ -178,7 +178,7 @@ def _profile(db, source, currency, today, account_ids=None):
         })
     merchants.sort(key=lambda item: item['monthly_average'], reverse=True)
 
-    opportunities = _spending_opportunities(merchant_spend, merchant_preferences, month_count, month_count)
+    opportunities = _spending_opportunities(merchant_spend, merchant_preferences, month_count, month_count, excluded_keys)
 
     incomes = [monthly[month]['income'] for month in months]
     expenses = [monthly[month]['expenses'] for month in months]
@@ -215,7 +215,7 @@ def _month_equivalent(start_date, end_date):
     return max(total, 1 / 31)
 
 
-def _period_profile(db, source, currency, start_date, end_date, account_ids=None):
+def _period_profile(db, source, currency, start_date, end_date, account_ids=None, excluded_keys=()):
     account_filter, account_params = _account_filter(account_ids)
     start_iso = start_date.isoformat()
     end_iso = end_date.isoformat()
@@ -280,7 +280,7 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
         })
     merchants.sort(key=lambda item: item['total'], reverse=True)
 
-    opportunities = _spending_opportunities(merchant_spend, merchant_preferences, month_equivalent, ceil(month_equivalent))
+    opportunities = _spending_opportunities(merchant_spend, merchant_preferences, month_equivalent, ceil(month_equivalent), excluded_keys)
 
     return {
         'period_start': start_iso,
@@ -398,6 +398,14 @@ def build_insights(db_path, source, currency, today=None, period_start=None, per
                 selected_by_goal[row['goal_id']].append(row['account_id'])
 
         scoped_profiles = {}
+        suggestion_month = today.strftime('%Y-%m')
+        skipped_by_goal = defaultdict(list)
+        for row in db.execute(
+            '''SELECT s.goal_id,s.merchant_key,s.name FROM savings_suggestion_skips s
+               JOIN savings_goals g ON g.id=s.goal_id
+               WHERE g.source=? AND g.currency=? AND s.month=? ORDER BY s.name,s.merchant_key''',
+            (source, currency, suggestion_month)):
+            skipped_by_goal[row['goal_id']].append(dict(row))
         for goal in goals:
             goal['manual_saved_amount'] = int(goal['saved_amount'] or 0)
             goal['uses_live_balance'] = bool(goal.get('account_id') and goal.get('account_name'))
@@ -407,13 +415,18 @@ def build_insights(db_path, source, currency, today=None, period_start=None, per
 
             account_ids = tuple(selected_by_goal[goal['id']])
             goal['analysis_account_ids'] = list(account_ids)
-            if account_ids not in scoped_profiles:
-                scoped_profiles[account_ids] = (
-                    _period_profile(db, source, currency, period_start, period_end, account_ids)
+            skipped = skipped_by_goal[goal['id']]
+            excluded_keys = tuple(sorted(item['merchant_key'] for item in skipped))
+            profile_key = (account_ids, excluded_keys)
+            if profile_key not in scoped_profiles:
+                scoped_profiles[profile_key] = (
+                    _period_profile(db, source, currency, period_start, period_end, account_ids, excluded_keys)
                     if period_start is not None and period_end is not None
-                    else _profile(db, source, currency, today, account_ids)
+                    else _profile(db, source, currency, today, account_ids, excluded_keys)
                 )
-            goal['analysis'] = _goal_analysis(goal, scoped_profiles[account_ids], today)
+            goal['analysis'] = _goal_analysis(goal, scoped_profiles[profile_key], today)
+            goal['analysis']['suggestion_month'] = suggestion_month
+            goal['analysis']['skipped_suggestions'] = [{'name': item['name']} for item in skipped]
 
     featured = next((goal for goal in goals if goal['featured']), goals[0] if goals else None)
     return {

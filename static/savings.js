@@ -62,9 +62,14 @@ function savingsStatus(goal){
   if(a.status==='possible_with_changes')return ['warning','Målet kræver ændringer',`Du mangler ca. ${money(a.monthly_shortfall,goal.currency,0)} om måneden. FjordBudget har fundet steder, hvor det muligvis kan hentes.`];
   return ['danger','Målet er ikke realistisk endnu',`Du mangler ca. ${money(a.monthly_shortfall,goal.currency,0)} om måneden, og de fundne besparelser dækker ikke hele forskellen.`];
 }
-function savingsSuggestion(item,currency){
+function savingsSuggestion(item,currency,goal){
   const visits=new Intl.NumberFormat('da-DK',{maximumFractionDigits:1}).format(item.average_visits_per_month);
-  return `<li><div><strong>${esc(item.name)}</strong><span>${esc(item.purchases)} køb i perioden · ca. ${esc(visits)} køb/md. · ${esc(money(item.monthly_average,currency,0))}/md. brugt</span><small>Prøv ét besøg færre om måneden. Et typisk køb var ${esc(money(item.typical_purchase,currency,0))}.</small></div><b>Op til ${esc(money(item.recommended_cut,currency,0))}/md.</b></li>`;
+  return `<li><div class="goal-suggestion-copy"><strong>${esc(item.name)}</strong><span>${esc(item.purchases)} køb i perioden · ca. ${esc(visits)} køb/md. · ${esc(money(item.monthly_average,currency,0))}/md. brugt</span><small>Prøv ét besøg færre om måneden. Et typisk køb var ${esc(money(item.typical_purchase,currency,0))}.</small></div><div class="goal-suggestion-actions"><b>Op til ${esc(money(item.recommended_cut,currency,0))}/md.</b><button type="button" class="text-button" data-skip-suggestion="${goal.id}" data-merchant="${esc(item.name)}" aria-label="Spring ${esc(item.name)} over i ${esc(monthName(goal.analysis.suggestion_month))}">Spring over denne måned</button></div></li>`;
+}
+function savingsSkippedSuggestions(goal){
+  const skipped=goal.analysis.skipped_suggestions || [];
+  if(!skipped.length)return '';
+  return `<details class="goal-skipped"><summary>Sprunget over i ${esc(monthName(goal.analysis.suggestion_month))} (${skipped.length})</summary><p>Disse forslag tæller ikke med i målets besparelser denne måned. De kan vises igen næste måned.</p><ul>${skipped.map(item=>`<li><span>${esc(item.name)}</span><button type="button" class="text-button" data-restore-suggestion="${goal.id}" data-merchant="${esc(item.name)}" aria-label="Tag ${esc(item.name)} med igen">Tag med igen</button></li>`).join('')}</ul></details>`;
 }
 function renderSavingsProfile(profile){
   const merchants=profile.merchants.slice(0,5);
@@ -88,6 +93,7 @@ async function loadSavings(){
   let scope;
   try{scope=savingsScope();}catch(error){showError('savingsError',error.message);return;}
   savingsLoadedScope='';savingsGoals=[];
+  $('newSavingsGoal').disabled=true;
   $('savingsList').innerHTML='<p class="muted">Henter opsparingsmål …</p>';
   showError('savingsError','');
   try{
@@ -117,11 +123,13 @@ async function loadSavings(){
         <p class="savings-deadline">Senest <time datetime="${esc(goal.deadline)}">${esc(deadline)}</time></p>
         <div class="goal-status ${tone}"><strong>${esc(label)}</strong><span>${esc(text)}</span></div>
         ${goal.analysis.months_analyzed?`<div class="goal-numbers"><span>Kræver <b>${esc(money(goal.analysis.required_monthly,goal.currency,0))}/md.</b></span><span>Råderum <b>${esc(money(goal.analysis.average_available,goal.currency,0))}/md.</b></span></div>`:''}
-        ${suggestions.length?`<div class="goal-suggestions"><h4>${goal.analysis.monthly_shortfall?'Forslag til at lukke forskellen':'Muligheder hvis du vil nå målet hurtigere'}</h4><p class="muted">Konkrete scenarier ud fra gentagne køb, ikke garanterede besparelser.</p><ul>${suggestions.map(item=>savingsSuggestion(item,goal.currency)).join('')}</ul>${goal.analysis.projected_with_changes?`<p>Hvis du fastholder disse ændringer, peger estimatet mod <strong>${esc(monthName(goal.analysis.projected_with_changes))}</strong>.</p>`:''}</div>`:(goal.analysis.months_analyzed?`<p class="analysis-note">Ingen sikre forslag til færre besøg i perioden. Engangskøb regnes ikke som en fast månedlig besparelse.</p>`:'')}
+        ${suggestions.length?`<div class="goal-suggestions"><h4>${goal.analysis.monthly_shortfall?'Forslag til at lukke forskellen':'Muligheder hvis du vil nå målet hurtigere'}</h4><p class="muted">Konkrete scenarier ud fra gentagne køb, ikke garanterede besparelser.</p><ul>${suggestions.map(item=>savingsSuggestion(item,goal.currency,goal)).join('')}</ul>${goal.analysis.projected_with_changes?`<p>Hvis du fastholder disse ændringer, peger estimatet mod <strong>${esc(monthName(goal.analysis.projected_with_changes))}</strong>.</p>`:''}</div>`:(goal.analysis.months_analyzed?`<p class="analysis-note">${goal.analysis.skipped_suggestions?.length?'Ingen flere relevante spareforslag denne måned.':'Ingen sikre forslag til færre besøg i perioden. Engangskøb regnes ikke som en fast månedlig besparelse.'}</p>`:'')}
+        ${savingsSkippedSuggestions(goal)}
         <div class="savings-actions"><button type="button" class="button quiet" data-edit-savings="${goal.id}" aria-label="Rediger ${esc(goal.name)}">Rediger</button><button type="button" class="text-button" data-delete-savings="${goal.id}" aria-label="Slet ${esc(goal.name)}">Slet</button></div>
       </article>`;
     }).join(''):'<div class="empty-state"><h3>Hvad drømmer du om?</h3><p>Opret dit første mål. FjordBudget beregner derefter, hvad det kræver pr. måned.</p></div>';
   }catch(error){if(generation===savingsGeneration){$('savingsList').innerHTML='';$('savingsProfile').innerHTML='';showError('savingsError',error.message);}}
+  finally{if(generation===savingsGeneration)$('newSavingsGoal').disabled=false;}
 }
 function updateSavingsAccountMode(){
   const account=savingsAccounts.find(item=>item.id===$('savingsAccount').value);
@@ -180,9 +188,21 @@ window.renderFeaturedGoal=function(goal){
     <div class="featured-goal-numbers"><span>${esc(money(goal.saved_amount,goal.currency,0))} af ${esc(money(goal.target_amount,goal.currency,0))}</span>${liveAccount}<div class="progress"><div class="progress-fill" style="width:${progress}%"></div></div><strong class="${tone}">${esc(label)}</strong>${a.months_analyzed?`<small>${esc(money(a.required_monthly,goal.currency,0))}/md. nødvendigt · ${esc(money(a.average_available,goal.currency,0))}/md. historisk råderum</small>`:''}</div>`;
 };
 $('newSavingsGoal').addEventListener('click',()=>openSavings());
-$('savingsList').addEventListener('click',event=>{
-  const button=event.target.closest('[data-edit-savings],[data-delete-savings]');if(!button || savingsLoadedScope!==savingsScope())return;
-  const goal=savingsGoals.find(g=>g.id===Number(button.dataset.editSavings || button.dataset.deleteSavings));if(!goal)return;
+$('savingsList').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-edit-savings],[data-delete-savings],[data-skip-suggestion],[data-restore-suggestion]');if(!button || savingsLoadedScope!==savingsScope())return;
+  const goal=savingsGoals.find(g=>g.id===Number(button.dataset.editSavings || button.dataset.deleteSavings || button.dataset.skipSuggestion || button.dataset.restoreSuggestion));if(!goal)return;
+  if(button.hasAttribute('data-skip-suggestion') || button.hasAttribute('data-restore-suggestion')){
+    const scope=savingsLoadedScope, restoring=button.hasAttribute('data-restore-suggestion');
+    button.disabled=true;showError('savingsError','');
+    try{
+      await api('/api/savings-goals/'+goal.id+'/suggestion-skips?'+scope,{method:restoring?'DELETE':'PUT',body:JSON.stringify({merchant:button.dataset.merchant,month:goal.analysis.suggestion_month})});
+      if(scope!==savingsScope())return;
+      toast(restoring?'Forslaget er taget med igen':'Forslaget er sprunget over denne måned');
+      await refresh();
+    }catch(error){if(scope===savingsScope())showError('savingsError',error.message);}
+    finally{button.disabled=false;}
+    return;
+  }
   if(button.hasAttribute('data-edit-savings')){openSavings(goal);return;}
   $('savingsDeleteForm').dataset.id=goal.id;$('savingsDeleteForm').dataset.scope=savingsScope();
   $('savingsDeleteText').textContent=`Vil du slette opsparingsmålet “${goal.name}”? Dine konti og posteringer bevares.`;

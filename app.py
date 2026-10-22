@@ -370,6 +370,33 @@ def create_app(config=None):
                 db.execute('DELETE FROM budget_categories WHERE name=?', (name,))
         return jsonify(ok=True)
 
+    @app.route('/api/savings-goals/<int:goal_id>/suggestion-skips', methods=['PUT', 'DELETE'])
+    def savings_suggestion_skip(goal_id):
+        source, _, currency = parameters()
+        body = request.get_json(silent=True)
+        name = body.get('merchant') if isinstance(body, dict) else None
+        if (not isinstance(name, str) or not 1 <= len(name.strip()) <= 200
+                or any(ord(char) < 32 for char in name) or not merchant_key(name)):
+            raise ValueError('Vælg en gyldig forhandler.')
+        month = body.get('month')
+        if month != date.today().strftime('%Y-%m'):
+            return jsonify(error='Måneden er skiftet. Genindlæs forslagene og prøv igen.'), 409
+        with connect(db_path) as db:
+            db.execute('BEGIN IMMEDIATE')
+            if not db.execute(
+                'SELECT 1 FROM savings_goals WHERE id=? AND source=? AND currency=?',
+                (goal_id, source, currency)).fetchone():
+                return jsonify(error='Opsparingsmålet findes ikke.'), 404
+            if request.method == 'PUT':
+                db.execute('''INSERT INTO savings_suggestion_skips(goal_id,month,merchant_key,name)
+                              VALUES (?,?,?,?) ON CONFLICT(goal_id,month,merchant_key)
+                              DO UPDATE SET name=excluded.name''',
+                           (goal_id, month, merchant_key(name), name.strip()))
+            else:
+                db.execute('DELETE FROM savings_suggestion_skips WHERE goal_id=? AND month=? AND merchant_key=?',
+                           (goal_id, month, merchant_key(name)))
+        return jsonify(ok=True)
+
     @app.route('/api/savings-goals', methods=['GET', 'POST'])
     @app.route('/api/savings-goals/<int:goal_id>', methods=['PUT', 'DELETE'])
     def savings_goals(goal_id=None):

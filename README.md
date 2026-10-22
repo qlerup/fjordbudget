@@ -61,7 +61,9 @@ Set merchants manually and select Remember for future entries. Rules match the n
 
 Goals have a target, saved amount and deadline. Optionally link an account to use its latest balance; the manual amount is retained if unlinked. One active goal appears on the overview. Monthly saving requirements are compared with historical disposable income and classified as realistic, tight, possible with changes, or unrealistic under current finances.
 
-Savings suggestions use actual spending at learned merchants, not budget categories. Fixed-expense merchants are excluded. Adjustable merchants use a conservative 10% of their monthly average as potential savings. Nothing automatically changes budgets or transactions.
+Savings suggestions use repeated purchases at learned merchants, not budget categories. Fixed-expense merchants and one-off purchases are excluded. The estimate uses one fewer visit per month, based on the median purchase amount and capped at half the monthly spending.
+
+Use “Spring over denne måned” to exclude a merchant from one goal's savings calculations for the current calendar month. The next relevant opportunity replaces it when available. Skips persist across reloads and apply to the goal on the overview too; “Tag med igen” restores a suggestion. Next month, skipped merchants become eligible again. The selected analysis dates still determine the spending history. Nothing automatically changes budgets or transactions.
 
 ## Data and backup
 
