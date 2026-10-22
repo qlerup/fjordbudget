@@ -131,6 +131,9 @@
 .savings-target small{font-size:13px;color:var(--muted);font-weight:500}.goal-status{margin-top:18px;padding:12px;border-radius:9px;background:#f5f7f0;display:grid;gap:5px}.goal-status strong{font-size:13px}.goal-status span{font-size:12px;line-height:1.5;color:var(--muted)}
 .goal-numbers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;font-size:12px;color:var(--muted)}.goal-numbers b{display:block;color:var(--ink);font-size:14px;margin-top:3px}
 .goal-suggestions{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}.goal-suggestions h4{margin:0 0 7px;font-size:13px}.goal-suggestions li b{white-space:nowrap;color:var(--green)}.goal-suggestions p{font-size:11px;margin:10px 0 0}.savings-form .checkbox-row{margin-top:10px}
+.goal-suggestion-copy{min-width:0;overflow-wrap:anywhere}.goal-suggestion-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0}.goal-suggestion-actions .text-button,.goal-skipped .text-button{font-size:12px;min-height:32px}.goal-skipped{margin-top:16px;font-size:12px;color:var(--muted)}.goal-skipped summary{cursor:pointer}.goal-skipped p{line-height:1.6}.goal-skipped ul{list-style:none;padding:0}.goal-skipped li{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:8px 0}.goal-skipped li span{min-width:0;overflow-wrap:anywhere}.goal-skipped button{flex-shrink:0}
+.goal-more-suggestions{margin-top:8px}.goal-more-suggestions summary{cursor:pointer;color:var(--green);font-size:12px;padding:10px 0}.suggestions-show-less,.goal-more-suggestions[open] .suggestions-show-more{display:none}.goal-more-suggestions[open] .suggestions-show-less{display:inline}.goal-more-suggestions summary:focus-visible{outline:3px solid #90ae79;outline-offset:3px}.goal-suggestions .goal-suggestion-count{color:var(--muted);margin-bottom:6px}
+@media(max-width:600px){.goal-suggestions li{flex-direction:column;gap:8px}.goal-suggestion-actions{width:100%;flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:wrap}}
 @media(max-width:760px){.featured-goal-panel,.spending-breakdown{grid-template-columns:1fr}.savings-profile-summary{grid-template-columns:1fr}.goal-numbers{grid-template-columns:1fr}.savings-period-form{align-items:stretch}.savings-period-form label{min-width:calc(50% - 5px)}.savings-period-form .button{width:100%}}
 
 /* Transaction completion status and merchant autocomplete. */
@@ -289,7 +292,25 @@
 .incomplete-transactions-card:hover{background:#fff6d8;border-color:#dcc477}.incomplete-card-icon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#f3df9d;color:#6f5714;font-size:21px;font-weight:750;flex:none}
 .incomplete-card-copy{display:grid;gap:2px;min-width:0}.incomplete-card-copy small{font-size:10px;letter-spacing:.7px;color:#7e6b32;font-weight:700}.incomplete-card-copy strong{font-size:25px;line-height:1.1}.incomplete-card-copy>span{font-size:12px;color:var(--muted)}
 .incomplete-card-chevron{width:17px;height:17px;margin-left:auto;color:#8b7b4a;flex:none}.incomplete-transactions-card.complete{background:#edf6ed;border-color:#c5dfc7;border-left-color:#47954f}.incomplete-transactions-card.complete .incomplete-card-icon{background:#d8ead9;color:#367a3e}.incomplete-transactions-card.complete .incomplete-card-copy small{color:#4b7350}
-.incomplete-transactions-dialog{width:min(980px,calc(100% - 28px))}.incomplete-dialog-transactions{border:0;padding:0;margin:0}.incomplete-dialog-transactions .table-scroll{margin-top:8px}.incomplete-dialog-transactions .empty-state{margin-top:12px}.incomplete-transactions-dialog>.dialog-actions{margin-top:18px}
+.incomplete-transactions-dialog{width:min(1280px,calc(100% - 28px))}.incomplete-dialog-transactions{border:0;padding:0;margin:0}.incomplete-dialog-transactions .table-scroll{margin-top:8px}.incomplete-dialog-transactions .empty-state{margin-top:12px}.incomplete-transactions-dialog>.dialog-actions{margin-top:18px}
+@media(min-width:761px){
+  .incomplete-dialog-transactions table{table-layout:fixed;white-space:normal}
+  .incomplete-dialog-transactions th:nth-child(2){width:22%}
+  .incomplete-dialog-transactions th:nth-child(3),.incomplete-dialog-transactions th:nth-child(4){width:16%}
+  .incomplete-dialog-transactions th:nth-child(5){width:76px}
+  .incomplete-dialog-transactions th.amount-cell{width:140px}
+  .incomplete-dialog-transactions td{overflow-wrap:anywhere}
+  .incomplete-dialog-transactions .merchant,.incomplete-dialog-transactions .merchant>span:last-child{min-width:0;max-width:100%}
+  .incomplete-dialog-transactions .merchant-name{max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
+  .incomplete-dialog-transactions .merchant-kind{white-space:normal;overflow-wrap:anywhere}
+  .incomplete-dialog-transactions .category-picker-button,.incomplete-dialog-transactions .merchant-picker-button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+  .incomplete-dialog-transactions td.amount-cell{white-space:nowrap}
+}
+@media(min-width:761px) and (max-width:1050px){
+  /* The account is also shown beneath the transaction title. */
+  .incomplete-dialog-transactions th:nth-child(2),.incomplete-dialog-transactions td:nth-child(2){display:none}
+  .incomplete-dialog-transactions th:nth-child(3),.incomplete-dialog-transactions th:nth-child(4){width:20%}
+}
 @media(max-width:760px){.overview-task-row{margin-top:12px}.incomplete-transactions-card{padding:14px 13px;gap:12px}.incomplete-card-icon{width:34px;height:34px}.incomplete-card-copy strong{font-size:22px}.incomplete-card-copy>span{font-size:11px}.incomplete-transactions-dialog{width:calc(100% - 18px);padding:18px}.incomplete-dialog-transactions{padding:0!important}.incomplete-transactions-dialog>.dialog-actions{flex-wrap:wrap}.incomplete-transactions-dialog>.dialog-actions .button{flex:1}}
 
 /* Last month's merchant spending: separate from the savings-goal analysis. */
@@ -303,4 +324,5 @@
 .spending-review-info span{font-size:12px;color:var(--muted)}
 .spending-review-list li>b{font-size:16px;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--green)}
 .spending-review-note{font-size:12px;line-height:1.55;color:var(--muted);margin:9px 0 0}
+.spending-review-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:12px 0 4px;margin:0 0 12px}.spending-review-pagination>span{display:grid;gap:3px;text-align:center;color:var(--muted);font-size:12px}.spending-review-pagination strong{font-weight:600}.spending-review-pagination small{font-size:11px}.spending-review-pagination .button{min-height:38px;padding:8px 12px}
 @media(max-width:760px){.spending-review-panel{margin-top:12px}.spending-review-list li{align-items:flex-start}.spending-review-list li>b{font-size:14px}}
