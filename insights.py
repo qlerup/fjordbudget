@@ -34,6 +34,7 @@ def _spending_opportunities(merchant_spend, preferences, months_equivalent, peri
     """
     opportunities = []
     for name, item in merchant_spend.items():
+        name = item.get('name', name)
         if _merchant_key(name) in excluded_keys or not preferences.get(_merchant_key(name), True):
             continue
         amounts = item['amounts']
@@ -146,7 +147,8 @@ def _profile(db, source, currency, today, account_ids=None, excluded_keys=()):
         category_spend[row['category']] += spend
         merchant = (row['merchant'] or '').strip()
         if merchant:
-            item = merchant_spend[merchant]
+            item = merchant_spend[_merchant_key(merchant)]
+            item.setdefault('name', merchant)
             item['total'] += spend
             item['count'] += 1
             item['months'].add(row['month'])
@@ -165,6 +167,7 @@ def _profile(db, source, currency, today, account_ids=None, excluded_keys=()):
         'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
     merchants = []
     for name, item in merchant_spend.items():
+        name = item['name']
         category = max(item['categories'], key=item['categories'].get)
         monthly_average = int(round(item['total'] / month_count))
         merchants.append({
@@ -249,7 +252,8 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
         category_spend[row['category']] += spend
         merchant = (row['merchant'] or '').strip()
         if merchant:
-            item = merchant_spend[merchant]
+            item = merchant_spend[_merchant_key(merchant)]
+            item.setdefault('name', merchant)
             item['total'] += spend
             item['count'] += 1
             item['months'].add(row['month'])
@@ -267,6 +271,7 @@ def _period_profile(db, source, currency, start_date, end_date, account_ids=None
         'SELECT merchant_key,adjustable FROM merchant_preferences WHERE source=?', (source,))}
     merchants = []
     for name, item in merchant_spend.items():
+        name = item['name']
         category = max(item['categories'], key=item['categories'].get)
         monthly_average = int(round(item['total'] / month_equivalent))
         merchants.append({

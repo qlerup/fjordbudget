@@ -35,6 +35,38 @@ class InsightTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_savings_combine_equivalent_merchant_names_before_testing_repeat_purchases(self):
+        from insights import _profile, _period_profile
+        end = date.today().replace(day=1) - timedelta(days=1)
+        start = end.replace(day=1)
+        with connect(self.db) as db:
+            db.execute('DELETE FROM transactions')
+            for index, name in enumerate(("McDonald's", 'McDonalds', 'McDonald’s')):
+                db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,
+                              description,amount,currency,category,merchant)
+                              VALUES ('demo-daily',?,?,?,?,'DKK','Fritid',?)''',
+                           (f'merchant-alias-{index}', start.isoformat(), 'Confirmed restaurant',
+                            -(index+1)*10000, name))
+            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,
+                          description,amount,currency,category)
+                          VALUES ('demo-daily','unconfirmed-mcd',?,'MCD 05758 SP FOLKEHUSET ABSALON',
+                                  -50000,'DKK','Fritid')''', (start.isoformat(),))
+            profiles = [_period_profile(db, 'demo', 'DKK', start, end, ['demo-daily']),
+                        _profile(db, 'demo', 'DKK', date.today(), ['demo-daily'])]
+            for profile in profiles:
+                self.assertEqual(len(profile['opportunities']), 1)
+                item = profile['opportunities'][0]
+                self.assertEqual(item['purchases'], 3)
+                self.assertEqual(item['monthly_average'], 60000)
+                self.assertEqual(item['suggested_cut'], 20000)
+                self.assertEqual(len(profile['merchants']), 1)
+            for excluded, preferences in ((('mcdonalds',), False), ((), True)):
+                if preferences:
+                    db.execute('''INSERT INTO merchant_preferences(source,merchant_key,name,adjustable)
+                                  VALUES ('demo','mcdonalds',"McDonald's",0)''')
+                self.assertEqual(_period_profile(db, 'demo', 'DKK', start, end,
+                                                 ['demo-daily'], excluded)['opportunities'], [])
+
     def test_merchant_rule_is_exact_remembered_and_used_by_analysis(self):
         with connect(self.db) as db:
             row = db.execute(
