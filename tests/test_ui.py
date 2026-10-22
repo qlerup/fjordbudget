@@ -175,6 +175,7 @@ class UITests(unittest.TestCase):
             expect(extra).not_to_be_visible()
             expect(card.locator('.goal-suggestions')).to_contain_text(names[0])
             card.locator('[data-skip-suggestion]').first.click()
+            self.page.locator('#savingsSkipDialog [value="month"]').click()
             expect(card.locator('.goal-skipped')).to_contain_text(names[0])
             expect(card.locator('.goal-suggestions')).not_to_contain_text(names[0])
             expect(card.locator('.goal-suggestions')).to_contain_text(names[3])

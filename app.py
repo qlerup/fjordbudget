@@ -20,7 +20,7 @@ from werkzeug.exceptions import HTTPException
 
 from banking import BankError, EnableBanking, account_name, sync_all
 from merchant_matching import apply_learned_merchants
-from db import CATEGORIES, COLORS, CURRENCIES, cents, connect, initialize, transaction_title, transaction_rule_title, category_list, budget_category_list
+from db import CATEGORIES, COLORS, CURRENCIES, PERMANENT_SAVINGS_SKIP_MONTH, cents, connect, initialize, transaction_title, transaction_rule_title, category_list, budget_category_list
 from hub_auth import register_hub_auth
 from insights import build_insights, last_month_spending
 
@@ -378,8 +378,12 @@ def create_app(config=None):
         if (not isinstance(name, str) or not 1 <= len(name.strip()) <= 200
                 or any(ord(char) < 32 for char in name) or not merchant_key(name)):
             raise ValueError('Vælg en gyldig forhandler.')
-        month = body.get('month')
-        if month != date.today().strftime('%Y-%m'):
+        duration = body.get('duration', 'month')
+        if duration not in ('month', 'permanent'):
+            raise ValueError('Vælg denne måned eller permanent.')
+        current_month = date.today().strftime('%Y-%m')
+        month = PERMANENT_SAVINGS_SKIP_MONTH if duration == 'permanent' else body.get('month')
+        if duration == 'month' and month != current_month:
             return jsonify(error='Måneden er skiftet. Genindlæs forslagene og prøv igen.'), 409
         with connect(db_path) as db:
             db.execute('BEGIN IMMEDIATE')
@@ -388,6 +392,15 @@ def create_app(config=None):
                 (goal_id, source, currency)).fetchone():
                 return jsonify(error='Opsparingsmålet findes ikke.'), 404
             if request.method == 'PUT':
+                key = merchant_key(name)
+                # An older tab's monthly choice must not downgrade a permanent one.
+                if duration == 'month' and db.execute(
+                    'SELECT 1 FROM savings_suggestion_skips WHERE goal_id=? AND month=? AND merchant_key=?',
+                    (goal_id, PERMANENT_SAVINGS_SKIP_MONTH, key)).fetchone():
+                    return jsonify(ok=True)
+                if duration == 'permanent':
+                    db.execute('DELETE FROM savings_suggestion_skips WHERE goal_id=? AND month=? AND merchant_key=?',
+                               (goal_id, current_month, key))
                 db.execute('''INSERT INTO savings_suggestion_skips(goal_id,month,merchant_key,name)
                               VALUES (?,?,?,?) ON CONFLICT(goal_id,month,merchant_key)
                               DO UPDATE SET name=excluded.name''',

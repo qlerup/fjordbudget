@@ -8,6 +8,8 @@ from decimal import Decimal, InvalidOperation
 CATEGORIES = ['Mad & indkøb', 'Bolig', 'Transport', 'Shopping', 'Fritid', 'Abonnementer', 'Sundhed', 'Andet', 'Indkomst', 'Overførsler']
 COLORS = ['#4b8266', '#7184b9', '#d9a453', '#b08ba4', '#74a7a2', '#a58b61', '#b97472', '#8e9594', '#377d65', '#929eae']
 CURRENCIES = {'DKK', 'EUR', 'USD', 'GBP', 'SEK', 'NOK', 'CHF', 'PLN'}
+# A permanent exclusion uses the existing skip table without expiring by month.
+PERMANENT_SAVINGS_SKIP_MONTH = '*'
 
 
 def cents(value):

@@ -69,7 +69,7 @@ The goal lists the total number of relevant suggestions. The first three are vis
 
 Each scenario also shows its individual contribution by the goal's deadline, capped at the remaining goal amount, its share of that remaining amount, and any estimated earlier completion month. These effects assume the freed amount is saved each month; an existing monthly deficit must be covered first. Individual scenarios are assessed separately, so capped progress percentages should not be added together.
 
-Use “Spring over denne måned” to exclude a merchant from one goal's savings calculations for the current calendar month. The next relevant opportunity replaces it when available. Skips persist across reloads and apply to the goal on the overview too; “Tag med igen” restores a suggestion. Next month, skipped merchants become eligible again. The selected analysis dates still determine the spending history. Nothing automatically changes budgets or transactions.
+Use “Spring over” to choose between excluding a merchant for the current calendar month or permanently for that goal. The next relevant opportunity replaces it when available. Both choices persist across reloads and apply to the goal on the overview too; “Tag med igen” restores a suggestion. Monthly skips expire next month; permanent skips remain until restored. The selected analysis dates still determine the spending history. Nothing automatically changes budgets or transactions.
 
 ## Data and backup
 

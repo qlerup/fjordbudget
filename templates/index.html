@@ -5,9 +5,9 @@
   <meta name="csrf-token" content="{{ csrf }}">
   <title>FjordBudget · Din økonomi, samlet</title>
   <link rel="icon" href="/static/icon.svg?v=brand-budget-green-20261005" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=savings-skip-options-20261023">
   <script src="/static/app.js?v=spending-review-pages-20261022" defer></script>
-  <script src="/static/savings.js?v=savings-wording-20261022" defer></script>
+  <script src="/static/savings.js?v=skip-options-20261023" defer></script>
   <script src="/static/merchants.js?v=category-merchant-choice-20261007" defer></script>
 <link rel="apple-touch-icon" href="/static/logos/icon-180.png?v=brand-budget-green-20261005"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"><link rel="stylesheet" href="/static/hub-session.css?v=email-update1"><script defer src="/static/hub-session.js?v=email-update1"></script>
 </head>
@@ -162,6 +162,18 @@
   </form>
 </dialog>
 <dialog id="savingsDeleteDialog" aria-labelledby="savingsDeleteTitle"><h2 id="savingsDeleteTitle">Slet opsparingsmål</h2><p id="savingsDeleteText"></p><form id="savingsDeleteForm"><div id="savingsDeleteError" class="error-box" role="alert" hidden></div><div class="dialog-actions"><button type="button" class="button quiet" data-close="savingsDeleteDialog">Annuller</button><button type="submit" class="button primary">Slet mål</button></div></form></dialog>
+<dialog id="savingsSkipDialog" class="savings-skip-dialog" aria-labelledby="savingsSkipTitle" aria-describedby="savingsSkipText">
+  <div class="dialog-header"><h2 id="savingsSkipTitle">Spring forslag over</h2><button type="button" class="icon-button" data-close="savingsSkipDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+  <p id="savingsSkipText" class="dialog-intro"></p>
+  <form id="savingsSkipForm">
+    <div class="savings-skip-options">
+      <button type="submit" name="duration" value="month" class="savings-skip-option"><span><strong>Spring over i denne måned</strong><small>Forslaget kan komme igen næste måned.</small></span><span class="savings-skip-arrow" aria-hidden="true">→</span></button>
+      <button type="submit" name="duration" value="permanent" class="savings-skip-option"><span><strong>Spring over permanent</strong><small>Udelad forslaget for dette mål, indtil du tager det med igen.</small></span><span class="savings-skip-arrow" aria-hidden="true">→</span></button>
+    </div>
+    <div id="savingsSkipError" class="error-box" role="alert" hidden></div>
+    <div class="dialog-actions"><button type="button" class="button quiet" data-close="savingsSkipDialog">Annuller</button></div>
+  </form>
+</dialog>
 <dialog id="merchantDialog" aria-labelledby="merchantTitle">
   <div class="dialog-header"><h2 id="merchantTitle">Vælg forhandler</h2><button type="button" class="icon-button" data-close="merchantDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
   <p class="dialog-intro">Fortæl FjordBudget hvor købet er foretaget. Bankens originale tekst ændres aldrig.</p>

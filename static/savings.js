@@ -67,18 +67,20 @@ function savingsSuggestion(item,currency,goal){
   const impact=item.goal_impact;
   const percent=impact?new Intl.NumberFormat('da-DK',{maximumFractionDigits:1}).format(impact.remaining_percent):'';
   const impactText=!impact?'':impact.extra_by_deadline>0?`<small class="suggestion-goal-impact">Det kan bringe dig <strong>${esc(money(impact.extra_by_deadline,currency,0))} tættere på ${esc(goal.name)}</strong> frem til udgangen af ${esc(monthName(goal.deadline))}${impact.remaining_percent>=.1?` — ${percent} % af det beløb, du mangler`:''}.${impact.months_sooner?` Med dette forslag alene peger estimatet mod ${esc(monthName(impact.projected_deadline))}, cirka ${impact.months_sooner} ${impact.months_sooner===1?'måned':'måneder'} tidligere.`:''}</small>`:'<small class="suggestion-goal-impact">Besparelsen går først til at dække dit negative månedlige råderum og giver endnu ikke ekstra opsparing til målet.</small>';
-  return `<li><div class="goal-suggestion-copy"><strong>${esc(item.name)}</strong><span>${esc(item.purchases)} køb i historikken · ca. ${esc(visits)} køb/md. · ${esc(money(item.monthly_average,currency,0))}/md. i gennemsnit</span><small>Hvis du stopper med at handle her, kan du frigøre ca. <strong>${esc(money(item.recommended_cut,currency,0))}/md.</strong> ud fra dit ${item.saving_reference==='recent'?'seneste gennemsnit':'historiske gennemsnit'}.</small>${item.saving_reference==='recent'?`<small>Dit seneste gennemsnit er ${esc(money(item.recent_monthly_average,currency,0))}/md. Beregningen bruger det lavere niveau.</small>`:''}${impactText}</div><div class="goal-suggestion-actions"><b>Op til ${esc(money(item.recommended_cut,currency,0))}/md.</b><button type="button" class="text-button" data-skip-suggestion="${goal.id}" data-merchant="${esc(item.name)}" aria-label="Spring ${esc(item.name)} over i ${esc(monthName(goal.analysis.suggestion_month))}">Spring over denne måned</button></div></li>`;
+  return `<li><div class="goal-suggestion-copy"><strong>${esc(item.name)}</strong><span>${esc(item.purchases)} køb i historikken · ca. ${esc(visits)} køb/md. · ${esc(money(item.monthly_average,currency,0))}/md. i gennemsnit</span><small>Hvis du stopper med at handle her, kan du frigøre ca. <strong>${esc(money(item.recommended_cut,currency,0))}/md.</strong> ud fra dit ${item.saving_reference==='recent'?'seneste gennemsnit':'historiske gennemsnit'}.</small>${item.saving_reference==='recent'?`<small>Dit seneste gennemsnit er ${esc(money(item.recent_monthly_average,currency,0))}/md. Beregningen bruger det lavere niveau.</small>`:''}${impactText}</div><div class="goal-suggestion-actions"><b>Op til ${esc(money(item.recommended_cut,currency,0))}/md.</b><button type="button" class="text-button" data-skip-suggestion="${goal.id}" data-merchant="${esc(item.name)}" aria-label="Spring ${esc(item.name)} over" aria-haspopup="dialog" aria-controls="savingsSkipDialog">Spring over</button></div></li>`;
 }
 function savingsSkippedSuggestions(goal){
   const skipped=goal.analysis.skipped_suggestions || [];
-  if(!skipped.length)return '';
-  return `<details class="goal-skipped"><summary>Sprunget over i ${esc(monthName(goal.analysis.suggestion_month))} (${skipped.length})</summary><p>Disse forslag tæller ikke med i målets besparelser denne måned. De kan vises igen næste måned.</p><ul>${skipped.map(item=>`<li><span>${esc(item.name)}</span><button type="button" class="text-button" data-restore-suggestion="${goal.id}" data-merchant="${esc(item.name)}" aria-label="Tag ${esc(item.name)} med igen">Tag med igen</button></li>`).join('')}</ul></details>`;
+  const permanent=goal.analysis.permanently_skipped_suggestions || [];
+  const group=(items,duration,title,text)=>!items.length?'':`<details class="goal-skipped"><summary>${esc(title)} (${items.length})</summary><p>${esc(text)}</p><ul>${items.map(item=>`<li><span>${esc(item.name)}</span><button type="button" class="text-button" data-restore-suggestion="${goal.id}" data-duration="${duration}" data-merchant="${esc(item.name)}" aria-label="Tag ${esc(item.name)} med igen">Tag med igen</button></li>`).join('')}</ul></details>`;
+  return group(skipped,'month','Sprunget over i '+monthName(goal.analysis.suggestion_month),'Disse forslag tæller ikke med i målets besparelser denne måned. De kan vises igen næste måned.')+
+    group(permanent,'permanent','Sprunget over permanent','Disse forslag tæller ikke med i målets besparelser fremover. Du kan tage dem med igen her.');
 }
 function savingsSuggestions(goal){
   const suggestions=goal.analysis.suggestions || [];
   const h=goal.analysis.suggestion_history;
   const historyNote=h?.months_analyzed?`<p class="analysis-note suggestion-history">Spareforslag bygger på ${h.months_analyzed} måneders historik: <strong>${esc(savingsDateLabel(h.period_start))} – ${esc(savingsDateLabel(h.period_end))}</strong>. Sammenlignet med ${esc(savingsDateLabel(h.recent_period_start))} – ${esc(savingsDateLabel(h.recent_period_end))} for at tage højde for ændrede vaner.</p>`:'<p class="analysis-note suggestion-history">Spareforslag kræver historik fra afsluttede måneder. Der bruges op til 12 måneder, efterhånden som historikken bliver tilgængelig.</p>';
-  if(!suggestions.length)return historyNote+(h?.months_analyzed?`<p class="analysis-note">${goal.analysis.skipped_suggestions?.length?'Ingen flere relevante spareforslag denne måned.':'Ingen sikre forslag ud fra gentagne og fortsat aktuelle køb. Engangskøb regnes ikke som en fast månedlig besparelse.'}</p>`:'');
+  if(!suggestions.length)return historyNote+(h?.months_analyzed?`<p class="analysis-note">${(goal.analysis.skipped_suggestions?.length || goal.analysis.permanently_skipped_suggestions?.length)?'Ingen flere relevante spareforslag efter dine fravalg.':'Ingen sikre forslag ud fra gentagne og fortsat aktuelle køb. Engangskøb regnes ikke som en fast månedlig besparelse.'}</p>`:'');
   const more=suggestions.slice(3);
   const rows=items=>items.map(item=>savingsSuggestion(item,goal.currency,goal)).join('');
   return `<div class="goal-suggestions"><h4>${goal.analysis.monthly_shortfall?'Forslag til at lukke forskellen':'Muligheder hvis du vil nå målet hurtigere'}</h4>${historyNote}<p class="muted">Scenarier for helt at stoppe køb. Beløbet kan kun spares, hvis det ikke bruges hos andre forhandlere.</p><p class="goal-suggestion-count">${suggestions.length===1?'Der er fundet 1 relevant forslag.':`Der er fundet ${suggestions.length} relevante forslag.`}</p><ul>${rows(suggestions.slice(0,3))}</ul>${more.length?`<details class="goal-more-suggestions"><summary><span class="suggestions-show-more">Vis ${more.length} flere forslag</span><span class="suggestions-show-less">Vis færre forslag</span></summary><ul>${rows(more)}</ul></details>`:''}${goal.analysis.projected_with_changes?`<p>Hvis du fastholder ${suggestions.length===1?'dette forslag':`alle ${suggestions.length} forslag`}, peger estimatet mod <strong>${esc(monthName(goal.analysis.projected_with_changes))}</strong>.</p>`:''}</div>`;
@@ -202,13 +204,21 @@ $('newSavingsGoal').addEventListener('click',()=>openSavings());
 $('savingsList').addEventListener('click',async event=>{
   const button=event.target.closest('[data-edit-savings],[data-delete-savings],[data-skip-suggestion],[data-restore-suggestion]');if(!button || savingsLoadedScope!==savingsScope())return;
   const goal=savingsGoals.find(g=>g.id===Number(button.dataset.editSavings || button.dataset.deleteSavings || button.dataset.skipSuggestion || button.dataset.restoreSuggestion));if(!goal)return;
-  if(button.hasAttribute('data-skip-suggestion') || button.hasAttribute('data-restore-suggestion')){
-    const scope=savingsLoadedScope, restoring=button.hasAttribute('data-restore-suggestion');
+  if(button.hasAttribute('data-skip-suggestion')){
+    const form=$('savingsSkipForm');
+    if(form.dataset.busy==='true')return;
+    Object.assign(form.dataset,{id:String(goal.id),merchant:button.dataset.merchant,month:goal.analysis.suggestion_month,scope:savingsLoadedScope});
+    $('savingsSkipText').textContent=`Hvor længe vil du udelade forslaget fra ${button.dataset.merchant} i målet “${goal.name}”?`;
+    showError('savingsSkipError','');$('savingsSkipDialog').showModal();
+    form.querySelector('[value="month"]').focus();return;
+  }
+  if(button.hasAttribute('data-restore-suggestion')){
+    const scope=savingsLoadedScope;
     button.disabled=true;showError('savingsError','');
     try{
-      await api('/api/savings-goals/'+goal.id+'/suggestion-skips?'+scope,{method:restoring?'DELETE':'PUT',body:JSON.stringify({merchant:button.dataset.merchant,month:goal.analysis.suggestion_month})});
+      await api('/api/savings-goals/'+goal.id+'/suggestion-skips?'+scope,{method:'DELETE',body:JSON.stringify({merchant:button.dataset.merchant,month:goal.analysis.suggestion_month,duration:button.dataset.duration || 'month'})});
       if(scope!==savingsScope())return;
-      toast(restoring?'Forslaget er taget med igen':'Forslaget er sprunget over denne måned');
+      toast('Forslaget er taget med igen');
       await refresh();
     }catch(error){if(scope===savingsScope())showError('savingsError',error.message);}
     finally{button.disabled=false;}
@@ -236,4 +246,28 @@ $('savingsDeleteForm').addEventListener('submit',async event=>{
   event.preventDefault();const button=event.submitter, form=event.currentTarget;button.disabled=true;showError('savingsDeleteError','');
   try{await api('/api/savings-goals/'+form.dataset.id+'?'+form.dataset.scope,{method:'DELETE'});$('savingsDeleteDialog').close();toast('Opsparingsmålet er slettet');await refresh();if(view==='savings')await loadSavings();}
   catch(error){showError('savingsDeleteError',error.message);}finally{button.disabled=false;}
+});
+
+$('savingsSkipDialog').addEventListener('cancel',event=>{
+  if($('savingsSkipForm').dataset.busy==='true')event.preventDefault();
+});
+$('savingsSkipForm').addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget;
+  if(form.dataset.busy==='true')return;
+  const {id,merchant,month,scope}=form.dataset, duration=event.submitter?.value || 'month';
+  const dialog=$('savingsSkipDialog'), buttons=dialog.querySelectorAll('button');
+  form.dataset.busy='true';buttons.forEach(button=>button.disabled=true);showError('savingsSkipError','');
+  try{
+    if(scope!==savingsScope())throw new Error('Visningen er ændret. Luk vinduet og åbn forslaget igen.');
+    await api('/api/savings-goals/'+id+'/suggestion-skips?'+scope,{method:'PUT',body:JSON.stringify({merchant,month,duration})});
+    dialog.close();
+    if(scope!==savingsScope())return;
+    toast(duration==='permanent'?'Forslaget er sprunget over permanent':'Forslaget er sprunget over denne måned');
+    await refresh();
+    if(scope===savingsScope() && view==='savings'){
+      const next=document.querySelector(`[data-skip-suggestion="${id}"]`) || document.querySelector(`[data-edit-savings="${id}"]`);
+      next?.focus({preventScroll:true});
+    }
+  }catch(error){showError('savingsSkipError',error.message);}
+  finally{form.dataset.busy='false';buttons.forEach(button=>button.disabled=false);}
 });

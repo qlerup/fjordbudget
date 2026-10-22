@@ -138,6 +138,49 @@ class SavingsSkipTests(unittest.TestCase):
         self.assertEqual(self.skip('Cafe 00', month='2000-01').status_code, 409)
         self.assertEqual(self.analysis()['skipped_suggestions'], [])
 
+    def test_permanent_skip_survives_month_changes_and_database_reopen(self):
+        before = self.analysis()
+        other = self.create_goal()
+        self.assertEqual(self.skip('Cafe 00', duration='permanent').status_code, 200)
+        initialize(self.db)
+        after = self.analysis()
+        self.assertEqual(after['skipped_suggestions'], [])
+        self.assertEqual(after['permanently_skipped_suggestions'], [{'name': 'Cafe 00'}])
+        self.assertEqual(after['potential_extra_saving'], before['potential_extra_saving'] - 48000)
+        self.assertEqual(after['suggestions'][0]['name'], 'Cafe 01')
+        self.assertEqual(self.analysis(other)['suggestions'][0]['name'], 'Cafe 00')
+        next_month = (self.today.replace(day=28) + timedelta(days=4)).replace(day=1)
+        result = build_insights(self.db, 'demo', 'DKK', today=next_month,
+                                period_start=self.start, period_end=self.end)
+        analysis = next(g['analysis'] for g in result['goals'] if g['id'] == self.goal)
+        self.assertEqual(analysis['permanently_skipped_suggestions'], [{'name': 'Cafe 00'}])
+        self.assertNotIn('Cafe 00', [s['name'] for s in analysis['suggestions']])
+        dashboard = self.client.get('/api/dashboard?source=demo').json
+        self.assertNotIn('Cafe 00', [s['name'] for s in dashboard['featured_goal']['analysis']['suggestions']])
+
+    def test_monthly_skip_can_be_promoted_and_permanent_skip_can_be_restored(self):
+        self.skip('Cafe 00')
+        self.skip('Cafe 00', duration='permanent')
+        self.skip('CAFE-00')  # Stale tabs do not downgrade the permanent choice.
+        self.assertEqual(self.analysis()['skipped_suggestions'], [])
+        self.assertEqual(self.analysis()['permanently_skipped_suggestions'], [{'name': 'Cafe 00'}])
+        self.assertEqual(self.skip('cafe 00', method='delete', duration='permanent', month='2000-01').status_code, 200)
+        self.assertEqual(self.analysis()['suggestions'][0]['name'], 'Cafe 00')
+        self.assertEqual(self.analysis()['permanently_skipped_suggestions'], [])
+        self.assertEqual(self.skip('cafe 00', method='delete', duration='permanent').status_code, 200)
+
+    def test_permanent_skip_validation_scope_and_goal_deletion(self):
+        for duration in (None, [], {}, '', 'forever'):
+            self.assertEqual(self.skip('Cafe 00', duration=duration).status_code, 400)
+        for scope in ('source=live', 'source=demo&currency=EUR'):
+            response = self.client.put(f'/api/savings-goals/{self.goal}/suggestion-skips?{scope}',
+                headers=self.headers, json={'merchant': 'Cafe 00', 'duration': 'permanent'})
+            self.assertEqual(response.status_code, 404)
+        self.skip('Cafe 00', duration='permanent')
+        self.client.delete(f'/api/savings-goals/{self.goal}?source=demo', headers=self.headers)
+        with connect(self.db) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM savings_suggestion_skips').fetchone()[0], 0)
+
 
 if __name__ == '__main__':
     unittest.main()

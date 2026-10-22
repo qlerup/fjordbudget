@@ -4,7 +4,7 @@ from math import ceil
 from statistics import median
 import re
 
-from db import connect, transaction_title
+from db import connect, transaction_title, PERMANENT_SAVINGS_SKIP_MONTH
 
 
 
@@ -463,10 +463,10 @@ def build_insights(db_path, source, currency, today=None, period_start=None, per
         suggestion_month = today.strftime('%Y-%m')
         skipped_by_goal = defaultdict(list)
         for row in db.execute(
-            '''SELECT s.goal_id,s.merchant_key,s.name FROM savings_suggestion_skips s
+            '''SELECT s.goal_id,s.merchant_key,s.name,s.month FROM savings_suggestion_skips s
                JOIN savings_goals g ON g.id=s.goal_id
-               WHERE g.source=? AND g.currency=? AND s.month=? ORDER BY s.name,s.merchant_key''',
-            (source, currency, suggestion_month)):
+               WHERE g.source=? AND g.currency=? AND s.month IN (?,?) ORDER BY s.name,s.merchant_key''',
+            (source, currency, suggestion_month, PERMANENT_SAVINGS_SKIP_MONTH)):
             skipped_by_goal[row['goal_id']].append(dict(row))
         for goal in goals:
             goal['manual_saved_amount'] = int(goal['saved_amount'] or 0)
@@ -478,7 +478,9 @@ def build_insights(db_path, source, currency, today=None, period_start=None, per
             account_ids = tuple(selected_by_goal[goal['id']])
             goal['analysis_account_ids'] = list(account_ids)
             skipped = skipped_by_goal[goal['id']]
-            excluded_keys = tuple(sorted(item['merchant_key'] for item in skipped))
+            permanent = [item for item in skipped if item['month'] == PERMANENT_SAVINGS_SKIP_MONTH]
+            permanent_keys = {item['merchant_key'] for item in permanent}
+            excluded_keys = tuple(sorted({item['merchant_key'] for item in skipped}))
             profile_key = (account_ids, excluded_keys)
             if profile_key not in scoped_profiles:
                 period_profile = (
@@ -492,7 +494,10 @@ def build_insights(db_path, source, currency, today=None, period_start=None, per
             goal['analysis'] = _goal_analysis(goal, scoped_profiles[profile_key], today)
             goal['analysis']['suggestion_history'] = scoped_profiles[profile_key]['suggestion_history']
             goal['analysis']['suggestion_month'] = suggestion_month
-            goal['analysis']['skipped_suggestions'] = [{'name': item['name']} for item in skipped]
+            goal['analysis']['skipped_suggestions'] = [
+                {'name': item['name']} for item in skipped
+                if item['month'] == suggestion_month and item['merchant_key'] not in permanent_keys]
+            goal['analysis']['permanently_skipped_suggestions'] = [{'name': item['name']} for item in permanent]
 
     featured = next((goal for goal in goals if goal['featured']), goals[0] if goals else None)
     return {
