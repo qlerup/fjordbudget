@@ -89,6 +89,8 @@ class MerchantMatcher:
     """
 
     def __init__(self, rule_rows, manual_rows=()):
+        self.community = {}
+        self.last_community = False
         exact, stable, equivalent = defaultdict(set), defaultdict(set), defaultdict(set)
         anchors = defaultdict(lambda: defaultdict(lambda: {'rules': set(), 'manual_count': 0}))
         anchor_owners = defaultdict(set)
@@ -162,6 +164,25 @@ class MerchantMatcher:
                     self.anchors[anchor] = example['merchant']
 
     def match(self, description):
+        self.last_community = False
+        result = self.local_match(description)
+        if result is not None:
+            return result
+        if not self.community:
+            return None
+        if (transaction_rule_title(description) in self.ambiguous_stable
+                or _signature(description) in self.ambiguous_equivalent):
+            return None
+        from community_protocol import safe_pair
+        try:
+            text,_ = safe_pair(description,'Forhandler')
+        except ValueError:
+            return None
+        result = self.community.get(text)
+        self.last_community = result is not None
+        return result
+
+    def local_match(self, description):
         # All MobilePay transfers/payments use the payment method by default,
         # independently of the recipient. Explicit manual choices on individual
         # rows are protected by merchant_manual=1 in the caller.
@@ -206,7 +227,7 @@ class MerchantMatcher:
 
 def load_merchant_matcher(db, source):
     """Learn from all saved rules and historic manual labels in this source."""
-    return MerchantMatcher(
+    matcher = MerchantMatcher(
         db.execute('SELECT title,merchant FROM merchant_rules WHERE source=?',
                    (source,)).fetchall(),
         db.execute(
@@ -215,6 +236,9 @@ def load_merchant_matcher(db, source):
                WHERE a.source=? AND t.amount<0 AND t.merchant_manual=1
                  AND t.merchant IS NOT NULL AND trim(t.merchant)!=''
                GROUP BY t.description,t.merchant''', (source,)).fetchall())
+    from community import community_lookup
+    matcher.community = community_lookup(db,source)
+    return matcher
 
 
 def apply_learned_merchants(db, source):
@@ -222,13 +246,14 @@ def apply_learned_merchants(db, source):
     matcher = load_merchant_matcher(db, source)
     updates = []
     for row in db.execute(
-        '''SELECT t.id,t.description,t.merchant FROM transactions t
+        '''SELECT t.id,t.description,t.merchant,t.merchant_community FROM transactions t
            JOIN accounts a ON a.id=t.account_id
            WHERE a.source=? AND t.merchant_manual=0
              AND (t.amount<0 OR lower(trim(t.description)) LIKE 'mobilepay%')''', (source,)):
         merchant = matcher.match(row['description'])
-        if merchant is not None and row['merchant'] != merchant:
-            updates.append((merchant, row['id']))
+        if ((merchant is not None and (row['merchant'] != merchant or row['merchant_community'] != int(matcher.last_community)))
+                or (merchant is None and row['merchant_community'])):
+            updates.append((merchant,int(matcher.last_community),row['id']))
     db.executemany(
-        'UPDATE transactions SET merchant=?,merchant_manual=0 WHERE id=?', updates)
+        'UPDATE transactions SET merchant=?,merchant_community=?,merchant_manual=0 WHERE id=?', updates)
     return len(updates)

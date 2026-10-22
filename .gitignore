@@ -1,4 +1,6 @@
 .env
+server.env
+*.env
 secrets/*
 !secrets/.gitkeep
 data/

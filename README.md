@@ -73,6 +73,30 @@ Each scenario also shows its individual contribution by the goal's deadline, cap
 
 Use “Spring over” to choose between excluding a merchant for the current calendar month or permanently for that goal. The next relevant opportunity replaces it when available. Both choices persist across reloads and apply to the goal on the overview too; “Tag med igen” restores a suggestion. Monthly skips expire next month; permanent skips remain until restored. The selected analysis dates still determine the spending history. Nothing automatically changes budgets or transactions.
 
+## Shared merchant knowledge (optional)
+
+FjordBudget Server is a separate service for a dedicated LXC, with its own database,
+admin UI and moderation queue. See [server installation and operation](fjordbudget_server/README.md).
+Both app Compose files support `COMMUNITY_SERVER_URL=https://your-server` and
+`COMMUNITY_SERVER_PUBLIC_KEY` (the server's pinned public transport key).
+Each owner explicitly enables sharing in **Indstillinger**, with an explanation and
+preview of eligible saved bank-text → merchant pairs. Sharing is off by default.
+Only bank text and merchant name are contributed; balances, amounts, dates, accounts
+and categories stay private. Conservative filtering excludes transfers and risky
+texts, but is not a guarantee of anonymization. Review the preview before enabling.
+
+Participants can download approved rules while opted in. Their apps only need an
+outbound HTTPS connection; no public app address, inbound ports or port forwarding
+are required. Unknown/conflicting associations wait for the server owner's review.
+The merge dialog asks for a canonical merchant name; that name returns to the original
+contributor's saved rule and matching transactions, preserving newer local edits.
+Downloaded rules are kept separately and are never uploaded as new training data.
+This is a growing reviewed rule library, not an AI model trained on banking histories.
+App/server request and response bodies are authenticated and encrypted with the pinned
+server key on top of HTTPS; no plaintext fallback is accepted. Bank texts and merchant
+names are also encrypted in the server database, with key files stored separately.
+The server can decrypt for moderation; this is not a direct peer-to-peer network.
+
 ## Data and backup
 
 The local `fjordbudget_budget_data` volume holds SQLite plus encryption/session keys. Bank session IDs and remote account IDs use Fernet; transactions and budget data are not encrypted as a whole database. Protect the disk and backups.

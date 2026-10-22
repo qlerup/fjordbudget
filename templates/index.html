@@ -9,6 +9,8 @@
   <script src="/static/app.js?v=spending-review-pages-20261022" defer></script>
   <script src="/static/savings.js?v=next-month-20261023" defer></script>
   <script src="/static/merchants.js?v=category-merchant-choice-20261007" defer></script>
+  <script src="/static/community.js?v=community-20261023" defer></script>
+  <link rel="stylesheet" href="/static/community.css?v=community-20261023">
 <link rel="apple-touch-icon" href="/static/logos/icon-180.png?v=brand-budget-green-20261005"><meta name="theme-color" content="#28533f"><link rel="manifest" href="/static/site.webmanifest"><link rel="stylesheet" href="/static/hub-session.css?v=email-update1"><script defer src="/static/hub-session.js?v=email-update1"></script>
 </head>
 <body>
@@ -42,7 +44,8 @@
     <button class="nav-item" data-view="budget"><svg><use href="#icon-chart"/></svg>Mit budget</button>
     <button class="nav-item" data-view="savings" aria-label="Opsparingsmål"><svg><use href="#icon-target"/></svg>Opsparingsmål</button>
   <button class="nav-item" data-view="categories" aria-label="Kategorier"><svg><use href="#icon-tag"/></svg>Kategorier</button>
-  <button class="nav-item" data-view="merchants" aria-label="Forhandlere"><svg><use href="#icon-store"/></svg>Forhandlere</button></nav>
+  <button class="nav-item" data-view="merchants" aria-label="Forhandlere"><svg><use href="#icon-store"/></svg>Forhandlere</button>
+  <button class="nav-item" id="openSettings" type="button" aria-label="Indstillinger"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-2Z"/></svg>Indstillinger</button></nav>
   <p class="nav-label second-label">FORBINDELSER</p>
   <button class="nav-item" data-connect><svg><use href="#icon-bank"/></svg>Mine banker</button>
   <div class="sidebar-bottom"><div class="privacy-icon"><svg><use href="#icon-shield"/></svg></div><strong>Din økonomi. Dit overblik.</strong><p>Kun læseadgang til banken.<br>Ingen betalinger eller overførsler.</p><span class="local-status"><i></i> {{ 'Beskyttet med FjordHub-login' if managed else 'Kører lokalt på din computer' }}</span></div>
@@ -106,9 +109,10 @@
         <div class="table-scroll"><table><thead><tr><th>Postering</th><th>Konto</th><th>Kategori</th><th>Forhandler</th><th>Dato</th><th class="amount-cell">Beløb</th></tr></thead><tbody id="transactionRows"></tbody></table></div><div id="emptyTransactions" class="empty-state" hidden><svg><use href="#icon-search"/></svg><h3>Ingen posteringer her endnu</h3><p>Prøv en anden måned eller et andet filter.</p></div><div class="table-footer"><span id="transactionCount"></span><div><button id="previousPage" class="page-button" aria-label="Forrige side">←</button><span id="pageLabel"></span><button id="nextPage" class="page-button" aria-label="Næste side">→</button></div></div>
       </section>
     </div>
-    <footer class="main-footer"><span>fjordbudget <span>·</span> Plads til det, der betyder noget.</span><span>Dine data gemmes lokalt</span></footer>
+    <footer class="main-footer"><span>fjordbudget <span>·</span> Plads til det, der betyder noget.</span><span>Dine bankkonti og beløb gemmes lokalt</span></footer>
   </div>
 </main>
+{% include 'community.html' %}
 <dialog id="incompleteTransactionsDialog" class="incomplete-transactions-dialog" aria-labelledby="incompleteTransactionsTitle">
   <div class="dialog-header"><div><p class="eyebrow">MANGLER OPLYSNINGER</p><h2 id="incompleteTransactionsTitle">Posteringer der mangler</h2></div><button type="button" class="icon-button" data-close="incompleteTransactionsDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
   <p class="dialog-intro">Udfyld kategori og eventuelt forhandler. Når en postering er færdig, forsvinder den automatisk fra denne liste.</p>

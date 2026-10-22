@@ -1,0 +1,29 @@
+name: fjordbudget-server
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "${SERVER_BIND:-127.0.0.1}:8088:8088"
+    environment:
+      SERVER_URL: ${SERVER_URL:?Set the public HTTPS server URL}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?Set a generated password hash}
+      DATA_DIR: /data
+      TZ: Europe/Copenhagen
+    volumes:
+      - community_data:/data
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import os,urllib.request; r=urllib.request.Request('http://127.0.0.1:8088/api/health',headers={'Host':__import__('urllib.parse',fromlist=['urlparse']).urlparse(os.environ['SERVER_URL']).netloc}); urllib.request.urlopen(r,timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  community_data:

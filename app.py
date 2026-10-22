@@ -23,6 +23,7 @@ from merchant_matching import apply_learned_merchants
 from db import CATEGORIES, COLORS, CURRENCIES, PERMANENT_SAVINGS_SKIP_MONTH, cents, connect, initialize, transaction_title, transaction_rule_title, category_list, budget_category_list
 from hub_auth import register_hub_auth
 from insights import build_insights, last_month_spending
+from community import register_community
 
 
 def merchant_key(value):
@@ -49,6 +50,8 @@ def create_app(config=None):
                       SESSION_COOKIE_NAME='fjordbudget_session', PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
                       APP_URL=os.environ.get('APP_URL', 'http://localhost:8060').rstrip('/'),
                       AUTO_SYNC_INTERVAL_SECONDS=os.environ.get('AUTO_SYNC_INTERVAL_SECONDS', '1800'),
+                      COMMUNITY_SERVER_URL=os.environ.get('COMMUNITY_SERVER_URL', ''),
+                      COMMUNITY_SERVER_PUBLIC_KEY=os.environ.get('COMMUNITY_SERVER_PUBLIC_KEY', ''),
                       SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
                       MAX_CONTENT_LENGTH=16384, TRUSTED_HOSTS=['localhost', '127.0.0.1'])
     if config:
@@ -756,7 +759,7 @@ def create_app(config=None):
 
             # A user-confirmed choice is authoritative. Inferred matches are not
             # marked manual and can safely be revised when the rules improve.
-            db.execute('UPDATE transactions SET merchant=?,merchant_manual=1 WHERE id=?',
+            db.execute('UPDATE transactions SET merchant=?,merchant_manual=1,merchant_community=0 WHERE id=?',
                        (merchant, transaction_id))
             # Confirmed choices train the matcher even when the user has not
             # explicitly saved a reusable rule. Multiple examples are required
@@ -1065,4 +1068,5 @@ def create_app(config=None):
     if not app.testing and auto_sync_interval > 0:
         threading.Thread(target=auto_sync_loop, daemon=True, name='fjordbudget-auto-sync').start()
 
+    register_community(app,db_path,cipher)
     return app

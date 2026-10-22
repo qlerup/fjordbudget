@@ -1,0 +1,18 @@
+<dialog id="communityDialog" class="community-dialog" aria-labelledby="communityTitle">
+  <div class="dialog-header"><div><p class="eyebrow">INDSTILLINGER</p><h2 id="communityTitle">Lær sammen med andre.</h2></div><button type="button" class="icon-button" data-close="communityDialog" aria-label="Luk"><svg><use href="#icon-close"/></svg></button></div>
+  <p class="dialog-intro">Hjælp FjordBudget med at genkende forhandlere, og få adgang til de banktekster, andre allerede har lært appen.</p>
+  <div class="community-explainer"><strong>Hvad er en banktekst?</strong><p>Det er beskrivelsen af et køb fra banken, fx <code>MCD 05755 STJERNE KEBAB</code>. Når du gemmer navnet <strong>Stjerne Kebab</strong>, lærer appen, hvilken forhandler teksten hører til.</p><p>Kun bankteksten og det gemte forhandlernavn deles. Beløb, datoer, konti, saldi og kategorier sendes ikke med.</p></div>
+  <div id="communityError" class="error-box" role="alert" hidden></div>
+  <p id="communityLoading" class="muted" role="status">Henter indstillinger …</p>
+  <form id="communityForm" hidden>
+    <div class="community-consent"><label class="checkbox-row"><input id="communityEnabled" type="checkbox"><span><strong>Del mine gemte banktekster</strong><small>Jeg vil dele egnede, gemte kortkøb med FjordBudget Server og hente fælles, godkendte regler. Nye gemte banktekster deles automatisk.</small></span></label></div>
+    <p class="small muted">Delingen er krypteret direkte mellem din app og FjordBudget Server, oven på HTTPS. Serveren kan læse teksterne for at godkende dem og gemmer banktekst og navn krypteret. Andre deltagere får kun de godkendte regler.</p>
+    <p class="small muted">Administratorens godkendte forhandlernavn sendes tilbage og opdaterer din delte huskeregel og de tilhørende posteringer. En nyere lokal rettelse bliver ikke overskrevet af et ældre svar.</p>
+    <p class="small muted">Når du slår deling til, sendes dine eksisterende, egnede huskeregler først til serveren. Dine nuværende navne bruges fortsat, mens noget venter på manuel godkendelse. Et afventende eller afvist bidrag ændrer ikke dine navne.</p>
+    <p class="small muted">Banktekster kan indeholde personlige oplysninger. Kontrollér forhåndsvisningen, før du deler. Overførsler, MobilePay, løn og tekster med lange tal eller kontaktoplysninger udelades automatisk. Filteret kan ikke opdage alle personnavne.</p>
+    <details class="community-preview"><summary id="communityPreviewCount">Se, hvad der kan blive delt</summary><div class="table-scroll"><table><thead><tr><th>Banktekst</th><th>Forhandler</th></tr></thead><tbody id="communityPreview"></tbody></table></div><p id="communityExcluded" class="small muted"></p></details>
+    <div class="community-state"><span id="communityState" role="status"></span><small id="communityServer" class="muted"></small><small id="communityLastSync" class="muted"></small></div>
+    <p class="small muted">Slår du deling fra, stopper afsendelse og fælles opslag, og den hentede regelkopi slettes lokalt. Godkendte bidrag bevares på serveren. Dine egne huskeregler og allerede godkendte navnerettelser bevares.</p>
+    <div class="dialog-actions"><button type="button" class="button quiet" id="communitySync">Synkroniser nu</button><button type="submit" class="button primary" id="communitySave">Gem valg</button></div>
+  </form>
+</dialog>

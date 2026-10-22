@@ -1,0 +1,13 @@
+FROM python:3.13-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 DATA_DIR=/data
+WORKDIR /app
+COPY fjordbudget_server/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+    && useradd --uid 10001 --create-home community \
+    && mkdir /data && chown community:community /data
+COPY --chown=community:community community_protocol.py ./
+COPY --chown=community:community community_crypto.py ./
+COPY --chown=community:community fjordbudget_server ./fjordbudget_server
+USER community
+EXPOSE 8088
+CMD ["gunicorn", "--bind", "0.0.0.0:8088", "--workers", "1", "--threads", "8", "--timeout", "60", "--access-logfile", "/dev/null", "fjordbudget_server.app:create_app()"]

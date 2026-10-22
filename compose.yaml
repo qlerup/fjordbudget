@@ -6,6 +6,8 @@ services:
       - "127.0.0.1:8060:8080"
     environment:
       APP_URL: http://localhost:8060
+      COMMUNITY_SERVER_URL: ${COMMUNITY_SERVER_URL:-}
+      COMMUNITY_SERVER_PUBLIC_KEY: ${COMMUNITY_SERVER_PUBLIC_KEY:-}
       ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-}
       ENABLE_BANKING_KEY_FILE: /run/secrets/enablebanking.pem
       TZ: Europe/Copenhagen

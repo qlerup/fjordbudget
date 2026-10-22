@@ -169,15 +169,16 @@ def import_account(db_path, account_id, transactions, balances):
             rule = rules.get(title) or stable_category_rules.get(signature)
             merchant_rule = merchant_matcher.match(row[2])
             row = (*row[:-1], rule or (row[-1] if row[-1] in categories else 'Andet'), int(rule is not None))
-            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual,merchant,merchant_manual)
-              VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
+            db.execute('''INSERT INTO transactions(account_id,external_id,booked_on,description,amount,currency,category,category_manual,merchant,merchant_manual,merchant_community)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account_id,external_id) DO UPDATE SET
               booked_on=excluded.booked_on, description=excluded.description, amount=excluded.amount,
               currency=excluded.currency,
               category=CASE WHEN excluded.category_manual=1 THEN excluded.category WHEN transactions.category_manual=1 THEN transactions.category ELSE excluded.category END,
               category_manual=MAX(transactions.category_manual,excluded.category_manual),
               merchant=CASE WHEN transactions.merchant_manual=1 THEN transactions.merchant ELSE excluded.merchant END,
-              merchant_manual=transactions.merchant_manual''',
-                       (account_id, *row, merchant_rule, 0))
+              merchant_manual=transactions.merchant_manual,
+              merchant_community=CASE WHEN transactions.merchant_manual=1 THEN 0 ELSE excluded.merchant_community END''',
+                       (account_id, *row, merchant_rule, 0,int(merchant_matcher.last_community)))
         db.execute('UPDATE accounts SET balance=?,balance_type=?,synced_at=? WHERE id=?',
                    (cents(balance['balance_amount']['amount']) if balance else None,
                     balance['balance_type'] if balance else None, datetime.now(timezone.utc).isoformat(), account_id))

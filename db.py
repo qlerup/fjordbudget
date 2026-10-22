@@ -83,6 +83,17 @@ def initialize(path):
           source TEXT NOT NULL CHECK(source IN ('demo','live')),
           title TEXT NOT NULL, merchant TEXT NOT NULL,
           PRIMARY KEY(source,title));
+        CREATE TABLE IF NOT EXISTS community_settings (
+          id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL DEFAULT 0,
+          client_id TEXT NOT NULL, credential TEXT NOT NULL,
+          cursor INTEGER NOT NULL DEFAULT 0, revoke_pending INTEGER NOT NULL DEFAULT 0,
+          last_sync TEXT, error TEXT, consent_version TEXT, resolution_cursor TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS community_rules (
+          bank_key TEXT PRIMARY KEY, merchant TEXT NOT NULL, revision INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS community_sent (
+          title TEXT PRIMARY KEY, bank_text TEXT NOT NULL,
+          submitted_merchant TEXT NOT NULL, local_merchant TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending');
         CREATE TABLE IF NOT EXISTS merchant_preferences (
           source TEXT NOT NULL CHECK(source IN ('demo','live')),
           merchant_key TEXT NOT NULL, name TEXT NOT NULL,
@@ -145,6 +156,8 @@ def initialize(path):
             db.execute('ALTER TABLE transactions ADD COLUMN merchant TEXT')
         if 'merchant_manual' not in transaction_columns:
             db.execute('ALTER TABLE transactions ADD COLUMN merchant_manual INTEGER NOT NULL DEFAULT 0')
+        if 'merchant_community' not in transaction_columns:
+            db.execute('ALTER TABLE transactions ADD COLUMN merchant_community INTEGER NOT NULL DEFAULT 0')
         goal_columns = {row[1] for row in db.execute('PRAGMA table_info(savings_goals)')}
         if 'saved_amount' not in goal_columns:
             db.execute('ALTER TABLE savings_goals ADD COLUMN saved_amount INTEGER NOT NULL DEFAULT 0')

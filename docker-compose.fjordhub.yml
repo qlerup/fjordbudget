@@ -19,6 +19,8 @@ services:
       - "${APP_PORT:-8060}:8080"
     environment:
       AUTH_MODE: fjordhub
+      COMMUNITY_SERVER_URL: ${COMMUNITY_SERVER_URL:-}
+      COMMUNITY_SERVER_PUBLIC_KEY: ${COMMUNITY_SERVER_PUBLIC_KEY:-}
       FJORDHUB_URL: ${FJORDHUB_URL:?FjordHub URL required}
       FJORDHUB_API_KEY: ${FJORDHUB_API_KEY:?FjordHub key required}
       DATA_DIR: /data
