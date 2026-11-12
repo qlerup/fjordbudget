@@ -2,6 +2,7 @@
   <summary><span><strong>Kom i gang gratis — trin for trin</strong><small>Opret din egen Enable Banking-adgang og forbind dine konti.</small></span><span aria-hidden="true">⌄</span></summary>
   <div class="bank-guide-content">
     <div class="bank-guide-notice"><strong>Første gang godkender du to steder</strong><p>Først tilknytter du dine konti på Enable Bankings hjemmeside. Derefter forbinder du banken her i FjordBudget. Du skal ikke lave begge trin ved hver opdatering. Guiden er til privat, ikke-kommerciel brug af dine egne konti under Enable Bankings vilkår.</p></div>
+    <div class="bank-guide-notice"><strong>Hav dette klar, før du starter</strong><p>Din egen e-mail, adgang til netbanken og bankens godkendelse (fx MitID). Åbn og log ind på den installation, du vil forbinde — også når du hjælper en anden person. Du skal kunne downloade en nøglefil og finde den igen i trin 4. Brug knapperne nedenfor til Enable Banking; du behøver ikke søge efter siderne selv.</p></div>
     <p id="bankGuideHttpsWarning" class="error-box" hidden>Åbn FjordBudget på dit endelige <strong>https://-domæne</strong>, og log ind dér, før du opretter API-applikationen. Returadressen nedenfor skal være offentligt tilgængelig via HTTPS; en lokal IP-adresse er ikke nok til denne opsætning.</p>
 
     <details class="bank-guide-step" data-bank-step="1" open>
@@ -30,6 +31,7 @@
           <div><dt>Allowed redirect URLs / Redirect URLs</dt><dd><code id="callbackUrl"></code><button type="button" class="button" data-bank-copy="callbackUrl" aria-label="Kopiér returadresse">Kopiér</button><small>Kopiér hele adressen inklusive <strong>/bank/callback</strong>. Har samme API-applikation flere returadresser, skrives de på hver sin linje.</small></dd></div>
           <div><dt>Allowed widget origins / Allowed webhook origins</dt><dd>Lad begge felter være tomme. FjordBudget bruger dem ikke.</dd></div>
         </dl>
+        <p>Adresserne ovenfor er beregnet til netop denne installation. Kopiér dem hver til sit tilsvarende felt hos Enable Banking. Brug ikke adresser fra en anden persons FjordBudget.</p>
         <p>Tryk <strong>Register</strong> for at oprette applikationen. Navnet og oplysningerne kan senere ændres via de tre prikker → <strong>Edit</strong> → <strong>Save</strong>.</p>
         <div class="bank-guide-actions"><a class="button" href="https://enablebanking.com/cp/applications" target="_blank" rel="noreferrer">Åbn API applications ↗</a><button type="button" class="button primary" data-bank-next="3">Videre til trin 3</button></div>
       </div>
@@ -38,10 +40,10 @@
     <details class="bank-guide-step" data-bank-step="3">
       <summary><span class="bank-guide-number">3</span><strong>Tilknyt dine konti på Enable Bankings hjemmeside</strong><span aria-hidden="true">⌄</span></summary>
       <div class="bank-guide-step-body">
-        <ol><li>Find din nye FjordBudget-applikation på Enable Bankings hjemmeside.</li><li>Tryk <strong>Activate by linking accounts</strong>. Har du allerede tilknyttede konti, hedder knappen <strong>Link accounts</strong> nederst under listen <strong>Linked accounts</strong>.</li><li>Vælg <strong>Denmark</strong>, din bank og dine private konti. Godkend i bankens flow med MitID, hvis banken beder om det.</li><li>Vælg de konti, du vil bruge, og bekræft tilknytningen. Kontrollér, at de står under <strong>Linked accounts</strong>.</li><li>Gentag via <strong>Link accounts</strong>, hvis du har flere banker eller senere tilføjer flere konti.</li></ol>
+        <ol><li>Åbn applikationslisten med knappen nedenfor, og find din nye FjordBudget-applikation.</li><li>Tryk <strong>Activate by linking accounts</strong>. Har du allerede tilknyttede konti, hedder knappen <strong>Link accounts</strong> nederst under listen <strong>Linked accounts</strong>.</li><li>Vælg <strong>Denmark</strong>, din bank og dine private konti. Godkend i bankens flow med MitID, hvis banken beder om det.</li><li>Vælg de konti, du vil bruge, og bekræft tilknytningen. Kontrollér, at de står under <strong>Linked accounts</strong>.</li><li>Gentag via <strong>Link accounts</strong>, hvis du har flere banker eller senere tilføjer flere konti.</li></ol>
         <div class="bank-guide-notice"><strong>“Active” og “Restricted” er den forventede gratis opsætning</strong><p>Kun de konti, der står under “Linked accounts”, kan hentes. Banken kan godt være på FjordBudgets bankliste, selv om du endnu ikke har tilknyttet dine konti dér. Du behøver ikke vælge <strong>Request unrestriction</strong>; fuld aktivering kræver en særskilt aftale med Enable Banking.</p></div>
         <p>Denne tilknytning giver API-applikationen adgang til dine egne konti. Den opretter ikke FjordBudgets banksamtykke — det gør du i trin 5.</p>
-        <div class="bank-guide-actions"><a class="button" href="https://enablebanking.com/cp/applications" target="_blank" rel="noreferrer">Åbn Linked accounts ↗</a><button type="button" class="button primary" data-bank-next="4">Videre til trin 4</button></div>
+        <div class="bank-guide-actions"><a class="button" href="https://enablebanking.com/cp/applications" target="_blank" rel="noreferrer">Åbn applikationer ↗</a><button type="button" class="button primary" data-bank-next="4">Videre til trin 4</button></div>
       </div>
     </details>
 
@@ -49,6 +51,7 @@
       <summary><span class="bank-guide-number">4</span><strong>Gem app-id og privat nøgle i FjordBudget</strong><span aria-hidden="true">⌄</span></summary>
       <div class="bank-guide-step-body">
         <ol><li>Kopiér <strong>Application ID / App-id</strong> fra Enable Banking. Det står ved applikationens navn og ligner <code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code>.</li><li>Tryk på knappen nedenfor og indsæt id'et i feltet <strong>App-id</strong>.</li><li>Vælg den downloadede <strong>.pem-fil</strong>, eller indsæt hele dens tekst i feltet <strong>Privat API-nøgle</strong>. Medtag både BEGIN- og END-linjen. Brug den private nøgle, ikke det offentlige certifikat.</li><li>Tryk <strong>Gem og fortsæt</strong>. Nøglen gemmes krypteret i denne installation.</li></ol>
+        <p><strong>På iPhone/iPad:</strong> Find den downloadede nøgle i appen <strong>Arkiver → Downloads/Overførsler</strong> (under iCloud Drive eller På min iPhone). Brug filvælgeren ved <strong>Privat API-nøgle</strong> i FjordBudget. Filen hedder normalt dit app-id efterfulgt af <strong>.pem</strong>; kontrollér, at den hører til samme applikation som id'et.</p>
         <p>Har du mistet nøglefilen, hjælper det ikke at kopiere app-id'et igen. Opret en ny API-applikation med en ny privat nøgle, og tilknyt dine konti til den.</p>
         <div class="bank-guide-actions"><button type="button" class="button primary" data-bank-target="credentials">Indsæt API-oplysninger</button><button type="button" class="text-button" data-bank-next="5">Vis næste trin</button></div>
       </div>
@@ -66,7 +69,8 @@
     <details class="bank-guide-step" data-bank-step="6">
       <summary><span class="bank-guide-number">6</span><strong>Vælg konti og få dit overblik</strong><span aria-hidden="true">⌄</span></summary>
       <div class="bank-guide-step-body">
-        <p>Vælg, hvilke hentede konti der skal med i FjordBudget, og giv dem eventuelt egne navne. Appen kan derefter opdatere automatisk, eller du kan bruge <strong>Opdater</strong>. Når banksamtykket udløber, godkender du forbindelsen igen.</p>
+        <p>Vælg, hvilke hentede konti der skal med i FjordBudget, og giv dem eventuelt egne navne. Appen kan derefter opdatere automatisk, eller du kan bruge <strong>Opdater saldi</strong>. Når banksamtykket udløber, godkender du forbindelsen igen.</p>
+        <p><strong>Sådan ved du, at det virker:</strong> Under <strong>Mine konti</strong> skal du se dine egne konti og saldi. Kontrollér, at du ikke står i demovisningen, og tryk <strong>Opdater saldi</strong>. Kontrollér også, at bankens posteringer vises. Hvor langt historikken går tilbage, afhænger af banken.</p>
         <p><strong>Ingen konti efter godkendelsen?</strong> Åbn Enable Banking → din applikation → <strong>Linked accounts</strong>. Tilknyt de manglende konti med <strong>Link accounts</strong>, og forbind derefter banken igen i FjordBudget. Kontrollér også, at du bruger Production og app-id/nøgle fra den samme applikation.</p>
         <p><strong>Forkert returadresse?</strong> Log ind på dit endelige domæne, åbn guiden igen, og kopiér den viste returadresse. Ret den hos Enable Banking via de tre prikker → Edit → Redirect URLs → Save.</p>
         <div class="bank-guide-actions"><button type="button" class="button primary" data-bank-target="picker">Tilbage til banktilknytning</button></div>
