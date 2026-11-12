@@ -93,6 +93,27 @@ class LocalAuthTests(unittest.TestCase):
         result=other.get('/login',headers={'X-Forwarded-Proto':'https'},environ_overrides={'REMOTE_ADDR':'192.168.1.50'})
         self.assertNotIn('Secure;',result.headers.get('Set-Cookie',''))
 
+    def test_public_https_setup_behind_http_proxy_uses_configured_origin(self):
+        self.app.config['APP_URL']='https://tommy.example.test'
+        client=self.app.test_client()
+        upstream='http://tommy.example.test'
+        page=client.get('/setup',base_url=upstream,
+                        environ_overrides={'REMOTE_ADDR':'192.168.1.50'})
+        self.assertIn('Secure;',page.headers.get('Set-Cookie',''))
+        csrf=re.search(r'name="csrf" value="([^"]+)"',page.text)[1]
+        data={'csrf':csrf,'username':'','password':'','password2':''}
+        reply=client.post('/setup',base_url=upstream,data=data,
+                          headers={'Origin':'https://tommy.example.test'},
+                          environ_overrides={'REMOTE_ADDR':'192.168.1.50'})
+        self.assertEqual(reply.status_code,400)
+        self.assertIn('Vælg et brugernavn',reply.text)
+        foreign=client.post('/setup',base_url=upstream,data=data,
+                            headers={'Origin':'https://other.example.test'})
+        self.assertEqual(foreign.status_code,403)
+        self.assertIn('Forespørgslen skal komme fra denne app.',foreign.text)
+        with connect(self.app.extensions['db_path']) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM local_owner').fetchone()[0],0)
+
     def test_auto_managed_configuration_skips_local_setup_and_partial_config_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             managed=create_app({'TESTING':True,'DATA_DIR':directory,'FJORDHUB_URL':'http://hub.test','FJORDHUB_API_KEY':'test-key'})

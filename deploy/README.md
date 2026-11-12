@@ -47,6 +47,12 @@ ordinary API writes use the existing CSRF protection. Sessions expire after 12 h
 
 ## A domain via an existing proxy or FjordHub
 
+Before first setup on a public domain, set `APP_URL=https://your-budget-domain.example`
+in `/etc/fjordbudget.env` and restart `fjordbudget`. Replace the example with the
+actual domain. Keep the scheme as HTTPS even when the proxy connects to the app
+over HTTP. The exact configured domain is recognized as HTTPS without relying
+on forwarded headers.
+
 Point the tunnel/proxy to `http://<LXC-IP>:8060`. Preserve the original Host header.
 Add the proxy's exact LAN IP to `TRUSTED_PROXY_IPS` in `/etc/fjordbudget.env`, then
 restart the service. Only those addresses can supply `X-Forwarded-Proto: https`.
@@ -58,6 +64,14 @@ assigned after the initial LAN installation. The configured LAN URL stays usable
 Open and log in through the final domain before copying the banking callback;
 the callback keeps the same browser origin so bank consent cookies work correctly.
 No FjordHub membership is needed merely because its proxy routes the domain.
+
+If setup reports “Forespørgslen skal komme fra denne app.”, check `APP_URL`
+against the address in the browser. A public HTTPS domain with a stale LAN HTTP
+configuration and an unrecognized proxy causes the form origin to be rejected.
+Correct `APP_URL`, restart the service, reload the setup page, and retry.
+For a domain change without updating `APP_URL`, the immediate proxy must be in
+`TRUSTED_PROXY_IPS` and must supply `X-Forwarded-Proto: https`.
+Do not remove the origin or CSRF checks to work around this error.
 
 ## Update, backup and recovery
 
